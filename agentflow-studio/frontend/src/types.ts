@@ -292,3 +292,25 @@ export interface ChatSendResult {
   runId?: string;
   provider?: string;
 }
+
+export interface QueueItem {
+  id: string;
+  taskId: string;
+  step: string;
+  label: string;
+  provider: string;
+  status: string; // queued | awaiting_approval | blocked | running | done | failed | skipped | cancelled
+  source: string;
+  enqueuedAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  note: string | null;
+  runId: string | null;
+}
+
+export interface QueueState {
+  items: QueueItem[];
+  mode: string;
+  activeCount: number;
+  runningProviders: string[];
+}

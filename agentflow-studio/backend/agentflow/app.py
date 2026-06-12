@@ -2,17 +2,28 @@
 
 from __future__ import annotations
 
+import asyncio
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import __version__, paths
-from .api import routes_agents, routes_chat, routes_logs, routes_projects, routes_tasks, routes_usage
+from . import __version__, paths, queue_service
+from .api import routes_agents, routes_chat, routes_logs, routes_projects, routes_queue, routes_tasks, routes_usage
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    # The dispatcher cues queued steps to agents for as long as the app runs.
+    dispatcher = asyncio.create_task(queue_service.dispatcher_loop())
+    yield
+    dispatcher.cancel()
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="AgentFlow Studio", version=__version__)
+    app = FastAPI(title="AgentFlow Studio", version=__version__, lifespan=_lifespan)
 
     app.add_middleware(
         CORSMiddleware,
@@ -32,6 +43,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_usage.router, prefix="/api/usage", tags=["usage"])
     app.include_router(routes_logs.router, prefix="/api/logs", tags=["logs"])
     app.include_router(routes_chat.router, prefix="/api/chat", tags=["chat"])
+    app.include_router(routes_queue.router, prefix="/api/queue", tags=["queue"])
 
     @app.get("/api/health")
     def health() -> dict:

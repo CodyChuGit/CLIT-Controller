@@ -2,9 +2,100 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { ArrowRight, Close, FileIcon, Inbox, Spinner, StopSquare } from "../components/icons";
 import StatusBadge from "../components/StatusBadge";
-import type { RunInfo, StepPreview, StepState, TaskDetail, TaskEvent, TaskMeta } from "../types";
+import type { QueueState, RunInfo, StepPreview, StepState, TaskDetail, TaskEvent, TaskMeta } from "../types";
 
 const STEP_ORDER = ["codex_spec", "claude_implement", "gemini_qa", "codex_review", "claude_fix"];
+
+/** What the orchestrator has cued up — the system dispatches each item to its agent. */
+function QueuePanel({
+  queue,
+  onApprove,
+  onRemove,
+  onClear,
+  onSelectTask,
+}: {
+  queue: QueueState;
+  onApprove: (id: string) => void;
+  onRemove: (id: string) => void;
+  onClear: () => void;
+  onSelectTask: (taskId: string) => void;
+}) {
+  return (
+    <section className="card overflow-hidden">
+      <div className="flex items-center gap-2 border-b border-neutral-200 px-3 py-1.5 dark:border-neutral-800">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+          Execution queue{queue.activeCount > 0 ? ` (${queue.activeCount} active)` : ""}
+        </span>
+        {queue.mode === "manual_approval" && (
+          <span className="rounded bg-amber-100 px-1.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+            manual approval
+          </span>
+        )}
+        <span className="flex-1" />
+        {queue.items.some((i) => i.status !== "running") && (
+          <button
+            onClick={onClear}
+            title="Clear queue (running items survive)"
+            aria-label="Clear queue"
+            className="focusable cursor-pointer rounded p-1 text-neutral-400 transition-colors duration-150 hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
+          >
+            <Close className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      {queue.items.length === 0 ? (
+        <p className="px-3 py-2.5 text-xs text-neutral-500">
+          Queue is empty — the orchestrator cues steps here (ask it in the chat), and the system runs them
+          one per agent, in order.
+        </p>
+      ) : (
+        queue.items.map((item) => (
+          <div
+            key={item.id}
+            className="flex items-center gap-2 border-b border-neutral-100 px-3 py-1.5 last:border-0 dark:border-neutral-800/60"
+          >
+            {item.status === "running" ? (
+              <Spinner className="h-3 w-3 shrink-0 text-blue-500" />
+            ) : (
+              <StatusBadge state={item.status} />
+            )}
+            <span className="text-xs font-medium">{item.label}</span>
+            <span className="chip">{item.provider}</span>
+            <button
+              onClick={() => onSelectTask(item.taskId)}
+              title={`Select task ${item.taskId}`}
+              className="focusable min-w-0 cursor-pointer truncate rounded font-mono text-[10px] text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400"
+            >
+              {item.taskId}
+            </button>
+            {item.note && (
+              <span className="min-w-0 flex-1 truncate text-[10px] text-amber-600 dark:text-amber-400" title={item.note}>
+                {item.note}
+              </span>
+            )}
+            <span className="flex-1" />
+            {(item.status === "blocked" || item.status === "awaiting_approval") && (
+              <button className="btn-primary px-2 py-0.5 text-[11px]" onClick={() => onApprove(item.id)}>
+                Approve
+              </button>
+            )}
+            {item.status !== "running" && (
+              <button
+                onClick={() => onRemove(item.id)}
+                title="Remove from queue"
+                aria-label={`Remove ${item.label} from queue`}
+                className="focusable cursor-pointer rounded p-0.5 text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400"
+              >
+                <Close className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        ))
+      )}
+    </section>
+  );
+}
 
 const SPECIAL_ARTIFACTS: Record<string, string> = {
   "@code": "production code",
@@ -375,8 +466,30 @@ export default function TasksPage() {
   const [error, setError] = useState<string | null>(null);
   const [taskFile, setTaskFile] = useState<{ name: string; content: string } | null>(null);
   const [reviewAgent, setReviewAgent] = useState<string | null>(null);
+  const [queue, setQueue] = useState<QueueState | null>(null);
   const fileViewerRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<number | null>(null);
+
+  const loadQueue = useCallback(async () => {
+    try {
+      setQueue(await api.queue());
+    } catch {
+      /* no workspace or backend away */
+    }
+  }, []);
+
+  // The dispatcher works in the background — keep the queue view live.
+  useEffect(() => {
+    void loadQueue();
+    const id = window.setInterval(loadQueue, 3000);
+    return () => window.clearInterval(id);
+  }, [loadQueue]);
+
+  // While the queue is executing, keep the selected task's detail fresh too.
+  const queueBusy = (queue?.items ?? []).some((i) => i.status === "running");
+  useEffect(() => {
+    if (queueBusy && selectedId) void loadDetail(selectedId);
+  }, [queueBusy, queue, selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadTasks = useCallback(async () => {
     try {
@@ -473,6 +586,15 @@ export default function TasksPage() {
     if (selectedId) await loadDetail(selectedId);
   };
 
+  const approveItem = async (id: string) => {
+    const res = await api.queueApprove(id);
+    if (res.status !== "started") setNotice(res.message ?? res.status);
+    setQueue(res.queue);
+  };
+
+  const removeItem = async (id: string) => setQueue(await api.queueRemove(id));
+  const clearQueue = async () => setQueue(await api.queueClear());
+
   const openFile = async (name: string) => {
     if (!selectedId) return;
     try {
@@ -527,6 +649,16 @@ export default function TasksPage() {
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
             {notice}
           </div>
+        )}
+
+        {queue && (
+          <QueuePanel
+            queue={queue}
+            onApprove={(id) => void approveItem(id)}
+            onRemove={(id) => void removeItem(id)}
+            onClear={() => void clearQueue()}
+            onSelectTask={setSelectedId}
+          />
         )}
 
         {tasks.length === 0 && !error && (

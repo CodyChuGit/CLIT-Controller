@@ -9,6 +9,7 @@ import type {
   InstallResult,
   LoginResult,
   LogsResponse,
+  QueueState,
   OrchestrationMode,
   Provider,
   Recommendation,
@@ -112,6 +113,14 @@ export const api = {
   // logs
   logs: () => get<LogsResponse>("/logs"),
   clearLogView: () => post<{ ok: boolean }>("/logs/clear-view"),
+
+  // queue
+  queue: () => get<QueueState>("/queue"),
+  queueAdd: (taskId: string, steps: string[]) => post<QueueState>("/queue/add", { taskId, steps }),
+  queueApprove: (itemId: string) =>
+    post<{ status: string; message?: string; queue: QueueState }>("/queue/approve", { itemId }),
+  queueRemove: (itemId: string) => post<QueueState>("/queue/remove", { itemId }),
+  queueClear: () => post<QueueState>("/queue/clear"),
 
   // chat
   chat: () => get<ChatState>("/chat"),

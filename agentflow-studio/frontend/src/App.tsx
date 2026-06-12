@@ -17,6 +17,7 @@ export default function App() {
   const [backendUp, setBackendUp] = useState(true);
   const [git, setGit] = useState<GitInfo | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
+  const [queuedCount, setQueuedCount] = useState(0);
 
   // Editor tabs live here so open files survive page switches.
   const [openFiles, setOpenFiles] = useState<EditorFile[]>([]);
@@ -43,13 +44,15 @@ export default function App() {
     if (!ws) {
       setGit(null);
       setUsage(null);
+      setQueuedCount(0);
       return;
     }
     try {
-      const [g, u] = await Promise.all([api.git(), api.usage()]);
+      const [g, u, q] = await Promise.all([api.git(), api.usage(), api.queue()]);
       if (wsRef.current === ws) {
         setGit(g);
         setUsage(u);
+        setQueuedCount(q.activeCount);
       }
     } catch {
       /* workspace cleared or backend briefly away — status bar shows what it has */
@@ -187,7 +190,14 @@ export default function App() {
         <ChatPanel workspacePath={project?.workspacePath ?? null} />
       </div>
 
-      <StatusBar backendUp={backendUp} project={project} git={git} usage={usage} onNavigate={setPage} />
+      <StatusBar
+        backendUp={backendUp}
+        project={project}
+        git={git}
+        usage={usage}
+        queuedCount={queuedCount}
+        onNavigate={setPage}
+      />
     </div>
   );
 }

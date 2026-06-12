@@ -14,6 +14,11 @@ const COLORS: Record<string, string> = {
   cancelled: "bg-neutral-400",
   idle: "bg-neutral-300 dark:bg-neutral-600",
   unchecked: "bg-neutral-300 dark:bg-neutral-600",
+  queued: "bg-neutral-400",
+  awaiting_approval: "bg-amber-500",
+  blocked: "bg-rose-500",
+  done: "bg-emerald-500",
+  skipped: "bg-amber-400",
 };
 
 export default function StatusBadge({ state, label }: { state: string; label?: string }) {

@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
-from . import config, git_service, paths, prompt_templates, task_service, usage_service
+from . import config, git_service, paths, prompt_templates, queue_service, task_service, usage_service
 from .process_runner import RUNNER, RunRecord, add_log_entry, now_iso
 from .provider_probe import AGENT_PROVIDER_IDS, resolve_executable
 from .redaction import redact
@@ -21,14 +21,28 @@ REPLAY_CLIP_CHARS = 1500  # per-message clip when replaying
 _pending: dict[str, str] = {}
 
 _TASK_DIRECTIVE_RE = re.compile(r"```agentflow-task\s*\n(.*?)```", re.DOTALL)
+_QUEUE_DIRECTIVE_RE = re.compile(r"```agentflow-queue\s*\n(.*?)```", re.DOTALL)
 
 
-def parse_task_directive(text: str) -> Optional[tuple[str, str]]:
-    """Extract (title, goal) from an ```agentflow-task``` block in a model reply."""
+def _parse_steps(raw: str) -> Optional[list[str]]:
+    """'full' → the standard sequence; otherwise a comma list of valid step ids."""
+    raw = raw.strip().lower()
+    if not raw:
+        return None
+    if raw == "full":
+        return list(task_service.FULL_SEQUENCE)
+    steps = [s.strip() for s in raw.split(",") if s.strip()]
+    if steps and all(s in task_service.STEP_DEFS for s in steps):
+        return steps
+    return None
+
+
+def parse_task_directive(text: str) -> Optional[tuple[str, str, Optional[list[str]]]]:
+    """Extract (title, goal, queue_steps) from an ```agentflow-task``` block."""
     m = _TASK_DIRECTIVE_RE.search(text or "")
     if not m:
         return None
-    title, goal_lines, in_goal = None, [], False
+    title, goal_lines, queue_steps, in_goal = None, [], None, False
     for line in m.group(1).splitlines():
         lower = line.lower()
         if lower.startswith("title:") and title is None:
@@ -37,12 +51,44 @@ def parse_task_directive(text: str) -> Optional[tuple[str, str]]:
         elif lower.startswith("goal:"):
             goal_lines.append(line[5:].strip())
             in_goal = True
+        elif lower.startswith("queue:"):
+            queue_steps = _parse_steps(line[6:])
+            in_goal = False
         elif in_goal and line.strip():
             goal_lines.append(line.strip())
     goal = " ".join(goal_lines).strip()
     if not title or not goal:
         return None
-    return title[:200], goal
+    return title[:200], goal, queue_steps
+
+
+def parse_queue_directive(text: str) -> Optional[tuple[str, list[str]]]:
+    """Extract (task_ref, steps) from an ```agentflow-queue``` block. task_ref may be 'latest'."""
+    m = _QUEUE_DIRECTIVE_RE.search(text or "")
+    if not m:
+        return None
+    task_ref, steps = None, None
+    for line in m.group(1).splitlines():
+        lower = line.lower()
+        if lower.startswith("task:"):
+            task_ref = line[5:].strip()
+        elif lower.startswith("steps:"):
+            steps = _parse_steps(line[6:])
+    if not task_ref or not steps:
+        return None
+    return task_ref, steps
+
+
+def _resolve_task_ref(workspace: Path, ref: str) -> Optional[str]:
+    tasks = task_service.list_tasks(workspace)
+    if not tasks:
+        return None
+    if ref.lower() in ("latest", "last", "newest"):
+        return tasks[0]["id"]
+    for t in tasks:
+        if t["id"] == ref or t["id"].endswith(ref) or ref in t["id"]:
+            return t["id"]
+    return None
 
 
 def _chat_file(workspace: Path) -> Path:
@@ -108,7 +154,11 @@ async def _workspace_summary(workspace: Path) -> str:
         git_line = "not a git repository"
     tasks = task_service.list_tasks(workspace)[:5]
     task_lines = "".join(f"\n- {t['id']}: {t['title']} ({t['status']})" for t in tasks) or " none yet"
-    return f"Workspace: {workspace} ({git_line})\nRecent AgentFlow tasks:{task_lines}"
+    return (
+        f"Workspace: {workspace} ({git_line})\n"
+        f"{queue_service.summary_line(workspace)}\n"
+        f"Recent AgentFlow tasks:{task_lines}"
+    )
 
 
 def _transcript(workspace: Path) -> str:
@@ -172,23 +222,44 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
             if record.status == "succeeded" and out:
                 append_message(workspace, "assistant", out, provider=provider,
                                durationMs=record.duration_ms)
-                # The orchestrator can create tasks via an ```agentflow-task``` block.
+                # The orchestrator can create tasks and queue steps via fenced blocks.
                 directive = parse_task_directive(out)
                 if directive is not None:
-                    title, goal = directive
+                    title, goal, queue_steps = directive
                     try:
                         meta = task_service.create_task(workspace, title, goal)
-                        append_message(
-                            workspace, "system",
-                            f"Task created by the orchestrator: {meta['id']} — review it on the Tasks tab.",
-                            provider=provider,
-                        )
+                        note = f"Task created by the orchestrator: {meta['id']}"
+                        if queue_steps:
+                            queue_service.add_steps(workspace, meta["id"], queue_steps, source="orchestrator")
+                            note += f" — {len(queue_steps)} step(s) queued; the system will cue each agent"
+                        append_message(workspace, "system", note + ". Review it on the Tasks tab.", provider=provider)
                         add_log_entry(
                             "chat", f"orchestrator created task {meta['id']}: {title}",
                             provider=provider, task_id=meta["id"],
                         )
                     except Exception as exc:  # noqa: BLE001 — never break the chat loop
                         append_message(workspace, "system", f"Could not create the task: {exc}", provider=provider)
+
+                queue_directive = parse_queue_directive(out)
+                if queue_directive is not None:
+                    ref, steps = queue_directive
+                    try:
+                        task_id = _resolve_task_ref(workspace, ref)
+                        if task_id is None:
+                            append_message(
+                                workspace, "system",
+                                f"Could not queue steps: no task matches `{ref}`.", provider=provider,
+                            )
+                        else:
+                            queue_service.add_steps(workspace, task_id, steps, source="orchestrator")
+                            append_message(
+                                workspace, "system",
+                                f"Orchestrator queued {len(steps)} step(s) for {task_id}: "
+                                f"{', '.join(steps)} — the system will cue each agent in order.",
+                                provider=provider,
+                            )
+                    except Exception as exc:  # noqa: BLE001
+                        append_message(workspace, "system", f"Could not queue steps: {exc}", provider=provider)
             elif record.status == "cancelled":
                 append_message(workspace, "system", "Response stopped.", provider=provider)
             else:

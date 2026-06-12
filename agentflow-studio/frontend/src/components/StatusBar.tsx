@@ -14,6 +14,7 @@ interface Props {
   project: CurrentProject | null;
   git: GitInfo | null;
   usage: Usage | null;
+  queuedCount: number;
   onNavigate: (page: PageId) => void;
 }
 
@@ -40,8 +41,8 @@ function Item({
   );
 }
 
-/** VS Code-style status bar: backend, workspace, branch, orchestration mode. */
-export default function StatusBar({ backendUp, project, git, usage, onNavigate }: Props) {
+/** VS Code-style status bar: backend, workspace, branch, queue, orchestration mode. */
+export default function StatusBar({ backendUp, project, git, usage, queuedCount, onNavigate }: Props) {
   const changed = git?.changedFileCount ?? 0;
   return (
     <footer
@@ -65,6 +66,13 @@ export default function StatusBar({ backendUp, project, git, usage, onNavigate }
           <GitBranch className="h-3 w-3" />
           {git.branch}
           {changed > 0 && <span className="tabular-nums text-amber-600 dark:text-amber-400">±{changed}</span>}
+        </Item>
+      )}
+
+      {queuedCount > 0 && (
+        <Item onClick={() => onNavigate("tasks")} title="Execution queue (open Tasks)">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-blue-500" aria-hidden="true" />
+          <span className="tabular-nums">{queuedCount} queued</span>
         </Item>
       )}
 

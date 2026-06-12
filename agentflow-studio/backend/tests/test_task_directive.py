@@ -1,4 +1,5 @@
-from agentflow.chat_service import parse_task_directive
+from agentflow.chat_service import parse_queue_directive, parse_task_directive
+from agentflow.task_service import FULL_SEQUENCE
 
 
 def test_parses_well_formed_block():
@@ -10,18 +11,39 @@ def test_parses_well_formed_block():
     )
     parsed = parse_task_directive(text)
     assert parsed is not None
-    title, goal = parsed
+    title, goal, queue_steps = parsed
     assert title == "Fix login crash"
     assert goal.startswith("The login screen crashes")
+    assert queue_steps is None
 
 
 def test_multiline_goal_is_joined():
     text = "```agentflow-task\ntitle: T\ngoal: line one\nline two continues\n```"
-    parsed = parse_task_directive(text)
-    assert parsed == ("T", "line one line two continues")
+    assert parse_task_directive(text) == ("T", "line one line two continues", None)
 
 
 def test_no_block_or_incomplete_returns_none():
     assert parse_task_directive("just chatting, no task here") is None
     assert parse_task_directive("```agentflow-task\ntitle: only a title\n```") is None
     assert parse_task_directive("") is None
+
+
+def test_task_block_with_queue_full():
+    text = "```agentflow-task\ntitle: T\ngoal: G\nqueue: full\n```"
+    parsed = parse_task_directive(text)
+    assert parsed is not None
+    assert parsed[2] == list(FULL_SEQUENCE)
+
+
+def test_task_block_with_queue_list_and_invalid():
+    ok = parse_task_directive("```agentflow-task\ntitle: T\ngoal: G\nqueue: codex_spec, gemini_qa\n```")
+    assert ok is not None and ok[2] == ["codex_spec", "gemini_qa"]
+    bad = parse_task_directive("```agentflow-task\ntitle: T\ngoal: G\nqueue: warp_drive\n```")
+    assert bad is not None and bad[2] is None  # invalid steps → create task, queue nothing
+
+
+def test_queue_directive_parses_and_validates():
+    text = "```agentflow-queue\ntask: latest\nsteps: claude_implement, gemini_qa\n```"
+    assert parse_queue_directive(text) == ("latest", ["claude_implement", "gemini_qa"])
+    assert parse_queue_directive("```agentflow-queue\ntask: x\nsteps: bogus\n```") is None
+    assert parse_queue_directive("no block") is None

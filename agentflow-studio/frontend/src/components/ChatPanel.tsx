@@ -186,7 +186,7 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
             <ChatBubble className="h-6 w-6 text-neutral-300 dark:text-neutral-600" />
             <p className="text-xs text-neutral-500">
               Chat with your orchestration model — plan work, decide routing, interpret agent results. Ask it
-              to create a task and it appears on the Tasks tab.
+              to create a task and queue the steps; the system cues each agent automatically.
             </p>
             <p className="text-[11px] text-neutral-400">
               Runs your own <span className="font-mono">{selected}</span> CLI. History is saved in the workspace.
