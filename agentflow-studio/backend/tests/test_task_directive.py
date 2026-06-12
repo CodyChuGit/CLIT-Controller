@@ -80,3 +80,13 @@ def test_command_denylist():
     assert command_denied("bash -c 'echo hi'") is not None
     assert command_denied("npm test && rm -rf /") is not None  # shell operators refused
     assert command_denied("cat foo > bar") is not None
+
+
+def test_command_workspace_confinement(tmp_path):
+    from agentflow.chat_service import command_denied
+
+    assert command_denied("npm run dev", tmp_path) is None
+    assert command_denied(f"cat {tmp_path}/notes.txt", tmp_path) is None
+    assert command_denied("cat /etc/passwd", tmp_path) is not None
+    assert command_denied("cat ~/.ssh/id_rsa", tmp_path) is not None
+    assert command_denied("cat ../secrets.txt", tmp_path) is not None

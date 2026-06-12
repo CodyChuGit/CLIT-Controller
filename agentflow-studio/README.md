@@ -69,6 +69,7 @@ Backend alone: `.venv/bin/python -m agentflow`. If you build the frontend once (
 - Logs and command previews are **redacted** (`sk-…`, `ghp_…`, `github_pat_…`, `xoxb-…`, `Bearer …`, `*API_KEY=…`, `token=…`, `password=…` → `[REDACTED]`).
 - `.env` files are never previewable in the file reader (`.env.example` is allowed).
 - Nothing is sent to any cloud service except through the official CLIs you invoke.
+- **Agents are confined to the workspace**: codex runs with `--sandbox workspace-write`, agy with `--sandbox`, claude's headless edits are cwd-scoped, and direct `agentflow-run` commands refuse path traversal and absolute paths outside the workspace (plus a denylist and no shell operators).
 - Config lives at `~/.agentflow/config.json` (global) and `<workspace>/.agentflow/` (per project).
 
 ## Usage tracking limitations

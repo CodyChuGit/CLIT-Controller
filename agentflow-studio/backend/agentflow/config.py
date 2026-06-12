@@ -29,14 +29,15 @@ DEFAULT_COMMAND_TEMPLATES = {
     # acceptEdits: claude may write/edit files without interactive approval (required in
     # headless -p mode); shell commands still follow normal permission rules.
     "claude": "claude -p --permission-mode acceptEdits {model} {prompt}",
-    "antigravity": "agy {model} -p {prompt}",
+    # --sandbox: agy's own terminal-restriction sandbox keeps it inside the workspace.
+    "antigravity": "agy --sandbox {model} -p {prompt}",
 }
 
 # Previous defaults we upgrade automatically when seen in stored config.
 _STALE_TEMPLATES = {
     "codex": {"codex exec {prompt}", "codex exec {model} {prompt}"},
     "claude": {"claude -p {prompt}", "claude -p {model} {prompt}"},
-    "antigravity": {"antigravity {prompt}", "antigravity -p {prompt}", "agy -p {prompt}"},
+    "antigravity": {"antigravity {prompt}", "antigravity -p {prompt}", "agy -p {prompt}", "agy {model} -p {prompt}"},
 }
 
 

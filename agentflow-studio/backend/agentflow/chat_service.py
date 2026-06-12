@@ -43,8 +43,8 @@ def parse_run_directives(text: str) -> list[str]:
     return commands[:MAX_RUN_DIRECTIVES]
 
 
-def command_denied(command: str) -> Optional[str]:
-    """Direct execution is exec-only and refuses the obviously dangerous."""
+def command_denied(command: str, workspace: Optional[Path] = None) -> Optional[str]:
+    """Direct execution is exec-only, workspace-confined, and refuses the dangerous."""
     try:
         tokens = shlex.split(command)
     except ValueError:
@@ -59,6 +59,15 @@ def command_denied(command: str) -> Optional[str]:
         return "refusing recursive force-delete on /"
     if any(ch in command for ch in ("|", ">", "<", ";", "&&", "`", "$(")):
         return "shell operators are not supported — one plain command only"
+    # Agents stay inside the workspace: no traversal, no absolute paths outside it.
+    if workspace is not None:
+        ws = str(workspace.resolve())
+        for t in tokens[1:]:
+            arg = t.split("=", 1)[1] if t.startswith("-") and "=" in t else t
+            if ".." in arg.split("/"):
+                return "path traversal (`..`) is not allowed"
+            if arg.startswith(("/", "~")) and not str(Path(arg).expanduser().resolve()).startswith(ws):
+                return f"`{arg}` is outside the workspace"
     return None
 
 
@@ -68,7 +77,7 @@ async def execute_run_directive(
     """The orchestrator runs simple operational commands directly — no task, no roles."""
     import asyncio
 
-    denied = command_denied(command)
+    denied = command_denied(command, workspace)
     if denied:
         append_message(workspace, "system", f"Didn't run `{command}` — {denied}.", provider=provider)
         return

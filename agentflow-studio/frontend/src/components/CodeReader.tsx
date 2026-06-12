@@ -1,7 +1,58 @@
+import { useMemo } from "react";
+import Prism from "prismjs";
+import "prismjs/components/prism-markup";
+import "prismjs/components/prism-css";
+import "prismjs/components/prism-clike";
+import "prismjs/components/prism-javascript";
+import "prismjs/components/prism-typescript";
+import "prismjs/components/prism-jsx";
+import "prismjs/components/prism-tsx";
+import "prismjs/components/prism-python";
+import "prismjs/components/prism-json";
+import "prismjs/components/prism-bash";
+import "prismjs/components/prism-swift";
+import "prismjs/components/prism-yaml";
+import "prismjs/components/prism-markdown";
+import "prismjs/components/prism-rust";
+import "prismjs/components/prism-go";
+import "prismjs/components/prism-java";
+import "prismjs/components/prism-kotlin";
+import "prismjs/components/prism-c";
+import "prismjs/components/prism-cpp";
+import "prismjs/components/prism-toml";
 import type { EditorFile } from "../types";
 import { FileIcon } from "./icons";
 
-const MAX_GUTTER_LINES = 8000; // skip line numbers on huge files
+const MAX_GUTTER_LINES = 8000; // skip line numbers (and highlighting) on huge files
+
+const LANG_BY_EXT: Record<string, string> = {
+  ts: "typescript",
+  tsx: "tsx",
+  js: "javascript",
+  jsx: "jsx",
+  mjs: "javascript",
+  py: "python",
+  json: "json",
+  css: "css",
+  html: "markup",
+  xml: "markup",
+  svg: "markup",
+  sh: "bash",
+  zsh: "bash",
+  swift: "swift",
+  yml: "yaml",
+  yaml: "yaml",
+  md: "markdown",
+  rs: "rust",
+  go: "go",
+  java: "java",
+  kt: "kotlin",
+  c: "c",
+  h: "c",
+  cpp: "cpp",
+  hpp: "cpp",
+  toml: "toml",
+};
 
 function formatSize(bytes?: number): string {
   if (bytes === undefined) return "";
@@ -33,9 +84,28 @@ export default function CodeReader({ file }: { file: EditorFile | null }) {
     );
   }
 
-  const lines = file.content.split("\n");
+  return <FileView file={file} />;
+}
+
+function FileView({ file }: { file: EditorFile }) {
+  const content = file.content ?? "";
+  const lines = content.split("\n");
   const showGutter = lines.length <= MAX_GUTTER_LINES;
   const gutterWidth = `${Math.max(String(lines.length).length, 2)}ch`;
+
+  // VS Code-style syntax coloring (token palette in styles.css).
+  const highlighted = useMemo(() => {
+    if (file.kind === "diff" || !showGutter) return null;
+    const ext = file.path.split(".").pop()?.toLowerCase() ?? "";
+    const lang = LANG_BY_EXT[ext];
+    const grammar = lang ? Prism.languages[lang] : undefined;
+    if (!grammar) return null;
+    try {
+      return Prism.highlight(content, grammar, lang);
+    } catch {
+      return null;
+    }
+  }, [content, file.path, file.kind, showGutter]);
 
   return (
     <div className="flex h-full flex-col bg-white dark:bg-neutral-900">
@@ -60,10 +130,12 @@ export default function CodeReader({ file }: { file: EditorFile | null }) {
                 </span>
               ))}
             </pre>
-          ) : (
-            <pre className="flex-1 whitespace-pre px-4 py-3 text-neutral-800 dark:text-neutral-200">
-              {file.content}
+          ) : highlighted !== null ? (
+            <pre className="code-highlight flex-1 whitespace-pre px-4 py-3 text-neutral-800 dark:text-neutral-200">
+              <code dangerouslySetInnerHTML={{ __html: highlighted }} />
             </pre>
+          ) : (
+            <pre className="flex-1 whitespace-pre px-4 py-3 text-neutral-800 dark:text-neutral-200">{content}</pre>
           )}
         </div>
       </div>

@@ -70,3 +70,107 @@ body {
     @apply rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[11px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Syntax highlighting — VS Code Light+ / Dark+ token palette (Prism classes,
+   scoped to the editor so chat/code chips keep their own styling). */
+.code-highlight .token.comment,
+.code-highlight .token.prolog,
+.code-highlight .token.cdata {
+  color: #008000;
+}
+.code-highlight .token.string,
+.code-highlight .token.char,
+.code-highlight .token.attr-value {
+  color: #a31515;
+}
+.code-highlight .token.keyword,
+.code-highlight .token.boolean,
+.code-highlight .token.tag,
+.code-highlight .token.constant {
+  color: #0000ff;
+}
+.code-highlight .token.atrule,
+.code-highlight .token.rule {
+  color: #af00db;
+}
+.code-highlight .token.function,
+.code-highlight .token.function-name {
+  color: #795e26;
+}
+.code-highlight .token.number {
+  color: #098658;
+}
+.code-highlight .token.class-name,
+.code-highlight .token.builtin,
+.code-highlight .token.namespace {
+  color: #267f99;
+}
+.code-highlight .token.property,
+.code-highlight .token.attr-name,
+.code-highlight .token.variable,
+.code-highlight .token.parameter {
+  color: #001080;
+}
+.code-highlight .token.selector {
+  color: #800000;
+}
+.code-highlight .token.punctuation,
+.code-highlight .token.operator {
+  color: #393a34;
+}
+.code-highlight .token.important,
+.code-highlight .token.bold {
+  font-weight: 600;
+}
+.code-highlight .token.italic {
+  font-style: italic;
+}
+
+@media (prefers-color-scheme: dark) {
+  .code-highlight .token.comment,
+  .code-highlight .token.prolog,
+  .code-highlight .token.cdata {
+    color: #6a9955;
+  }
+  .code-highlight .token.string,
+  .code-highlight .token.char,
+  .code-highlight .token.attr-value {
+    color: #ce9178;
+  }
+  .code-highlight .token.keyword,
+  .code-highlight .token.boolean,
+  .code-highlight .token.tag,
+  .code-highlight .token.constant {
+    color: #569cd6;
+  }
+  .code-highlight .token.atrule,
+  .code-highlight .token.rule {
+    color: #c586c0;
+  }
+  .code-highlight .token.function,
+  .code-highlight .token.function-name {
+    color: #dcdcaa;
+  }
+  .code-highlight .token.number {
+    color: #b5cea8;
+  }
+  .code-highlight .token.class-name,
+  .code-highlight .token.builtin,
+  .code-highlight .token.namespace {
+    color: #4ec9b0;
+  }
+  .code-highlight .token.property,
+  .code-highlight .token.attr-name,
+  .code-highlight .token.variable,
+  .code-highlight .token.parameter {
+    color: #9cdcfe;
+  }
+  .code-highlight .token.selector {
+    color: #d7ba7d;
+  }
+  .code-highlight .token.punctuation,
+  .code-highlight .token.operator {
+    color: #d4d4d4;
+  }
+}
