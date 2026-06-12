@@ -43,6 +43,50 @@ def test_send_with_missing_provider_is_graceful(tmp_path):
     assert "not installed" in messages[1]["content"]
 
 
+def test_direct_channels_are_separate(tmp_path):
+    ws = make_workspace(tmp_path)
+    chat_service.append_message(ws, "user", "orchestrator question")
+    chat_service.append_message(ws, "user", "codex question", channel="codex")
+    chat_service.append_message(ws, "assistant", "codex answer", channel="codex", provider="codex")
+
+    state = chat_service.chat_state(ws)
+    assert [m["content"] for m in state["messages"]] == ["orchestrator question"]
+    assert [m["content"] for m in state["channels"]["codex"]] == ["codex question", "codex answer"]
+    assert state["channels"]["claude"] == []
+    assert set(state["channelPending"]) == {"codex", "claude", "antigravity"}
+
+    chat_service.clear_chat(ws, channel="codex")
+    state = chat_service.chat_state(ws)
+    assert state["channels"]["codex"] == []
+    assert [m["content"] for m in state["messages"]] == ["orchestrator question"]
+
+
+def test_direct_send_missing_provider_is_graceful(tmp_path, monkeypatch):
+    ws = make_workspace(tmp_path)
+    monkeypatch.setattr(chat_service, "resolve_executable", lambda _argv0: None)
+    result = asyncio.run(chat_service.send_direct(ws, "codex", "hello"))
+    assert result["status"] == "provider_missing"
+    msgs = chat_service.chat_state(ws)["channels"]["codex"]
+    assert msgs[0]["role"] == "user"
+    assert msgs[1]["role"] == "system"
+    assert "not installed" in msgs[1]["content"]
+
+
+def test_direct_send_rejects_unknown_provider(tmp_path):
+    ws = make_workspace(tmp_path)
+    result = asyncio.run(chat_service.send_direct(ws, "shell", "rm everything"))
+    assert result["status"] == "error"
+
+
+def test_direct_chat_prompt_has_no_directives():
+    from agentflow.prompt_templates import direct_chat_prompt
+
+    prompt = direct_chat_prompt("claude", "user: hi\nassistant: hello", "fix the header")
+    assert "agentflow-" in prompt  # the "no directives" instruction names them
+    assert "```agentflow" not in prompt  # but teaches no directive blocks
+    assert "user: fix the header" in prompt
+
+
 def test_chat_messages_are_redacted(tmp_path):
     ws = make_workspace(tmp_path)
     chat_service.append_message(ws, "user", "my key is sk-secret12345678 ok?")

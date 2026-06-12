@@ -417,7 +417,11 @@ function AgentActivity({ queue, running }: { queue: QueueState | null; running: 
 
 /* ------------------------------------------------------------------- panel */
 
-/** Persistent orchestrator chat dock — always available on the right. */
+const ORCH = "orchestrator";
+const TAB_SHORT: Record<string, string> = { antigravity: "agy" };
+const FALLBACK_AGENTS = ["codex", "claude", "antigravity"];
+
+/** Persistent chat dock — the orchestrator plus a direct line to each agent. */
 export default function ChatPanel({ workspacePath }: { workspacePath: string | null }) {
   const hasWorkspace = Boolean(workspacePath);
   const [open, setOpen] = useState(() => localStorage.getItem(OPEN_KEY) !== "0");
@@ -428,14 +432,24 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
   const [running, setRunning] = useState<RunInfo[]>([]);
   const [input, setInput] = useState("");
   const [provider, setProvider] = useState<string | null>(null);
+  const [channel, setChannel] = useState<string>(() => loadState("chatTab", ORCH));
+  const [seen, setSeen] = useState<Record<string, number>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef(workspacePath);
 
+  const isOrch = channel === ORCH;
+
   const toggle = (next: boolean) => {
     setOpen(next);
     localStorage.setItem(OPEN_KEY, next ? "1" : "0");
+  };
+
+  const switchTab = (id: string) => {
+    setChannel(id);
+    saveState("chatTab", id);
+    setNotice(null);
   };
 
   // Each workspace has its own chat — drop everything from the previous one.
@@ -446,6 +460,7 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
     setRunning([]);
     setNotice(null);
     setProvider(null);
+    setSeen({});
   }, [workspacePath]);
 
   const load = useCallback(async () => {
@@ -462,8 +477,14 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
     }
   }, [workspacePath]);
 
+  const channelMessages = (id: string): ChatMessage[] =>
+    id === ORCH ? data?.messages ?? [] : data?.channels?.[id] ?? [];
+  const messages = channelMessages(channel);
+  const pending = (isOrch ? data?.pending : data?.channelPending?.[channel]) ?? null;
+
   const busy =
     data?.pending != null ||
+    Object.values(data?.channelPending ?? {}).some((p) => p != null) ||
     (queue?.items ?? []).some((i) => i.status === "running") ||
     running.some((r) => r.step === "orchestrate");
 
@@ -474,10 +495,28 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
     return () => window.clearInterval(id);
   }, [open, hasWorkspace, load, busy]);
 
+  // The active tab is always caught up; other tabs flag replies that arrived meanwhile.
+  useEffect(() => {
+    if (!data) return;
+    setSeen((prev) => {
+      const next = { ...prev };
+      for (const id of [ORCH, ...Object.keys(data.channels ?? {})]) {
+        const len = id === ORCH ? data.messages.length : (data.channels?.[id] ?? []).length;
+        if (next[id] === undefined || id === channel) next[id] = len;
+      }
+      return next;
+    });
+  }, [data, channel]);
+
+  const hasUnread = (id: string) => {
+    const len = channelMessages(id).length;
+    return len > (seen[id] ?? len);
+  };
+
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [data?.messages.length, data?.pending?.outputTail, busy]);
+  }, [messages.length, pending?.outputTail, busy, channel]);
 
   const send = async () => {
     const message = input.trim();
@@ -485,7 +524,7 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
     setSending(true);
     setNotice(null);
     try {
-      const res = await api.chatSend(message, provider);
+      const res = isOrch ? await api.chatSend(message, provider) : await api.chatDirect(channel, message);
       if (res.status === "started") {
         setInput("");
       } else if (res.message) {
@@ -505,8 +544,8 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
       <div className="flex w-10 shrink-0 flex-col items-center border-l border-neutral-200 bg-white py-2 dark:border-neutral-800 dark:bg-neutral-900">
         <button
           onClick={() => toggle(true)}
-          title="Open orchestrator chat"
-          aria-label="Open orchestrator chat"
+          title="Open chat"
+          aria-label="Open chat"
           className="focusable cursor-pointer rounded-lg p-2 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
         >
           <ChatBubble className="h-5 w-5" />
@@ -537,45 +576,76 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
       <section
         style={{ width }}
         className="flex shrink-0 flex-col border-l border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
-        aria-label="Orchestrator chat"
+        aria-label="Agent chat"
       >
-      {/* header */}
-      <div className="flex shrink-0 items-center gap-1.5 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
-        <ChatBubble className="h-4 w-4 text-accent-subtle" />
-        <span className="text-xs font-semibold">Orchestrator</span>
-        <select
-          className="focusable ml-1 min-w-0 flex-1 cursor-pointer rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 font-mono text-[11px] text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
-          value={selected}
-          onChange={(e) => setProvider(e.target.value)}
-          aria-label="Chat provider"
-        >
-          {(data?.providers ?? [{ id: selected, installed: true }]).map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.id}
-              {!p.installed ? " (not installed)" : ""}
-            </option>
-          ))}
-        </select>
-        <button
-          onClick={() => {
-            if (window.confirm("Clear the chat history for this workspace?")) {
-              void api.chatClear().then(load);
-            }
-          }}
-          title="Clear chat history"
-          aria-label="Clear chat history"
-          className="icon-btn"
-        >
-          <Close className="h-3.5 w-3.5" />
-        </button>
-        <button
-          onClick={() => toggle(false)}
-          title="Collapse chat"
-          aria-label="Collapse chat"
-          className="icon-btn"
-        >
-          <ChevronRight className="h-3.5 w-3.5" />
-        </button>
+      {/* tab strip: orchestrator + a direct line to each agent */}
+      <div className="flex h-8 shrink-0 items-stretch border-b border-neutral-200 bg-surface dark:border-neutral-800 dark:bg-neutral-950">
+        <div role="tablist" aria-label="Chat channel" className="flex min-w-0 flex-1 items-stretch overflow-x-auto">
+          {[ORCH, ...(data?.providers?.map((p) => p.id) ?? FALLBACK_AGENTS)].map((id) => {
+            const active = id === channel;
+            const installed = id === ORCH || (data?.providers?.find((p) => p.id === id)?.installed ?? true);
+            const chPending = id === ORCH ? data?.pending : data?.channelPending?.[id];
+            return (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={active}
+                onClick={() => switchTab(id)}
+                title={
+                  !installed
+                    ? `${id} is not installed`
+                    : id === ORCH
+                      ? "Orchestrator — creates tasks and cues the agents"
+                      : `Direct chat with ${id} — no orchestration`
+                }
+                className={`focusable relative flex shrink-0 cursor-pointer items-center gap-1.5 border-r border-neutral-200 px-2.5 text-[11px] transition-colors duration-150 dark:border-neutral-800 ${
+                  active
+                    ? "bg-white text-neutral-800 dark:bg-neutral-900 dark:text-neutral-100"
+                    : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800/60 dark:hover:text-neutral-200"
+                }`}
+              >
+                {active && <span className="absolute inset-x-0 top-0 h-0.5 bg-accent" aria-hidden="true" />}
+                {id === ORCH ? (
+                  <ChatBubble className="h-3 w-3 text-accent-subtle" />
+                ) : (
+                  <span
+                    className={`h-2 w-2 rounded-full ${PROVIDER_DOT[id] ?? "bg-neutral-400"} ${
+                      chPending ? "animate-pulse" : ""
+                    } ${installed ? "" : "opacity-40"}`}
+                    aria-hidden="true"
+                  />
+                )}
+                <span className={id === ORCH ? "font-medium" : "font-mono"}>{TAB_SHORT[id] ?? id}</span>
+                {!active && hasUnread(id) && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex shrink-0 items-center gap-0.5 px-1">
+          <button
+            onClick={() => {
+              const label = isOrch ? "orchestrator" : channel;
+              if (window.confirm(`Clear the ${label} chat for this workspace?`)) {
+                void api.chatClear(channel).then(load);
+              }
+            }}
+            title="Clear this chat"
+            aria-label="Clear this chat"
+            className="icon-btn"
+          >
+            <Close className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => toggle(false)}
+            title="Collapse chat"
+            aria-label="Collapse chat"
+            className="icon-btn"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* messages */}
@@ -585,34 +655,46 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
             <ChatBubble className="h-6 w-6 text-neutral-300 dark:text-neutral-600" />
             <p className="text-xs text-neutral-500">Open a workspace to start.</p>
           </div>
-        ) : data && data.messages.length === 0 && !data.pending ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 px-2 text-center">
-            <ChatBubble className="h-6 w-6 text-neutral-300 dark:text-neutral-600" />
-            <p className="text-xs text-neutral-500">
-              Ask the orchestrator for work — it creates tasks and cues the agents.
-            </p>
-            <div className="flex flex-wrap justify-center gap-1">
-              {Object.keys(STEP_META).map((s) => (
-                <StepChip key={s} name={s} />
-              ))}
+        ) : data && messages.length === 0 && !pending ? (
+          isOrch ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 px-2 text-center">
+              <ChatBubble className="h-6 w-6 text-neutral-300 dark:text-neutral-600" />
+              <p className="text-xs text-neutral-500">
+                Ask the orchestrator for work — it creates tasks and cues the agents.
+              </p>
+              <div className="flex flex-wrap justify-center gap-1">
+                {Object.keys(STEP_META).map((s) => (
+                  <StepChip key={s} name={s} />
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-2 px-2 text-center">
+              <span className={`h-2.5 w-2.5 rounded-full ${PROVIDER_DOT[channel] ?? "bg-neutral-400"}`} aria-hidden="true" />
+              <p className="text-xs text-neutral-500">
+                Direct chat with <span className="font-mono">{channel}</span> — no tasks, no queue.
+              </p>
+            </div>
+          )
         ) : (
-          data?.messages.map((m, i) => <Bubble key={`${m.time}-${i}`} msg={m} />)
+          messages.map((m, i) => <Bubble key={`${m.time}-${i}`} msg={m} />)
         )}
 
-        <AgentActivity queue={queue} running={running} />
+        {isOrch && <AgentActivity queue={queue} running={running} />}
 
-        {data?.pending && (
+        {pending && (
           <div className="flex flex-col items-start">
             <span className="mb-0.5 flex items-center gap-1.5 px-1 text-[10px] text-neutral-400">
               <Spinner className="h-3 w-3" />
-              <span className={`h-2 w-2 rounded-full ${PROVIDER_DOT[selected] ?? "bg-neutral-400"}`} aria-hidden="true" />
+              <span
+                className={`h-2 w-2 rounded-full ${PROVIDER_DOT[isOrch ? selected : channel] ?? "bg-neutral-400"}`}
+                aria-hidden="true"
+              />
               thinking…
             </span>
-            {data.pending.outputTail && (
+            {pending.outputTail && (
               <pre className="max-h-36 w-full overflow-auto whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50/60 p-2 font-mono text-[10px] leading-relaxed text-neutral-600 dark:border-blue-900 dark:bg-blue-950/30 dark:text-neutral-300">
-                {data.pending.outputTail}
+                {pending.outputTail}
               </pre>
             )}
           </div>
@@ -627,9 +709,31 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
           </p>
         )}
         <div className="flex items-end gap-1.5">
+          {isOrch && (
+            <select
+              className="focusable h-[38px] max-w-[96px] shrink-0 cursor-pointer rounded-md border border-neutral-200 bg-white px-1 font-mono text-[10px] text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+              value={selected}
+              onChange={(e) => setProvider(e.target.value)}
+              title="CLI that runs the orchestrator"
+              aria-label="Orchestrator CLI"
+            >
+              {(data?.providers ?? [{ id: selected, installed: true }]).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.id}
+                  {!p.installed ? " (not installed)" : ""}
+                </option>
+              ))}
+            </select>
+          )}
           <textarea
             className="input max-h-32 min-h-[38px] flex-1 resize-none text-xs"
-            placeholder={hasWorkspace ? "Ask the orchestrator… (Enter to send)" : "Open a workspace first"}
+            placeholder={
+              !hasWorkspace
+                ? "Open a workspace first"
+                : isOrch
+                  ? "Ask the orchestrator… (Enter to send)"
+                  : `Message ${TAB_SHORT[channel] ?? channel} directly… (Enter to send)`
+            }
             value={input}
             disabled={!hasWorkspace || sending}
             onChange={(e) => setInput(e.target.value)}
@@ -642,10 +746,10 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
             rows={Math.min(4, Math.max(1, input.split("\n").length))}
             aria-label="Chat message"
           />
-          {data?.pending ? (
+          {pending ? (
             <button
               className="btn-danger shrink-0 px-2.5"
-              onClick={() => void api.chatStop().then(load)}
+              onClick={() => void api.chatStop(channel).then(load)}
               title="Stop response"
               aria-label="Stop response"
             >

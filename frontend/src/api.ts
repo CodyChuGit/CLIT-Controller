@@ -138,6 +138,8 @@ export const api = {
   chat: () => get<ChatState>("/chat"),
   chatSend: (message: string, provider: string | null) =>
     post<ChatSendResult>("/chat/send", { message, provider: provider ?? undefined }),
-  chatStop: () => post<{ stopped: boolean }>("/chat/stop"),
-  chatClear: () => post<{ ok: boolean }>("/chat/clear"),
+  chatDirect: (provider: string, message: string) =>
+    post<ChatSendResult>("/chat/direct", { message, provider }),
+  chatStop: (channel: string) => post<{ stopped: boolean }>("/chat/stop", { channel }),
+  chatClear: (channel: string) => post<{ ok: boolean }>("/chat/clear", { channel }),
 };

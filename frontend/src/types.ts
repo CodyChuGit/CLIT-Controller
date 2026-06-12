@@ -302,6 +302,9 @@ export interface ChatPending {
 export interface ChatState {
   messages: ChatMessage[];
   pending: ChatPending | null;
+  /** Direct (non-orchestrated) chat history per agent provider. */
+  channels: Record<string, ChatMessage[]>;
+  channelPending: Record<string, ChatPending | null>;
   defaultProvider: string;
   providers: { id: string; installed: boolean }[];
 }

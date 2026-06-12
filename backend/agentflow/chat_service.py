@@ -17,8 +17,14 @@ MAX_STORED_MESSAGES = 200
 REPLAY_MESSAGES = 12      # how many past messages are replayed to the CLI
 REPLAY_CLIP_CHARS = 1500  # per-message clip when replaying
 
-# workspace path -> run id of the in-flight chat response
+# "workspace::channel" -> run id of the in-flight chat response
 _pending: dict[str, str] = {}
+
+ORCHESTRATOR_CHANNEL = "orchestrator"
+
+
+def _pkey(workspace: Path, channel: str) -> str:
+    return f"{workspace}::{channel}"
 
 _TASK_DIRECTIVE_RE = re.compile(r"```agentflow-task\s*\n(.*?)```", re.DOTALL)
 _QUEUE_DIRECTIVE_RE = re.compile(r"```agentflow-queue\s*\n(.*?)```", re.DOTALL)
@@ -232,23 +238,36 @@ def load_chat(workspace: Path) -> dict:
     return data
 
 
+def _channel_messages(data: dict, channel: str) -> list:
+    """Orchestrator history lives in `messages`; direct agent chats under `channels`."""
+    if channel == ORCHESTRATOR_CHANNEL:
+        return data["messages"]
+    channels = data.setdefault("channels", {})
+    return channels.setdefault(channel, [])
+
+
 def _save_chat(workspace: Path, data: dict) -> None:
     data["updatedAt"] = now_iso()
     if len(data["messages"]) > MAX_STORED_MESSAGES:
         data["messages"] = data["messages"][-MAX_STORED_MESSAGES:]
+    for channel, msgs in data.get("channels", {}).items():
+        if len(msgs) > MAX_STORED_MESSAGES:
+            data["channels"][channel] = msgs[-MAX_STORED_MESSAGES:]
     config.write_json(_chat_file(workspace), data)
 
 
-def append_message(workspace: Path, role: str, content: str, **extra) -> dict:
+def append_message(workspace: Path, role: str, content: str, channel: str = ORCHESTRATOR_CHANNEL, **extra) -> dict:
     data = load_chat(workspace)
     msg = {"role": role, "content": redact(content), "time": now_iso(), **extra}
-    data["messages"].append(msg)
+    _channel_messages(data, channel).append(msg)
     _save_chat(workspace, data)
     return msg
 
 
-def clear_chat(workspace: Path) -> None:
-    _save_chat(workspace, {"messages": []})
+def clear_chat(workspace: Path, channel: str = ORCHESTRATOR_CHANNEL) -> None:
+    data = load_chat(workspace)
+    _channel_messages(data, channel).clear()
+    _save_chat(workspace, data)
 
 
 def provider_options() -> list[dict]:
@@ -262,15 +281,16 @@ def provider_options() -> list[dict]:
     return out
 
 
-def pending_state(workspace: Path) -> Optional[dict]:
-    run_id = _pending.get(str(workspace))
+def pending_state(workspace: Path, channel: str = ORCHESTRATOR_CHANNEL) -> Optional[dict]:
+    key = _pkey(workspace, channel)
+    run_id = _pending.get(key)
     if not run_id:
         return None
     record = RUNNER.runs.get(run_id)
     if record is None or record.status != "running":
         # finished (on_complete clears) or evicted — either way nothing is in flight
         if record is None:
-            _pending.pop(str(workspace), None)
+            _pending.pop(key, None)
         return None
     tail = (record.stdout + ("\n" + record.stderr if record.stderr else ""))[-1200:]
     return {"runId": run_id, "status": record.status, "outputTail": redact(tail)}
@@ -298,8 +318,9 @@ async def _workspace_summary(workspace: Path) -> str:
     )
 
 
-def _transcript(workspace: Path) -> str:
-    msgs = [m for m in load_chat(workspace)["messages"] if m["role"] in ("user", "assistant")]
+def _transcript(workspace: Path, channel: str = ORCHESTRATOR_CHANNEL) -> str:
+    data = load_chat(workspace)
+    msgs = [m for m in _channel_messages(data, channel) if m["role"] in ("user", "assistant")]
     recent = msgs[-REPLAY_MESSAGES:]
     lines = []
     for m in recent:
@@ -325,6 +346,8 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
             "message": "Claude usage health is RED — pick a cheaper provider for chat (codex/antigravity) or update its health on the Usage page.",
         }
 
+    # History snapshot first — the new message goes into the prompt separately.
+    transcript = _transcript(workspace)
     append_message(workspace, "user", message)
 
     template = config.get_command_templates().get(provider, f"{provider} {{prompt}}")
@@ -338,12 +361,11 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
         return {"status": "provider_missing", "message": note}
 
     # Build the prompt only after the cheap checks pass.
-    transcript = _transcript(workspace)
     summary = await _workspace_summary(workspace)
     prompt = prompt_templates.orchestrator_chat_prompt(usage, summary, transcript, message)
     argv = task_service._build_argv(template, prompt, config.get_models().get(provider))
 
-    ws_key = str(workspace)
+    ws_key = _pkey(workspace, ORCHESTRATOR_CHANNEL)
 
     async def on_complete(record: RunRecord) -> None:
         try:
@@ -433,12 +455,77 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
     return {"status": "started", "runId": record.id, "provider": provider}
 
 
-async def stop(workspace: Path) -> dict:
-    run_id = _pending.get(str(workspace))
+async def stop(workspace: Path, channel: str = ORCHESTRATOR_CHANNEL) -> dict:
+    run_id = _pending.get(_pkey(workspace, channel))
     if not run_id:
         return {"stopped": False}
     ok = await RUNNER.cancel(run_id)
     return {"stopped": ok}
+
+
+async def send_direct(workspace: Path, provider: str, message: str) -> dict:
+    """Direct chat with one agent CLI — no orchestration, no directives, no tasks."""
+    if provider not in AGENT_PROVIDER_IDS:
+        return {"status": "error", "message": f"`{provider}` is not a chat agent."}
+    if pending_state(workspace, provider) is not None:
+        return {"status": "busy", "message": f"`{provider}` is still replying. Stop it or wait."}
+
+    # History snapshot first — the new message goes into the prompt separately.
+    transcript = _transcript(workspace, channel=provider)
+    append_message(workspace, "user", message, channel=provider)
+
+    template = config.get_command_templates().get(provider, f"{provider} {{prompt}}")
+    argv0 = shlex.split(template)[0]
+    if resolve_executable(argv0) is None:
+        note = f"`{provider}` is not installed (`{argv0}` not on PATH) — install it on the Agents page."
+        append_message(workspace, "system", note, channel=provider, provider=provider)
+        return {"status": "provider_missing", "message": note}
+
+    prompt = prompt_templates.direct_chat_prompt(provider, transcript, message)
+    argv = task_service._build_argv(template, prompt, config.get_models().get(provider))
+    key = _pkey(workspace, provider)
+
+    async def on_complete(record: RunRecord) -> None:
+        try:
+            usage_service.record_call(
+                workspace, provider,
+                prompt_chars=len(prompt),
+                output_chars=len(record.stdout) + len(record.stderr),
+                duration_ms=record.duration_ms or 0,
+                status=record.status,
+            )
+            out = record.stdout.strip()
+            if record.status == "succeeded" and out:
+                append_message(workspace, "assistant", out, channel=provider,
+                               provider=provider, durationMs=record.duration_ms)
+            elif record.status == "cancelled":
+                append_message(workspace, "system", "Response stopped.", channel=provider, provider=provider)
+            else:
+                err_tail = (record.stderr or record.stdout or "no output").strip()[-800:]
+                append_message(
+                    workspace, "system",
+                    f"`{provider}` exited with {record.exit_code}: {err_tail}",
+                    channel=provider, provider=provider,
+                )
+            add_log_entry(
+                "chat",
+                f"direct chat via {provider}: {record.status} in {(record.duration_ms or 0) / 1000:.1f}s",
+                provider=provider, step="chat",
+                status="info" if record.status == "succeeded" else "warn",
+            )
+        finally:
+            if _pending.get(key) == record.id:
+                _pending.pop(key, None)
+
+    record, _task = await RUNNER.start(argv, workspace, step="chat", provider=provider, on_complete=on_complete)
+    if record.status == "error":
+        _pending.pop(key, None)
+        note = f"Could not start `{provider}`: {record.stderr.strip()[:300]}"
+        append_message(workspace, "system", note, channel=provider, provider=provider)
+        return {"status": "error", "message": note}
+
+    _pending[key] = record.id
+    return {"status": "started", "runId": record.id, "provider": provider}
 
 
 async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, output_tail: str = "") -> dict:
@@ -590,9 +677,12 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
 
 def chat_state(workspace: Path) -> dict:
     routing = config.get_workspace_routing(workspace)
+    data = load_chat(workspace)
     return {
-        "messages": load_chat(workspace)["messages"],
+        "messages": data["messages"],
         "pending": pending_state(workspace),
+        "channels": {pid: data.get("channels", {}).get(pid, []) for pid in AGENT_PROVIDER_IDS},
+        "channelPending": {pid: pending_state(workspace, pid) for pid in AGENT_PROVIDER_IDS},
         "defaultProvider": routing.get("orchestrator", "antigravity"),
         "providers": provider_options(),
     }

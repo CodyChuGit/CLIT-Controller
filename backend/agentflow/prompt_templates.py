@@ -183,6 +183,22 @@ def orchestrator_chat_prompt(usage: dict, workspace_summary: str, transcript: st
     )
 
 
+def direct_chat_prompt(provider: str, transcript: str, message: str) -> str:
+    """Direct line to one agent CLI — no orchestration framing, no directives."""
+    convo = f"Conversation so far:\n{transcript}\n\n" if transcript else ""
+    return (
+        f"You are `{provider}` in a direct chat inside AgentFlow Studio. The user is talking to you "
+        "one-on-one — there is no orchestrator, no task pipeline, and no agentflow-* directive blocks. "
+        "Your working directory is the user's workspace; stay inside it. You may read files, and edit "
+        "them when the user asks you to.\n\n"
+        "Reply in compact markdown: lead with the answer, keep it under ~150 words unless the user "
+        "asks for depth.\n\n"
+        f"{convo}"
+        f"user: {message}\n\n"
+        "Reply as the assistant."
+    )
+
+
 STEP_PROMPTS = {
     "codex_spec": codex_spec_prompt,
     "claude_implement": claude_implement_prompt,

@@ -16,6 +16,10 @@ class SendRequest(BaseModel):
     provider: str | None = None
 
 
+class ChannelRequest(BaseModel):
+    channel: str = chat_service.ORCHESTRATOR_CHANNEL
+
+
 @router.get("")
 def get_chat():
     return chat_service.chat_state(require_workspace())
@@ -26,12 +30,21 @@ async def send(body: SendRequest):
     return await chat_service.send(require_workspace(), body.message.strip(), body.provider)
 
 
+@router.post("/direct")
+async def send_direct(body: SendRequest):
+    if not body.provider:
+        return {"status": "error", "message": "provider is required for direct chat"}
+    return await chat_service.send_direct(require_workspace(), body.provider, body.message.strip())
+
+
 @router.post("/stop")
-async def stop():
-    return await chat_service.stop(require_workspace())
+async def stop(body: ChannelRequest | None = None):
+    channel = body.channel if body else chat_service.ORCHESTRATOR_CHANNEL
+    return await chat_service.stop(require_workspace(), channel)
 
 
 @router.post("/clear")
-def clear():
-    chat_service.clear_chat(require_workspace())
+def clear(body: ChannelRequest | None = None):
+    channel = body.channel if body else chat_service.ORCHESTRATOR_CHANNEL
+    chat_service.clear_chat(require_workspace(), channel)
     return {"ok": True}
