@@ -12,11 +12,7 @@ interface Props {
   onSetModel: (id: string, model: string) => Promise<string>;
 }
 
-const MODEL_SUGGESTIONS: Record<string, string[]> = {
-  claude: ["sonnet", "opus", "haiku"],
-  codex: [],
-  antigravity: [],
-};
+const CUSTOM = "__custom__";
 
 function copyText(text: string) {
   if (navigator.clipboard?.writeText) void navigator.clipboard.writeText(text);
@@ -26,16 +22,19 @@ export default function ProviderCard({ provider: p, onCheck, onLogin, onInstall,
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [showLog, setShowLog] = useState(false);
-  const [model, setModel] = useState(p.model ?? "");
+  const [customMode, setCustomMode] = useState(false);
+  const [customModel, setCustomModel] = useState("");
 
   // Stay in sync when the providers list refreshes externally.
-  useEffect(() => setModel(p.model ?? ""), [p.model]);
+  useEffect(() => {
+    setCustomMode(false);
+    setCustomModel("");
+  }, [p.model]);
 
-  const saveModel = async () => {
-    const next = model.trim();
-    if (next === (p.model ?? "")) return;
+  const saveModel = async (next: string) => {
+    if (next.trim() === (p.model ?? "")) return;
     try {
-      setNote(await onSetModel(p.id, next));
+      setNote(await onSetModel(p.id, next.trim()));
     } catch (e) {
       setNote(String(e));
     }
@@ -131,22 +130,49 @@ export default function ProviderCard({ provider: p, onCheck, onLogin, onInstall,
               <label htmlFor={`model-${p.id}`}>Model</label>
             </dt>
             <dd className="min-w-0 flex-1 text-right">
-              <input
-                id={`model-${p.id}`}
-                list={MODEL_SUGGESTIONS[p.id]?.length ? `models-${p.id}` : undefined}
-                className="input ml-auto max-w-[170px] px-2 py-0.5 text-right font-mono text-[11px]"
-                placeholder="CLI default"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                onBlur={() => void saveModel()}
-                onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-              />
-              {MODEL_SUGGESTIONS[p.id]?.length > 0 && (
-                <datalist id={`models-${p.id}`}>
-                  {MODEL_SUGGESTIONS[p.id].map((m) => (
-                    <option key={m} value={m} />
+              {customMode ? (
+                <input
+                  id={`model-${p.id}`}
+                  autoFocus
+                  className="input ml-auto max-w-[180px] px-2 py-0.5 text-right font-mono text-[11px]"
+                  placeholder="model name…"
+                  value={customModel}
+                  onChange={(e) => setCustomModel(e.target.value)}
+                  onBlur={() => {
+                    if (customModel.trim()) void saveModel(customModel);
+                    setCustomMode(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                    if (e.key === "Escape") setCustomMode(false);
+                  }}
+                />
+              ) : (
+                <select
+                  id={`model-${p.id}`}
+                  className="input ml-auto max-w-[180px] cursor-pointer px-2 py-0.5 font-mono text-[11px]"
+                  value={p.model ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === CUSTOM) {
+                      setCustomModel(p.model ?? "");
+                      setCustomMode(true);
+                    } else {
+                      void saveModel(v);
+                    }
+                  }}
+                >
+                  <option value="">CLI default</option>
+                  {p.model && !p.modelOptions.includes(p.model) && (
+                    <option value={p.model}>{p.model}</option>
+                  )}
+                  {p.modelOptions.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
                   ))}
-                </datalist>
+                  <option value={CUSTOM}>Custom…</option>
+                </select>
               )}
             </dd>
           </div>

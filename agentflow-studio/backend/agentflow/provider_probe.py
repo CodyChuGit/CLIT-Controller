@@ -57,6 +57,8 @@ PROVIDERS: list[dict] = [
         "loginCommand": "codex login",
         "versionCommand": "codex --version",
         "statusCommand": None,
+        # Best-effort curated list (codex has no public models subcommand) — Custom covers the rest.
+        "modelOptions": ["gpt-5.5-codex", "gpt-5.5", "gpt-5.1-codex", "gpt-5.1-codex-mini"],
     },
     {
         # Successor to the sunset Gemini CLI. Official installer puts the `agy`
@@ -73,6 +75,16 @@ PROVIDERS: list[dict] = [
         "loginCommand": "agy",
         "versionCommand": "{exe} --version",
         "statusCommand": None,
+        # Refreshed from `agy models` on every Check; this is the fallback.
+        "modelsCommand": "{exe} models",
+        "modelOptions": [
+            "Gemini 3.5 Flash (Medium)",
+            "Gemini 3.5 Flash (High)",
+            "Gemini 3.1 Pro (High)",
+            "Claude Sonnet 4.6 (Thinking)",
+            "Claude Opus 4.6 (Thinking)",
+            "GPT-OSS 120B (Medium)",
+        ],
     },
     {
         "id": "claude",
@@ -87,6 +99,15 @@ PROVIDERS: list[dict] = [
         "loginCommand": "claude",
         "versionCommand": "claude --version",
         "statusCommand": None,
+        "modelOptions": [
+            "sonnet",
+            "opus",
+            "haiku",
+            "claude-fable-5",
+            "claude-opus-4-8",
+            "claude-sonnet-4-6",
+            "claude-haiku-4-5",
+        ],
     },
     {
         "id": "ollama",
@@ -162,6 +183,22 @@ def which(provider_id: str) -> Optional[str]:
     return None
 
 
+def _parse_model_lines(text: str) -> list[str]:
+    """Parse a CLI's `models` listing: one model name per non-noise line."""
+    models = []
+    for line in (text or "").splitlines():
+        line = line.strip().lstrip("-*• ").strip()
+        if not line or len(line) > 80:
+            continue
+        lower = line.lower()
+        if any(noise in lower for noise in ("usage", "error", "login", "available", "command", "http")):
+            continue
+        models.append(line)
+        if len(models) >= 24:
+            break
+    return models
+
+
 def base_state(provider_id: str) -> dict:
     """Static definition + cached check results (no subprocess calls)."""
     d = dict(_definition(provider_id))
@@ -175,6 +212,7 @@ def base_state(provider_id: str) -> dict:
             "lastChecked": cached.get("lastChecked"),
             "lastLog": cached.get("lastLog", ""),
             "installing": is_installing(provider_id),
+            "modelOptions": cached.get("modelOptions") or d.get("modelOptions", []),
         }
     )
     return d
@@ -218,6 +256,14 @@ async def check_provider(provider_id: str) -> dict:
             logs.append(f"$ {d['statusCommand']}\n{out2}")
             if provider_id == "gh":
                 result["status"] = "ok" if rec2.exit_code == 0 else "needs_login"
+
+        if d.get("modelsCommand"):
+            models_cmd = d["modelsCommand"].replace("{exe}", path)
+            rec3 = await RUNNER.run_and_wait(models_cmd.split(), Path.home(), timeout=10, provider=provider_id)
+            parsed = _parse_model_lines(rec3.stdout)
+            if parsed:
+                result["modelOptions"] = parsed
+                logs.append(f"$ {models_cmd}\n{rec3.stdout.strip()[:600]}")
 
         result["lastLog"] = redact("\n\n".join(logs))[-4000:]
 

@@ -22,3 +22,22 @@ def test_every_provider_defines_install_fields():
     for p in provider_probe.PROVIDERS:
         assert "installCommand" in p
         assert "installHint" in p
+
+
+def test_parse_model_lines_filters_noise():
+    out = (
+        "Gemini 3.5 Flash (High)\n"
+        "  - Claude Sonnet 4.6 (Thinking)\n"
+        "\n"
+        "Usage of agy:\n"
+        "Error: something\n"
+        "GPT-OSS 120B (Medium)\n"
+    )
+    parsed = provider_probe._parse_model_lines(out)
+    assert parsed == ["Gemini 3.5 Flash (High)", "Claude Sonnet 4.6 (Thinking)", "GPT-OSS 120B (Medium)"]
+
+
+def test_agent_providers_have_model_options():
+    for pid in ("codex", "claude", "antigravity"):
+        d = provider_probe.base_state(pid)
+        assert len(d["modelOptions"]) > 0

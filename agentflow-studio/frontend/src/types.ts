@@ -44,6 +44,7 @@ export interface Provider {
   statusCommand: string | null;
   model: string;
   modelEditable: boolean;
+  modelOptions: string[];
 }
 
 export interface InstallResult {
