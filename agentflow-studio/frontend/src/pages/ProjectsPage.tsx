@@ -102,7 +102,9 @@ export default function ProjectsPage({
           </div>
         </PanelSection>
 
-        {hasWorkspace && <SourceControlPanel onOpenDiff={onOpenDiff} />}
+        {hasWorkspace && project?.workspacePath && (
+          <SourceControlPanel workspacePath={project.workspacePath} onOpenDiff={onOpenDiff} />
+        )}
 
         {hasWorkspace && (
           <div className="flex min-h-0 flex-1 flex-col">

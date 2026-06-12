@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import type { GitFileEntry, GitStatus } from "../types";
 import { ChevronDown, ChevronRight, GitBranch, Refresh, Spinner } from "./icons";
@@ -54,24 +54,36 @@ function FileRow({
 }
 
 interface Props {
+  workspacePath: string;
   onOpenDiff: (path: string, staged: boolean) => void;
 }
 
 /** VS Code-style source control: live status, stage/unstage, commit, click-to-diff. */
-export default function SourceControlPanel({ onOpenDiff }: Props) {
+export default function SourceControlPanel({ workspacePath, onOpenDiff }: Props) {
   const [open, setOpen] = useState(true);
   const [status, setStatus] = useState<GitStatus | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const wsRef = useRef(workspacePath);
+
+  // New workspace, new repo: reset immediately instead of showing the old one.
+  useEffect(() => {
+    wsRef.current = workspacePath;
+    setStatus(null);
+    setMessage("");
+    setNote(null);
+  }, [workspacePath]);
 
   const load = useCallback(async () => {
+    const ws = workspacePath;
     try {
-      setStatus(await api.gitStatus());
+      const s = await api.gitStatus();
+      if (wsRef.current === ws) setStatus(s); // ignore stale responses from a previous workspace
     } catch {
       /* workspace/backend issues are surfaced elsewhere */
     }
-  }, []);
+  }, [workspacePath]);
 
   // Live, like VS Code: refresh on an interval while the panel is open.
   useEffect(() => {

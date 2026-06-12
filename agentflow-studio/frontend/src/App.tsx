@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import ActivityBar, { type PageId } from "./components/ActivityBar";
 import ChatPanel from "./components/ChatPanel";
@@ -32,16 +32,25 @@ export default function App() {
     }
   }, []);
 
+  // Guard against in-flight responses from a previous workspace landing late.
+  const wsRef = useRef<string | null>(null);
+  useEffect(() => {
+    wsRef.current = project?.workspacePath ?? null;
+  }, [project?.workspacePath]);
+
   const refreshShell = useCallback(async () => {
-    if (!project?.workspacePath) {
+    const ws = project?.workspacePath ?? null;
+    if (!ws) {
       setGit(null);
       setUsage(null);
       return;
     }
     try {
       const [g, u] = await Promise.all([api.git(), api.usage()]);
-      setGit(g);
-      setUsage(u);
+      if (wsRef.current === ws) {
+        setGit(g);
+        setUsage(u);
+      }
     } catch {
       /* workspace cleared or backend briefly away — status bar shows what it has */
     }
@@ -58,10 +67,12 @@ export default function App() {
     return () => window.clearInterval(id);
   }, [refreshShell, page]);
 
-  // Switching workspaces invalidates open editor tabs.
+  // Switching workspaces invalidates open editor tabs and all per-workspace shell data.
   useEffect(() => {
     setOpenFiles([]);
     setActivePath(null);
+    setGit(null);
+    setUsage(null);
   }, [project?.workspacePath]);
 
   const openFile = useCallback(async (path: string) => {
@@ -173,7 +184,7 @@ export default function App() {
           )}
         </main>
 
-        <ChatPanel hasWorkspace={Boolean(project?.workspacePath)} />
+        <ChatPanel workspacePath={project?.workspacePath ?? null} />
       </div>
 
       <StatusBar backendUp={backendUp} project={project} git={git} usage={usage} onNavigate={setPage} />

@@ -36,8 +36,9 @@ function Bubble({ msg }: { msg: ChatMessage }) {
   );
 }
 
-/** Persistent orchestrator chat dock — always available on the left. */
-export default function ChatPanel({ hasWorkspace }: { hasWorkspace: boolean }) {
+/** Persistent orchestrator chat dock — always available on the right. */
+export default function ChatPanel({ workspacePath }: { workspacePath: string | null }) {
+  const hasWorkspace = Boolean(workspacePath);
   const [open, setOpen] = useState(() => localStorage.getItem(OPEN_KEY) !== "0");
   const [data, setData] = useState<ChatState | null>(null);
   const [input, setInput] = useState("");
@@ -45,20 +46,31 @@ export default function ChatPanel({ hasWorkspace }: { hasWorkspace: boolean }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef(workspacePath);
 
   const toggle = (next: boolean) => {
     setOpen(next);
     localStorage.setItem(OPEN_KEY, next ? "1" : "0");
   };
 
+  // Each workspace has its own chat — drop everything from the previous one.
+  useEffect(() => {
+    wsRef.current = workspacePath;
+    setData(null);
+    setNotice(null);
+    setProvider(null);
+  }, [workspacePath]);
+
   const load = useCallback(async () => {
-    if (!hasWorkspace) return;
+    const ws = workspacePath;
+    if (!ws) return;
     try {
-      setData(await api.chat());
+      const state = await api.chat();
+      if (wsRef.current === ws) setData(state); // ignore stale responses
     } catch {
       /* backend banner covers outages */
     }
-  }, [hasWorkspace]);
+  }, [workspacePath]);
 
   // Poll fast while a reply is streaming in, slowly otherwise.
   useEffect(() => {
