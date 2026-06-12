@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { TreeNode } from "../types";
-import { ChevronDown, ChevronRight, FileIcon, Folder } from "./icons";
+import FileTypeIcon from "./FileTypeIcon";
+import { ChevronDown, ChevronRight, Folder } from "./icons";
 
 interface NodeProps {
   node: TreeNode;
@@ -15,12 +16,12 @@ function Node({ node, depth, onOpenFile, selected }: NodeProps) {
 
   if (node.type === "dir") {
     return (
-      <div>
+      <div className="relative">
         <button
           style={pad}
           onClick={() => setOpen(!open)}
           aria-expanded={open}
-          className="focusable flex w-full cursor-pointer items-center gap-1.5 rounded py-1 pr-2 text-left text-[13px] text-neutral-700 transition-colors duration-150 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+          className="focusable flex w-full cursor-pointer items-center gap-1.5 rounded py-0.5 pr-2 text-left text-[13px] text-neutral-700 transition-colors duration-150 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
         >
           {open ? (
             <ChevronDown className="h-3 w-3 shrink-0 text-neutral-400" />
@@ -30,9 +31,19 @@ function Node({ node, depth, onOpenFile, selected }: NodeProps) {
           <Folder className="h-3.5 w-3.5 shrink-0 text-accent-subtle" />
           <span className="truncate font-medium">{node.name}</span>
         </button>
-        {open && node.children?.map((c) => (
-          <Node key={c.path} node={c} depth={depth + 1} onOpenFile={onOpenFile} selected={selected} />
-        ))}
+        {open && (
+          <div className="relative">
+            {/* VS Code-style indent guide */}
+            <span
+              aria-hidden="true"
+              className="absolute bottom-0 top-0 w-px bg-neutral-200 dark:bg-neutral-800"
+              style={{ left: `${depth * 14 + 13}px` }}
+            />
+            {node.children?.map((c) => (
+              <Node key={c.path} node={c} depth={depth + 1} onOpenFile={onOpenFile} selected={selected} />
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -45,7 +56,7 @@ function Node({ node, depth, onOpenFile, selected }: NodeProps) {
       onClick={() => onOpenFile(node.path)}
       aria-current={selected === node.path ? "true" : undefined}
       title={previewable ? node.path : "Not previewable (binary / excluded)"}
-      className={`focusable flex w-full items-center gap-1.5 rounded py-1 pr-2 text-left text-[13px] transition-colors duration-150 ${
+      className={`focusable flex w-full items-center gap-1.5 rounded py-0.5 pr-2 text-left text-[13px] transition-colors duration-150 ${
         selected === node.path
           ? "bg-accent/10 text-blue-700 dark:bg-accent/20 dark:text-blue-300"
           : previewable
@@ -54,7 +65,7 @@ function Node({ node, depth, onOpenFile, selected }: NodeProps) {
       }`}
     >
       <span className="w-3 shrink-0" />
-      <FileIcon className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+      <FileTypeIcon name={node.name} />
       <span className="truncate">{node.name}</span>
     </button>
   );

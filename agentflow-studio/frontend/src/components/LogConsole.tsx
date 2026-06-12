@@ -47,7 +47,7 @@ export default function LogConsole({ entries, running = [] }: Props) {
       {running.length > 0 && (
         <div className="mb-3 space-y-2" aria-live="polite">
           {running.map((r) => (
-            <div key={r.id} className="rounded-xl border border-blue-200 bg-blue-50/60 p-3 dark:border-blue-900 dark:bg-blue-950/30">
+            <div key={r.id} className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 dark:border-blue-900 dark:bg-blue-950/30">
               <div className="mb-1 flex items-center gap-2 text-xs">
                 <StatusBadge state="running" />
                 <span className="chip">{r.provider ?? "process"}</span>

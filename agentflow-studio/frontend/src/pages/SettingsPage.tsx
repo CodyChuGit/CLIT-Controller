@@ -116,7 +116,7 @@ export default function SettingsPage() {
         </dl>
       </section>
 
-      <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+      <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
         AgentFlow uses official CLI auth and does not store provider secrets.
       </p>
     </div>

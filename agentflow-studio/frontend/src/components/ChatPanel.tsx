@@ -24,7 +24,7 @@ function Bubble({ msg }: { msg: ChatMessage }) {
       )}
       <div
         title={msg.time}
-        className={`max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-xs leading-relaxed ${
+        className={`max-w-[85%] whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-xs leading-relaxed ${
           mine
             ? "rounded-br-sm bg-accent text-white"
             : "rounded-bl-sm border border-neutral-200 bg-white text-neutral-800 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
@@ -202,7 +202,7 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
               <Spinner className="h-3 w-3" /> thinking…
             </span>
             {data.pending.outputTail && (
-              <pre className="max-h-36 w-full overflow-auto whitespace-pre-wrap rounded-xl border border-blue-200 bg-blue-50/60 p-2 font-mono text-[10px] leading-relaxed text-neutral-600 dark:border-blue-900 dark:bg-blue-950/30 dark:text-neutral-300">
+              <pre className="max-h-36 w-full overflow-auto whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50/60 p-2 font-mono text-[10px] leading-relaxed text-neutral-600 dark:border-blue-900 dark:bg-blue-950/30 dark:text-neutral-300">
                 {data.pending.outputTail}
               </pre>
             )}

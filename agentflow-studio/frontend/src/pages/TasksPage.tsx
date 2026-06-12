@@ -145,7 +145,7 @@ function StepCard({
             : "border-neutral-200 dark:border-neutral-800";
 
   return (
-    <div className={`rounded-xl border bg-white p-2.5 shadow-sm dark:bg-neutral-900 ${border}`}>
+    <div className={`rounded-lg border bg-white p-2.5 shadow-sm dark:bg-neutral-900 ${border}`}>
       <div className="flex items-center gap-1.5">
         <span className="min-w-0 flex-1 truncate text-xs font-semibold">{preview.label}</span>
         {running && <Spinner className="h-3 w-3 text-blue-500" />}
@@ -331,7 +331,7 @@ function AgentReview({
       ) : (
         <div className="space-y-2">
           {[...runs].reverse().map((run) => (
-            <div key={run.id} className="rounded-xl border border-neutral-200 p-2.5 dark:border-neutral-800">
+            <div key={run.id} className="rounded-lg border border-neutral-200 p-2.5 dark:border-neutral-800">
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <span className="font-medium">{run.step}</span>
                 <StatusBadge state={run.status} />
@@ -524,7 +524,7 @@ export default function TasksPage() {
         )}
         {error && <div className="card border-rose-200 p-4 text-sm text-rose-600 dark:border-rose-900">{error}</div>}
         {notice && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
             {notice}
           </div>
         )}

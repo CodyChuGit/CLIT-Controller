@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import type { GitFileEntry, GitStatus } from "../types";
+import FileTypeIcon from "./FileTypeIcon";
 import { ChevronDown, ChevronRight, GitBranch, Refresh, Spinner } from "./icons";
 
 const CODE_COLORS: Record<string, string> = {
@@ -12,6 +13,7 @@ const CODE_COLORS: Record<string, string> = {
   C: "text-blue-600 dark:text-blue-400",
 };
 
+/** VS Code-style row: type icon · name · dimmed dir · hover action · status letter on the right. */
 function FileRow({
   entry,
   staged,
@@ -28,16 +30,16 @@ function FileRow({
   const name = entry.path.split("/").pop() ?? entry.path;
   const dir = entry.path.slice(0, entry.path.length - name.length).replace(/\/$/, "");
   return (
-    <div className="group flex items-center gap-1 rounded px-1 py-0.5 hover:bg-neutral-100 dark:hover:bg-neutral-800">
+    <div className="group flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-neutral-100 dark:hover:bg-neutral-800">
       <button
         onClick={onOpenDiff}
         title={`Open diff: ${entry.path}`}
         className="focusable flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded text-left"
       >
-        <span className={`w-3 shrink-0 text-center font-mono text-[11px] font-bold ${CODE_COLORS[entry.code] ?? "text-neutral-500"}`}>
-          {entry.code}
+        <FileTypeIcon name={name} />
+        <span className={`truncate text-xs ${entry.code === "D" ? "text-neutral-400 line-through" : "text-neutral-700 dark:text-neutral-300"}`}>
+          {name}
         </span>
-        <span className="truncate text-xs text-neutral-700 dark:text-neutral-300">{name}</span>
         {dir && <span className="truncate text-[10px] text-neutral-400">{dir}</span>}
       </button>
       <button
@@ -49,6 +51,12 @@ function FileRow({
       >
         {staged ? "−" : "+"}
       </button>
+      <span
+        className={`w-3 shrink-0 text-center font-mono text-[11px] font-bold ${CODE_COLORS[entry.code] ?? "text-neutral-500"}`}
+        title={`Status: ${entry.code}`}
+      >
+        {entry.code}
+      </span>
     </div>
   );
 }

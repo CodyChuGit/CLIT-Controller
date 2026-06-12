@@ -21,7 +21,7 @@ export default function BudgetModePicker({ value, onChange }: Props) {
           role="radio"
           aria-checked={value === m.id}
           onClick={() => onChange(m.id)}
-          className={`focusable cursor-pointer rounded-xl border p-3 text-left transition-all duration-150 active:scale-[0.99] ${
+          className={`focusable cursor-pointer rounded-lg border p-3 text-left transition-all duration-150 active:scale-[0.99] ${
             value === m.id
               ? "border-accent bg-blue-50 ring-1 ring-accent dark:border-accent dark:bg-blue-950/40"
               : "border-neutral-200 bg-white hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
