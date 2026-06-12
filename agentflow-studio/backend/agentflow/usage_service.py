@@ -213,3 +213,121 @@ def increment_local_steps(workspace: Path, count: int = 1) -> dict:
 
 def provider_health(usage: dict, provider: str) -> str:
     return usage.get("providers", {}).get(provider, {}).get("health", "green")
+
+
+# ----------------------------------------------------- live usage from the CLIs
+# codex caches the API's real rate-limit snapshots in its session files; claude
+# and agy expose nothing headlessly (verified), so they fall back to manual limits.
+
+import time as _time
+
+
+def _extract_rate_limits(text: str):
+    import json as _json
+
+    i = text.rfind('"rate_limits":')
+    if i == -1:
+        return None
+    j = text.find("{", i)
+    if j == -1:
+        return None
+    depth = 0
+    for k in range(j, min(len(text), j + 4000)):
+        if text[k] == "{":
+            depth += 1
+        elif text[k] == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    return _json.loads(text[j : k + 1])
+                except _json.JSONDecodeError:
+                    return None
+    return None
+
+
+def _window_label(minutes) -> str:
+    minutes = minutes or 0
+    if minutes >= 1440:
+        return f"{round(minutes / 1440)}d"
+    return f"{round(minutes / 60)}h"
+
+
+def codex_live_usage():
+    """Newest rate_limits snapshot from ~/.codex session files (real API data)."""
+    from datetime import datetime, timezone
+
+    base = Path.home() / ".codex" / "sessions"
+    if not base.is_dir():
+        return None
+    try:
+        files = sorted(base.rglob("*.jsonl"), key=lambda f: f.stat().st_mtime, reverse=True)[:12]
+    except OSError:
+        return None
+    for f in files:
+        try:
+            size = f.stat().st_size
+            with open(f, "rb") as fh:
+                fh.seek(max(0, size - 200_000))
+                text = fh.read().decode("utf-8", "replace")
+        except OSError:
+            continue
+        rl = _extract_rate_limits(text)
+        if not rl or not rl.get("primary"):
+            continue
+        windows = []
+        for key in ("primary", "secondary"):
+            w = rl.get(key)
+            if w and w.get("used_percent") is not None:
+                windows.append(
+                    {
+                        "label": _window_label(w.get("window_minutes")),
+                        "usedPercent": float(w["used_percent"]),
+                        "resetsAt": w.get("resets_at"),
+                    }
+                )
+        if windows:
+            return {
+                "available": True,
+                "plan": rl.get("plan_type"),
+                "windows": windows,
+                "sourcedAt": datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc).isoformat(
+                    timespec="seconds"
+                ),
+            }
+    return None
+
+
+_live_cache: dict = {"at": 0.0, "data": None}
+
+
+def live_usage(force: bool = False) -> dict:
+    now = _time.time()
+    if not force and _live_cache["data"] is not None and now - _live_cache["at"] < 60:
+        return _live_cache["data"]
+    data = {
+        "codex": codex_live_usage()
+        or {"available": False, "note": "no recent codex session data — run codex once"},
+        "claude": {"available": False, "note": "Claude Code exposes no headless usage API — manual limit"},
+        "antigravity": {"available": False, "note": "agy exposes no usage API — manual limit"},
+    }
+    _live_cache["at"] = now
+    _live_cache["data"] = data
+    return data
+
+
+def live_summary_line() -> str:
+    """Compact live-quota line for the orchestrator's budget awareness."""
+    from datetime import datetime, timezone
+
+    codex = live_usage().get("codex", {})
+    if not codex.get("available"):
+        return ""
+    parts = []
+    for w in codex.get("windows", []):
+        reset = ""
+        if w.get("resetsAt"):
+            dt = datetime.fromtimestamp(w["resetsAt"], tz=timezone.utc)
+            hours = max(0, (dt - datetime.now(timezone.utc)).total_seconds() / 3600)
+            reset = f", resets in {hours:.1f}h"
+        parts.append(f"{w['label']} window {w['usedPercent']:.0f}% used{reset}")
+    return f"Codex live quota ({codex.get('plan', '?')} plan): " + "; ".join(parts)

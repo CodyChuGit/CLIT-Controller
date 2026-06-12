@@ -288,10 +288,12 @@ async def _workspace_summary(workspace: Path) -> str:
     detail = "\n\n".join(
         task_service.task_state_summary(workspace, t["id"]) for t in tasks[:2]
     )
+    live_line = usage_service.live_summary_line()
     return (
         f"Workspace: {workspace} ({git_line})\n"
         f"{queue_service.summary_line(workspace)}\n"
-        f"Recent AgentFlow tasks:{task_lines}"
+        + (f"{live_line}\n" if live_line else "")
+        + f"Recent AgentFlow tasks:{task_lines}"
         + (f"\n\nCurrent task state (per agent):\n{detail}" if detail else "")
     )
 

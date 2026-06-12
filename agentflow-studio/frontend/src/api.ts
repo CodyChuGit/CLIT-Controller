@@ -7,6 +7,7 @@ import type {
   GitInfo,
   GitStatus,
   InstallResult,
+  LiveProviderUsage,
   LoginResult,
   LogsResponse,
   PreviewState,
@@ -111,6 +112,7 @@ export const api = {
     post<Usage>("/usage/provider-health", { provider, health }),
   setProviderLimit: (provider: string, limitCalls: number | null, windowHours: number | null) =>
     post<Usage>("/usage/provider-limit", { provider, limitCalls, windowHours }),
+  usageLive: (force = false) => get<Record<string, LiveProviderUsage>>(`/usage/live?force=${force}`),
   recommendations: () => get<Recommendation>("/usage/recommendations"),
 
   // logs

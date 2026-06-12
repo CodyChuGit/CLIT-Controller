@@ -229,6 +229,20 @@ export interface ProviderUsage {
   lastStatus: string;
 }
 
+export interface LiveWindow {
+  label: string;
+  usedPercent: number;
+  resetsAt: number | null;
+}
+
+export interface LiveProviderUsage {
+  available: boolean;
+  plan?: string;
+  windows?: LiveWindow[];
+  sourcedAt?: string;
+  note?: string;
+}
+
 export interface Usage {
   mode: string;
   orchestrationMode: OrchestrationMode;

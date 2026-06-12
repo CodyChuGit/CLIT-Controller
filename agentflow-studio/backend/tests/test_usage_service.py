@@ -62,3 +62,19 @@ def test_window_reset_and_limits(tmp_path):
     fresh = usage_service.ensure_usage(ws)
     assert fresh["providers"]["claude"]["callsToday"] == 0
     assert fresh["providers"]["claude"]["limitCalls"] == 20  # limit survives resets
+
+
+def test_extract_rate_limits_brace_matching():
+    line = (
+        '{"type":"event","payload":{"rate_limits":{"limit_id":"codex","primary":'
+        '{"used_percent":32.0,"window_minutes":300,"resets_at":1781279261},'
+        '"secondary":{"used_percent":15.0,"window_minutes":10080,"resets_at":1781847311},'
+        '"plan_type":"plus"}}}'
+    )
+    rl = usage_service._extract_rate_limits(line)
+    assert rl is not None
+    assert rl["primary"]["used_percent"] == 32.0
+    assert rl["plan_type"] == "plus"
+    assert usage_service._window_label(300) == "5h"
+    assert usage_service._window_label(10080) == "7d"
+    assert usage_service._extract_rate_limits("no limits here") is None

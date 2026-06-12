@@ -36,6 +36,11 @@ def set_limit(body: ProviderLimitRequest):
     return usage_service.set_provider_limit(require_workspace(), body.provider, body.limitCalls, body.windowHours)
 
 
+@router.get("/live")
+def live(force: bool = False):
+    return usage_service.live_usage(force=force)
+
+
 @router.get("/recommendations")
 async def recommendations():
     ws = require_workspace()

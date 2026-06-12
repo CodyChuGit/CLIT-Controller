@@ -5,7 +5,7 @@ import { Refresh } from "../components/icons";
 import RoutingRecommendationCard from "../components/RoutingRecommendationCard";
 import StatusBadge from "../components/StatusBadge";
 import UsageHealthBadge from "../components/UsageHealthBadge";
-import type { Health, OrchestrationMode, Recommendation, Usage } from "../types";
+import type { Health, LiveProviderUsage, OrchestrationMode, Recommendation, Usage } from "../types";
 
 function fmtDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
@@ -29,6 +29,42 @@ function usedColor(used: number, limit: number | null): string {
   if (left <= 0.1) return "text-rose-600 dark:text-rose-400";
   if (left <= 0.35) return "text-amber-600 dark:text-amber-400";
   return "text-emerald-600 dark:text-emerald-400";
+}
+
+function epochResets(resetsAt: number | null): string {
+  if (!resetsAt) return "";
+  const ms = resetsAt * 1000 - Date.now();
+  if (ms <= 0) return "now";
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.round((ms % 3_600_000) / 60_000);
+  return h > 24 ? `in ${Math.round(h / 24)}d ${h % 24}h` : h > 0 ? `in ${h}h ${m}m` : `in ${m}m`;
+}
+
+function pctColor(used: number): string {
+  if (used >= 90) return "bg-rose-500";
+  if (used >= 65) return "bg-amber-500";
+  return "bg-emerald-500";
+}
+
+/** Real session usage straight from the CLI's own data. */
+function LiveWindows({ liveData }: { liveData: LiveProviderUsage }) {
+  return (
+    <div className="space-y-1">
+      {(liveData.windows ?? []).map((w) => (
+        <div key={w.label} className="flex items-center justify-end gap-1.5">
+          <span className="font-mono text-[10px] text-neutral-400">{w.label}</span>
+          <div className="h-1.5 w-20 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+            <div className={`h-full rounded-full ${pctColor(w.usedPercent)}`} style={{ width: `${Math.min(100, w.usedPercent)}%` }} />
+          </div>
+          <span className={`w-16 text-right tabular-nums font-semibold ${
+            w.usedPercent >= 90 ? "text-rose-600 dark:text-rose-400" : w.usedPercent >= 65 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"
+          }`}>
+            {(100 - w.usedPercent).toFixed(0)}% left
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /** Inline editor for a provider's call limit + reset window. */
@@ -64,14 +100,16 @@ function LimitCell({
 
 export default function UsagePage() {
   const [usage, setUsage] = useState<Usage | null>(null);
+  const [live, setLive] = useState<Record<string, LiveProviderUsage> | null>(null);
   const [rec, setRec] = useState<Recommendation | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [u, r] = await Promise.all([api.usage(), api.recommendations()]);
+      const [u, r, l] = await Promise.all([api.usage(), api.recommendations(), api.usageLive()]);
       setUsage(u);
       setRec(r);
+      setLive(l);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -161,6 +199,10 @@ export default function UsagePage() {
                         <UsageHealthBadge value={p.health} onChange={(h) => void setHealth(id, h)} name={id} />
                       </td>
                       <td className="px-2 py-1.5">
+                        {live?.[id]?.available ? (
+                          <LiveWindows liveData={live[id]} />
+                        ) : (
+                        <>
                         <LimitCell id={id} usage={p} onSave={(l, h) => void setLimit(id, l, h)} />
                         {p.limitCalls != null && (
                           <div className="ml-auto mt-1 h-1 w-20 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
@@ -176,8 +218,23 @@ export default function UsagePage() {
                             />
                           </div>
                         )}
+                        </>
+                        )}
                       </td>
                       <td className="px-2 py-1.5">
+                        {live?.[id]?.available ? (
+                          <div className="space-y-0.5">
+                            {(live[id].windows ?? []).map((w) => (
+                              <div key={w.label} className="flex items-center gap-1.5 text-[11px]">
+                                <span className="font-mono text-[10px] text-neutral-400">{w.label}</span>
+                                <span className="tabular-nums text-neutral-500">{epochResets(w.resetsAt)}</span>
+                              </div>
+                            ))}
+                            <span className="rounded bg-violet-100 px-1 text-[9px] font-semibold uppercase text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                              live · {live[id].plan ?? "cli"}
+                            </span>
+                          </div>
+                        ) : (
                         <div className="flex items-center gap-1.5">
                           <select
                             className="input w-auto cursor-pointer px-1 py-0 font-mono text-[10px]"
@@ -191,6 +248,7 @@ export default function UsagePage() {
                           </select>
                           <span className="tabular-nums text-neutral-500">{resetsIn(p.windowStartedAt, p.windowHours)}</span>
                         </div>
+                        )}
                       </td>
                       <td className="px-2 py-1.5 text-right tabular-nums">
                         {p.estimatedPromptChars.toLocaleString()} / {p.estimatedOutputChars.toLocaleString()}
