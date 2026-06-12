@@ -86,6 +86,32 @@ def step_provider(workspace: Path, step: str) -> str:
     return routing.get(STEP_DEFS[step]["role"], "claude")
 
 
+def set_orchestrated(workspace: Path, task_id: str) -> None:
+    meta = _load_meta(workspace, task_id)
+    if not meta.get("orchestrated"):
+        meta["orchestrated"] = True
+        meta.setdefault("consults", 0)
+        _save_meta(workspace, meta)
+
+
+def task_state_summary(workspace: Path, task_id: str) -> str:
+    """Compact, truthful state for the orchestrator: what each agent actually did."""
+    meta = _load_meta(workspace, task_id)
+    lines = [f"Task {task_id}: {meta['title']} — goal: {meta.get('goal', '')[:200]}"]
+    for step, s in meta.get("steps", {}).items():
+        bits = [s.get("status", "idle")]
+        if s.get("artifactsWritten"):
+            bits.append("wrote " + ", ".join(s["artifactsWritten"]))
+        if s.get("codeChanged"):
+            bits.append(f"changed {len(s['codeChanged'])} code file(s)")
+        lines.append(f"- {step} ({s.get('provider', '?')}): {'; '.join(bits)}")
+    events = meta.get("events", [])[-4:]
+    if events:
+        lines.append("Recent events:")
+        lines += [f"  • {e['detail'][:140]}" for e in events]
+    return "\n".join(lines)
+
+
 def _add_event(workspace: Path, task_id: str, type_: str, detail: str, *, step=None, provider=None, extra=None) -> None:
     """Append to the task's structured handoff log (shown as the orchestration timeline)."""
     meta = _load_meta(workspace, task_id)
@@ -122,7 +148,7 @@ async def _changed_code_paths(workspace: Path) -> set[str]:
 # ----------------------------------------------------------------- create/list
 
 
-def create_task(workspace: Path, title: str, goal: str) -> dict:
+def create_task(workspace: Path, title: str, goal: str, orchestrated: bool = False) -> dict:
     usage = usage_service.ensure_usage(workspace)
     routing = config.get_workspace_routing(workspace)
 
@@ -145,6 +171,8 @@ def create_task(workspace: Path, title: str, goal: str) -> dict:
         "steps": {step: {"status": "idle", "provider": step_provider(workspace, step)} for step in STEP_DEFS},
         "fullSequence": {"status": "idle", "currentStep": None},
         "events": [],
+        "orchestrated": orchestrated,
+        "consults": 0,
     }
     _save_meta(workspace, meta)
     _add_event(

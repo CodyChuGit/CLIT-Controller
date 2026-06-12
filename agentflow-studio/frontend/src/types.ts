@@ -153,6 +153,8 @@ export interface TaskMeta {
   steps: Record<string, StepState>;
   fullSequence: { status: string; currentStep: string | null };
   events?: TaskEvent[];
+  orchestrated?: boolean;
+  consults?: number;
 }
 
 export interface StepPreview {

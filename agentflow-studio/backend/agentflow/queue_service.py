@@ -135,6 +135,24 @@ def _set_item(workspace: Path, item_id: str, **fields) -> Optional[dict]:
 # ------------------------------------------------------------- the dispatcher
 
 
+def _request_consult(data: dict, item: dict, record) -> None:
+    """Ask the orchestrator to review a finished step of an orchestrated task."""
+    if any(c["taskId"] == item["taskId"] for c in data.get("consults", [])):
+        return  # one pending consult per task is enough
+    tail = ""
+    if record is not None:
+        tail = (record.stdout + ("\n" + record.stderr if record.stderr else ""))[-1500:]
+    data.setdefault("consults", []).append(
+        {
+            "taskId": item["taskId"],
+            "trigger": f"{item['label']} via {item['provider']} finished: {item['status']}"
+            + (f" ({item['note']})" if item.get("note") else ""),
+            "outputTail": tail,
+            "requestedAt": now_iso(),
+        }
+    )
+
+
 def _finalize_running(workspace: Path) -> None:
     """Sync pass: settle finished runs, block later steps of failed tasks, prune history."""
     data = load_queue(workspace)
@@ -159,6 +177,13 @@ def _finalize_running(workspace: Path) -> None:
             if not ok:
                 failed_tasks.add(item["taskId"])
             changed = True
+            # Closed loop: orchestrated tasks go back to the orchestrator after every step.
+            try:
+                meta = task_service._load_meta(workspace, item["taskId"])
+                if meta.get("orchestrated"):
+                    _request_consult(data, item, record)
+            except FileNotFoundError:
+                pass
 
     if failed_tasks:
         for item in data["items"]:
@@ -262,10 +287,46 @@ async def approve_item(workspace: Path, item_id: str) -> dict:
     return await dispatch_item(workspace, item_id, confirm=True, source="manual")
 
 
+async def _process_consults(workspace: Path, manual: bool) -> None:
+    """Run at most one pending orchestrator consult, when the orchestrator is free."""
+    from . import chat_service  # local import: chat_service ↔ queue_service
+
+    data = load_queue(workspace)
+    consults = data.get("consults", [])
+    if not consults:
+        return
+    if manual:
+        dropped = consults
+        data["consults"] = []
+        _save(workspace, data)
+        for c in dropped:
+            try:
+                task_service._add_event(
+                    workspace, c["taskId"], "needs_user",
+                    "orchestrator consult skipped (Manual Approval mode) — queue the next step yourself",
+                )
+            except FileNotFoundError:
+                pass
+        return
+    if chat_service.pending_state(workspace) is not None:
+        return  # the user is mid-conversation with the orchestrator — wait
+    routing = config.get_workspace_routing(workspace)
+    orchestrator = routing.get("orchestrator", "antigravity")
+    busy = {r.provider for r in RUNNER.running_runs() if r.provider}
+    if orchestrator in busy or any(r.step == "orchestrate" for r in RUNNER.running_runs()):
+        return
+    consult = consults.pop(0)
+    _save(workspace, data)
+    await chat_service.orchestrator_consult(
+        workspace, consult["taskId"], consult["trigger"], consult.get("outputTail", "")
+    )
+
+
 async def tick(workspace: Path) -> None:
     _finalize_running(workspace)
     usage = usage_service.ensure_usage(workspace)
     manual = usage.get("orchestrationMode") == "manual_approval"
+    await _process_consults(workspace, manual)
     candidate = _pick_candidate(workspace, manual)
     if candidate:
         await dispatch_item(workspace, candidate, confirm=False, source="auto")

@@ -22,6 +22,28 @@ _pending: dict[str, str] = {}
 
 _TASK_DIRECTIVE_RE = re.compile(r"```agentflow-task\s*\n(.*?)```", re.DOTALL)
 _QUEUE_DIRECTIVE_RE = re.compile(r"```agentflow-queue\s*\n(.*?)```", re.DOTALL)
+_DONE_DIRECTIVE_RE = re.compile(r"```agentflow-done\s*\n(.*?)```", re.DOTALL)
+_NEEDS_USER_DIRECTIVE_RE = re.compile(r"```agentflow-needs-user\s*\n(.*?)```", re.DOTALL)
+
+MAX_CONSULTS_PER_TASK = 6
+
+
+def _parse_reason_block(regex: re.Pattern[str], text: str) -> Optional[str]:
+    m = regex.search(text or "")
+    if not m:
+        return None
+    for line in m.group(1).splitlines():
+        if line.lower().startswith("reason:"):
+            return line[7:].strip() or "no reason given"
+    return "no reason given"
+
+
+def parse_done_directive(text: str) -> Optional[str]:
+    return _parse_reason_block(_DONE_DIRECTIVE_RE, text)
+
+
+def parse_needs_user_directive(text: str) -> Optional[str]:
+    return _parse_reason_block(_NEEDS_USER_DIRECTIVE_RE, text)
 
 
 def _parse_steps(raw: str) -> Optional[list[str]]:
@@ -154,10 +176,15 @@ async def _workspace_summary(workspace: Path) -> str:
         git_line = "not a git repository"
     tasks = task_service.list_tasks(workspace)[:5]
     task_lines = "".join(f"\n- {t['id']}: {t['title']} ({t['status']})" for t in tasks) or " none yet"
+    # The orchestrator must see what each agent actually did, not just task names.
+    detail = "\n\n".join(
+        task_service.task_state_summary(workspace, t["id"]) for t in tasks[:2]
+    )
     return (
         f"Workspace: {workspace} ({git_line})\n"
         f"{queue_service.summary_line(workspace)}\n"
         f"Recent AgentFlow tasks:{task_lines}"
+        + (f"\n\nCurrent task state (per agent):\n{detail}" if detail else "")
     )
 
 
@@ -227,7 +254,7 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
                 if directive is not None:
                     title, goal, queue_steps = directive
                     try:
-                        meta = task_service.create_task(workspace, title, goal)
+                        meta = task_service.create_task(workspace, title, goal, orchestrated=True)
                         note = f"Task created by the orchestrator: {meta['id']}"
                         if queue_steps:
                             queue_service.add_steps(workspace, meta["id"], queue_steps, source="orchestrator")
@@ -251,6 +278,7 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
                                 f"Could not queue steps: no task matches `{ref}`.", provider=provider,
                             )
                         else:
+                            task_service.set_orchestrated(workspace, task_id)
                             queue_service.add_steps(workspace, task_id, steps, source="orchestrator")
                             append_message(
                                 workspace, "system",
@@ -296,6 +324,145 @@ async def stop(workspace: Path) -> dict:
         return {"stopped": False}
     ok = await RUNNER.cancel(run_id)
     return {"stopped": ok}
+
+
+async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, output_tail: str = "") -> dict:
+    """System-initiated orchestrator turn after a step finishes: it sees the results
+    and decides the next action (queue more steps, declare done, or escalate)."""
+    meta = task_service._load_meta(workspace, task_id)
+    consults = int(meta.get("consults", 0))
+    if consults >= MAX_CONSULTS_PER_TASK:
+        task_service._add_event(
+            workspace, task_id, "needs_user",
+            f"orchestrator consult limit reached ({MAX_CONSULTS_PER_TASK}) — continue manually or via chat",
+        )
+        return {"status": "consult_limit"}
+
+    routing = config.get_workspace_routing(workspace)
+    provider = routing.get("orchestrator", "antigravity")
+    usage = usage_service.ensure_usage(workspace)
+    template = config.get_command_templates().get(provider, f"{provider} {{prompt}}")
+    if resolve_executable(shlex.split(template)[0]) is None:
+        task_service._add_event(
+            workspace, task_id, "needs_user",
+            f"orchestrator consult skipped — `{provider}` is not installed",
+        )
+        return {"status": "provider_missing"}
+
+    state = task_service.task_state_summary(workspace, task_id)
+    prompt = prompt_templates.orchestrator_consult_prompt(usage, state, trigger, redact(output_tail[-1500:]))
+    argv = task_service._build_argv(template, prompt, config.get_models().get(provider))
+
+    from datetime import datetime
+
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_file = paths.task_logs_dir(workspace, task_id) / f"{stamp}-orchestrate.log"
+    prompt_file = paths.task_logs_dir(workspace, task_id) / f"{stamp}-orchestrate.prompt.txt"
+    prompt_file.parent.mkdir(exist_ok=True)
+    prompt_file.write_text(redact(prompt), encoding="utf-8")
+
+    meta = task_service._load_meta(workspace, task_id)
+    meta["consults"] = consults + 1
+    task_service._save_meta(workspace, meta)
+    task_service._add_event(
+        workspace, task_id, "consult",
+        f"system consulted the orchestrator ({provider}): {trigger[:120]}",
+        provider=provider,
+    )
+
+    async def on_complete(record) -> None:
+        try:
+            usage_service.record_call(
+                workspace, provider,
+                prompt_chars=len(prompt),
+                output_chars=len(record.stdout) + len(record.stderr),
+                duration_ms=record.duration_ms or 0,
+                status=record.status,
+            )
+            out = record.stdout.strip()
+            if record.status != "succeeded" or not out:
+                task_service._add_event(
+                    workspace, task_id, "needs_user",
+                    f"orchestrator consult failed ({record.status}, exit {record.exit_code}) — decide the next step manually",
+                    provider=provider,
+                )
+                return
+
+            from . import queue_service  # local import: queue_service ↔ chat_service
+
+            queued = parse_queue_directive(out)
+            done_reason = parse_done_directive(out)
+            user_reason = parse_needs_user_directive(out)
+            reasoning = _TASK_DIRECTIVE_RE.sub("", _QUEUE_DIRECTIVE_RE.sub("", out))
+            reasoning = _DONE_DIRECTIVE_RE.sub("", _NEEDS_USER_DIRECTIVE_RE.sub("", reasoning)).strip()[:240]
+
+            if queued is not None:
+                _ref, steps = queued
+                queue_service.add_steps(workspace, task_id, steps, source="orchestrator")
+                task_service._add_event(
+                    workspace, task_id, "consult",
+                    f"orchestrator decision: queue {', '.join(steps)}" + (f" — {reasoning}" if reasoning else ""),
+                    provider=provider,
+                )
+                append_message(
+                    workspace, "system",
+                    f"Orchestrator reviewed `{trigger[:60]}` → queued {', '.join(steps)} for {task_id}.",
+                    provider=provider,
+                )
+            elif done_reason is not None:
+                meta2 = task_service._load_meta(workspace, task_id)
+                meta2["status"] = "done"
+                meta2["orchestratorVerdict"] = {"verdict": "done", "reason": done_reason, "at": now_iso()}
+                task_service._save_meta(workspace, meta2)
+                task_service._add_event(
+                    workspace, task_id, "done",
+                    f"orchestrator declared the task complete: {done_reason}",
+                    provider=provider,
+                )
+                append_message(
+                    workspace, "system",
+                    f"Orchestrator marked {task_id} complete: {done_reason}",
+                    provider=provider,
+                )
+            elif user_reason is not None:
+                task_service._add_event(
+                    workspace, task_id, "needs_user",
+                    f"orchestrator needs your decision: {user_reason}",
+                    provider=provider,
+                )
+                append_message(
+                    workspace, "system",
+                    f"Orchestrator needs your input on {task_id}: {user_reason}",
+                    provider=provider,
+                )
+            else:
+                task_service._add_event(
+                    workspace, task_id, "needs_user",
+                    "orchestrator replied without an actionable block — decide the next step manually"
+                    + (f" (it said: {reasoning})" if reasoning else ""),
+                    provider=provider,
+                )
+            add_log_entry(
+                "orchestrate",
+                f"consult for {task_id} via {provider}: {record.status} in {(record.duration_ms or 0) / 1000:.1f}s",
+                provider=provider, task_id=task_id, step="orchestrate",
+            )
+        except Exception as exc:  # noqa: BLE001 — the loop must never die here
+            add_log_entry("orchestrate", f"consult post-processing failed: {exc}", status="error", task_id=task_id)
+
+    record, _task = await RUNNER.start(
+        argv, workspace,
+        task_id=task_id, step="orchestrate", provider=provider,
+        log_file=str(log_file), on_complete=on_complete,
+    )
+    if record.status == "error":
+        task_service._add_event(
+            workspace, task_id, "needs_user",
+            f"orchestrator consult could not start: {record.stderr.strip()[:200]}",
+            provider=provider,
+        )
+        return {"status": "error"}
+    return {"status": "started", "runId": record.id}
 
 
 def chat_state(workspace: Path) -> dict:

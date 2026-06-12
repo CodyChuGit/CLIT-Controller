@@ -95,6 +95,35 @@ After fixing, append to 04_CLAUDE_IMPLEMENTATION_SUMMARY.md.
     )
 
 
+def orchestrator_consult_prompt(usage: dict, task_state: str, trigger: str, output_tail: str) -> str:
+    """After a step finishes, the system asks the orchestrator what to do next."""
+    tail = f"Output from that step (tail):\n{output_tail}\n\n" if output_tail else ""
+    return (
+        f"{budget_context_header(usage)}\n\n"
+        "You are the orchestration model for AgentFlow Studio, supervising a task whose step just "
+        "finished. Decide the next action based on what the task ACTUALLY needs — you are not bound "
+        "to a fixed pipeline. Skip steps that add no value; pick the agent that fits the work: "
+        "codex (specs/plans/reviews), claude (implementation/bug fixing), antigravity (QA/broad checks).\n\n"
+        f"{task_state}\n\n"
+        f"Just happened: {trigger}\n\n"
+        f"{tail}"
+        "Reply with AT MOST two sentences of reasoning plus exactly ONE of these blocks:\n\n"
+        "Queue the next step(s):\n"
+        "```agentflow-queue\n"
+        "task: <task id>\n"
+        "steps: <comma list from: codex_spec, claude_implement, gemini_qa, codex_review, claude_fix>\n"
+        "```\n\n"
+        "The task is complete (or further agent spend isn't worth it):\n"
+        "```agentflow-done\n"
+        "reason: <one line>\n"
+        "```\n\n"
+        "A human decision is required:\n"
+        "```agentflow-needs-user\n"
+        "reason: <one line>\n"
+        "```"
+    )
+
+
 def orchestrator_chat_prompt(usage: dict, workspace_summary: str, transcript: str, message: str) -> str:
     """Prompt for the persistent orchestrator chat. Compact by design."""
     convo = f"Conversation so far:\n{transcript}\n\n" if transcript else ""
@@ -116,8 +145,11 @@ def orchestrator_chat_prompt(usage: dict, workspace_summary: str, transcript: st
         "goal: <compact goal description>\n"
         "queue: full\n"
         "```\n"
-        "(`queue:` is optional — `full` means codex_spec, claude_implement, gemini_qa, codex_review; "
-        "or give a comma list of steps; omit the line to create without queueing.)\n\n"
+        "(`queue:` is optional — usually queue only the FIRST step the task actually needs: AgentFlow "
+        "reports back to you after every step finishes so you can decide the next one based on the "
+        "results. Use the task's complexity: a trivial change may go straight to claude_implement; "
+        "complex work starts with codex_spec. `full` queues the whole standard pipeline — only use it "
+        "when you genuinely want the fixed sequence.)\n\n"
         "Queue steps for an existing task:\n"
         "```agentflow-queue\n"
         "task: <task id, or `latest`>\n"

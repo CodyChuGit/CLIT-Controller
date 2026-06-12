@@ -47,3 +47,12 @@ def test_queue_directive_parses_and_validates():
     assert parse_queue_directive(text) == ("latest", ["claude_implement", "gemini_qa"])
     assert parse_queue_directive("```agentflow-queue\ntask: x\nsteps: bogus\n```") is None
     assert parse_queue_directive("no block") is None
+
+
+def test_done_and_needs_user_directives():
+    from agentflow.chat_service import parse_done_directive, parse_needs_user_directive
+
+    assert parse_done_directive("```agentflow-done\nreason: QA passed, review clean\n```") == "QA passed, review clean"
+    assert parse_done_directive("nothing here") is None
+    assert parse_needs_user_directive("```agentflow-needs-user\nreason: budget call\n```") == "budget call"
+    assert parse_needs_user_directive("```agentflow-done\nreason: x\n```") is None

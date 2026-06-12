@@ -117,6 +117,9 @@ const EVENT_DOT: Record<string, string> = {
   blocked: "bg-rose-500",
   local_check: "bg-neutral-400",
   sequence: "bg-blue-500",
+  consult: "bg-violet-500",
+  done: "bg-emerald-500",
+  needs_user: "bg-amber-500",
 };
 
 function fmtDuration(ms?: number | null): string {
@@ -643,10 +646,19 @@ export default function TasksPage() {
           )}
         </header>
 
-        {detail?.task.fullSequence && detail.task.fullSequence.status !== "idle" && (
+        {detail && (detail.task.orchestrated || (detail.task.fullSequence && detail.task.fullSequence.status !== "idle")) && (
           <div className="flex items-center gap-2 text-xs text-neutral-500">
-            Sequence: <StatusBadge state={detail.task.fullSequence.status} />
-            {detail.task.fullSequence.currentStep && <span>at {detail.task.fullSequence.currentStep}</span>}
+            {detail.task.orchestrated && (
+              <span className="rounded bg-violet-100 px-1.5 text-[10px] font-medium text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                orchestrator-driven
+              </span>
+            )}
+            {detail.task.fullSequence && detail.task.fullSequence.status !== "idle" && (
+              <>
+                Sequence: <StatusBadge state={detail.task.fullSequence.status} />
+                {detail.task.fullSequence.currentStep && <span>at {detail.task.fullSequence.currentStep}</span>}
+              </>
+            )}
           </div>
         )}
         {error && <div className="card border-rose-200 p-4 text-sm text-rose-600 dark:border-rose-900">{error}</div>}

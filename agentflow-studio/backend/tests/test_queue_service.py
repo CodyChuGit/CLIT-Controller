@@ -66,3 +66,28 @@ def test_summary_line(tmp_path):
     queue_service.add_steps(ws, tid, ["codex_spec"])
     line = queue_service.summary_line(ws)
     assert "1 active" in line and "codex_spec" in line
+
+
+def test_consult_requested_for_orchestrated_tasks(tmp_path):
+    ws = tmp_path / "ws2"
+    ws.mkdir()
+    config.ensure_workspace(ws)
+    meta = task_service.create_task(ws, "Orchestrated", "Goal.", orchestrated=True)
+    data = queue_service.load_queue(ws)
+    item = {"taskId": meta["id"], "label": "Implement", "provider": "claude", "status": "done", "note": None}
+    queue_service._request_consult(data, item, None)
+    queue_service._request_consult(data, item, None)  # duplicate per task is skipped
+    assert len(data["consults"]) == 1
+    assert data["consults"][0]["taskId"] == meta["id"]
+
+
+def test_task_state_summary_reports_agent_work(tmp_path):
+    ws = tmp_path / "ws3"
+    ws.mkdir()
+    config.ensure_workspace(ws)
+    meta = task_service.create_task(ws, "Summary", "Goal.")
+    m = task_service._load_meta(ws, meta["id"])
+    m["steps"]["codex_spec"].update(status="succeeded", artifactsWritten=["01_CODEX_SPEC.md"])
+    task_service._save_meta(ws, m)
+    summary = task_service.task_state_summary(ws, meta["id"])
+    assert "codex_spec" in summary and "wrote 01_CODEX_SPEC.md" in summary
