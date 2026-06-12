@@ -1,6 +1,5 @@
 import type { Recommendation } from "../types";
 import { ArrowRight } from "./icons";
-import UsageHealthBadge from "./UsageHealthBadge";
 
 export default function RoutingRecommendationCard({ rec }: { rec: Recommendation }) {
   return (
@@ -20,18 +19,7 @@ export default function RoutingRecommendationCard({ rec }: { rec: Recommendation
               manual approval
             </span>
           )}
-          <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
-            {rec.modeLabel}
-          </span>
         </div>
-      </div>
-
-      <div className="mb-3 flex flex-wrap gap-4 text-xs text-neutral-500">
-        {(["claude", "codex", "antigravity"] as const).map((p) => (
-          <span key={p} className="flex items-center gap-1.5 capitalize">
-            {p} <UsageHealthBadge value={rec.health[p] ?? null} name={p} />
-          </span>
-        ))}
       </div>
 
       {rec.warnings.map((w, i) => (

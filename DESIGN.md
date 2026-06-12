@@ -56,8 +56,8 @@ Edge-to-edge layouts (Explorer, Tasks console) own their scroll areas; centered 
 ## Layout primitives
 
 - **App shell:** activity bar (48px icon rail, left) · main content · chat dock (resizable, right) ·
-  status bar (24px, bottom — solid accent blue with white text, VS Code-style; rose when the
-  backend is offline). Panels are solid surfaces separated by hairline borders; centered pages
+  status bar (24px, bottom — quiet neutral strip; offline state signals in rose text, never a
+  colored banner). Panels are solid surfaces separated by hairline borders; centered pages
   use `max-w-5xl p-6`.
 - **Panel section** (Explorer sidebar pattern): collapsible header row — chevron + uppercase
   micro-label + optional mono badge + right-aligned icon actions — then content, then
@@ -71,6 +71,8 @@ Edge-to-edge layouts (Explorer, Tasks console) own their scroll areas; centered 
 - **Buttons:** `.btn-primary` (accent) / `.btn-secondary` (bordered) / `.btn-danger`; add `.btn-xs`
   for compact row actions. One primary action per view.
 - **Icon buttons:** use `.icon-btn` (hover square, focus ring), always with `title` + `aria-label`.
+- **Segmented control** (mutually exclusive modes): bordered `rounded-md` strip of `text-xs`
+  segments, selected = `bg-blue-50 text-blue-700`; hints go in `title` tooltips, not body text.
 - **Status badge:** dot + lowercase label pill (`StatusBadge`). Health = three-dot
   traffic light (`UsageHealthBadge`).
 - **Chips:** `.chip` for provider/meta; artifact chips are bordered minis (`text-[10px]

@@ -12,25 +12,28 @@ interface Props {
   onChange: (mode: OrchestrationMode) => void;
 }
 
+/** Segmented control; hints live in tooltips to keep the row quiet. */
 export default function BudgetModePicker({ value, onChange }: Props) {
   return (
-    <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" role="radiogroup" aria-label="Orchestration mode">
+    <div
+      className="inline-flex overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-800"
+      role="radiogroup"
+      aria-label="Orchestration mode"
+    >
       {MODES.map((m) => (
         <button
           key={m.id}
           role="radio"
           aria-checked={value === m.id}
+          title={m.hint}
           onClick={() => onChange(m.id)}
-          className={`focusable cursor-pointer rounded-lg border p-2.5 text-left transition-all duration-150 active:scale-[0.99] ${
+          className={`focusable cursor-pointer border-l border-neutral-200 px-3 py-1 text-xs transition-colors duration-150 first:border-l-0 dark:border-neutral-800 ${
             value === m.id
-              ? "border-accent bg-blue-50 ring-1 ring-accent dark:border-accent dark:bg-blue-950/40"
-              : "border-neutral-200 bg-white hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
+              ? "bg-blue-50 font-medium text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+              : "bg-white text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700 dark:bg-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
           }`}
         >
-          <div className={`text-xs font-medium ${value === m.id ? "text-blue-700 dark:text-blue-300" : ""}`}>
-            {m.label}
-          </div>
-          <div className="mt-0.5 text-[10px] leading-snug text-neutral-500 dark:text-neutral-400">{m.hint}</div>
+          {m.label}
         </button>
       ))}
     </div>
