@@ -3,7 +3,18 @@ import { api } from "../api";
 import type { ChatMessage, ChatState, QueueState, RunInfo } from "../types";
 import DragHandle from "./DragHandle";
 import { loadState, saveState } from "../persist";
-import { ChatBubble, ChevronRight, Close, Send, Spinner, StopSquare, TopHat } from "./icons";
+import {
+  AntigravityMark,
+  ChatBubble,
+  ChevronRight,
+  ClaudeMark,
+  Close,
+  OpenAIMark,
+  Send,
+  Spinner,
+  StopSquare,
+  TopHat,
+} from "./icons";
 
 const OPEN_KEY = "agentflow.chatOpen";
 const COLLAPSE_CHARS = 700; // longer messages start collapsed ("Show more")
@@ -87,6 +98,27 @@ const PROVIDER_DOT: Record<string, string> = {
   antigravity: "bg-sky-500",
   shell: "bg-neutral-500",
 };
+
+const PROVIDER_TEXT: Record<string, string> = {
+  codex: "text-emerald-600 dark:text-emerald-500",
+  claude: "text-orange-600 dark:text-orange-500",
+  antigravity: "text-sky-600 dark:text-sky-500",
+};
+
+const PROVIDER_MARK: Record<string, (p: React.SVGProps<SVGSVGElement>) => JSX.Element> = {
+  codex: OpenAIMark,
+  claude: ClaudeMark,
+  antigravity: AntigravityMark,
+};
+
+/** The provider's official mark in its accent color; dot fallback for unknowns. */
+function ProviderMark({ id, className = "h-4 w-4" }: { id: string; className?: string }) {
+  const Mark = PROVIDER_MARK[id];
+  if (!Mark) {
+    return <span className={`h-2 w-2 rounded-full ${PROVIDER_DOT[id] ?? "bg-neutral-400"}`} aria-hidden="true" />;
+  }
+  return <Mark className={`${className} ${PROVIDER_TEXT[id] ?? ""}`} />;
+}
 
 /* ------------------------------------------------- message rendering helpers */
 
@@ -344,7 +376,7 @@ function Bubble({ msg }: { msg: ChatMessage }) {
     <div className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
       {!mine && msg.provider && (
         <span className="mb-0.5 flex items-center gap-1.5 px-1 text-[10px] text-neutral-400">
-          <span className={`h-2 w-2 rounded-full ${PROVIDER_DOT[msg.provider] ?? "bg-neutral-400"}`} aria-hidden="true" />
+          <ProviderMark id={msg.provider} className="h-3 w-3" />
           <span className="font-mono">{msg.provider}</span>
           {msg.durationMs !== undefined && <span className="tabular-nums">{(msg.durationMs / 1000).toFixed(1)}s</span>}
         </span>
@@ -575,10 +607,9 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
               aria-label={`Open ${id} chat`}
               className="focusable relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors duration-150 hover:bg-neutral-100 dark:hover:bg-neutral-800"
             >
-              <span
-                className={`h-2.5 w-2.5 rounded-full ${PROVIDER_DOT[id] ?? "bg-neutral-400"} ${chPending ? "animate-pulse" : ""}`}
-                aria-hidden="true"
-              />
+              <span className={chPending ? "animate-pulse" : ""}>
+                <ProviderMark id={id} className="h-[18px] w-[18px]" />
+              </span>
               {hasUnread(id) && (
                 <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
               )}
@@ -643,12 +674,9 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
                 {id === ORCH ? (
                   <TopHat className="h-3.5 w-3.5 text-accent-subtle" />
                 ) : (
-                  <span
-                    className={`h-2 w-2 rounded-full ${PROVIDER_DOT[id] ?? "bg-neutral-400"} ${
-                      chPending ? "animate-pulse" : ""
-                    } ${installed ? "" : "opacity-40"}`}
-                    aria-hidden="true"
-                  />
+                  <span className={`${chPending ? "animate-pulse" : ""} ${installed ? "" : "opacity-40"}`}>
+                    <ProviderMark id={id} className="h-3 w-3" />
+                  </span>
                 )}
                 <span className={id === ORCH ? "font-medium" : "font-mono"}>{TAB_SHORT[id] ?? id}</span>
                 {!active && hasUnread(id) && (
@@ -705,7 +733,7 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
             </div>
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-2 px-2 text-center">
-              <span className={`h-2.5 w-2.5 rounded-full ${PROVIDER_DOT[channel] ?? "bg-neutral-400"}`} aria-hidden="true" />
+              <ProviderMark id={channel} className="h-6 w-6" />
               <p className="text-xs text-neutral-500">
                 Direct chat with <span className="font-mono">{channel}</span> — no tasks, no queue.
               </p>
@@ -721,10 +749,7 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
           <div className="flex flex-col items-start">
             <span className="mb-0.5 flex items-center gap-1.5 px-1 text-[10px] text-neutral-400">
               <Spinner className="h-3 w-3" />
-              <span
-                className={`h-2 w-2 rounded-full ${PROVIDER_DOT[isOrch ? selected : channel] ?? "bg-neutral-400"}`}
-                aria-hidden="true"
-              />
+              <ProviderMark id={isOrch ? selected : channel} className="h-3 w-3" />
               thinking…
             </span>
             {pending.outputTail && (
