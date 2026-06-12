@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
 import stat
 import subprocess
@@ -24,6 +25,7 @@ PROVIDERS: list[dict] = [
         "usageMode": "free/local",
         "preferredUse": "local version control",
         "installHint": "xcode-select --install  (or: brew install git)",
+        "installCommand": "brew install git",
         "loginCommand": None,
         "versionCommand": "git --version",
         "statusCommand": None,
@@ -37,6 +39,7 @@ PROVIDERS: list[dict] = [
         "usageMode": "free/local",
         "preferredUse": "PRs, issues, repo operations",
         "installHint": "brew install gh",
+        "installCommand": "brew install gh",
         "loginCommand": "gh auth login",
         "versionCommand": "gh --version",
         "statusCommand": "gh auth status",
@@ -50,6 +53,7 @@ PROVIDERS: list[dict] = [
         "usageMode": "plan/quota preferred",
         "preferredUse": "specs, plans, reviews",
         "installHint": "npm install -g @openai/codex",
+        "installCommand": "npm install -g @openai/codex --no-fund --no-audit --cache /tmp/agentflow-npm-cache",
         "loginCommand": "codex login",
         "versionCommand": "codex --version",
         "statusCommand": None,
@@ -63,6 +67,7 @@ PROVIDERS: list[dict] = [
         "usageMode": "daily/quota preferred",
         "preferredUse": "orchestration, QA, broad checks",
         "installHint": "npm install -g @google/gemini-cli",
+        "installCommand": "npm install -g @google/gemini-cli --no-fund --no-audit --cache /tmp/agentflow-npm-cache",
         "loginCommand": "gemini",
         "versionCommand": "gemini --version",
         "statusCommand": None,
@@ -76,6 +81,7 @@ PROVIDERS: list[dict] = [
         "usageMode": "daily/quota preferred",
         "preferredUse": "orchestration, UI checks",
         "installHint": "Install Google Antigravity and ensure `antigravity` is on your PATH",
+        "installCommand": None,
         "loginCommand": "antigravity",
         "versionCommand": "antigravity --version",
         "statusCommand": None,
@@ -89,6 +95,7 @@ PROVIDERS: list[dict] = [
         "usageMode": "plan/quota preferred",
         "preferredUse": "implementation and bug fixing only",
         "installHint": "npm install -g @anthropic-ai/claude-code",
+        "installCommand": "npm install -g @anthropic-ai/claude-code --no-fund --no-audit --cache /tmp/agentflow-npm-cache",
         "loginCommand": "claude",
         "versionCommand": "claude --version",
         "statusCommand": None,
@@ -102,6 +109,7 @@ PROVIDERS: list[dict] = [
         "usageMode": "free/local",
         "preferredUse": "future local summarization and cheap routing",
         "installHint": "brew install ollama",
+        "installCommand": "brew install ollama",
         "loginCommand": None,
         "versionCommand": "ollama --version",
         "statusCommand": None,
@@ -115,6 +123,7 @@ PROVIDERS: list[dict] = [
         "usageMode": "free/local",
         "preferredUse": "local LLM server on Apple Silicon — future on-device summarization and cheap routing",
         "installHint": "ensure `omlx` is on your PATH (or: pip install mlx-lm / mlx-omni-server)",
+        "installCommand": None,
         "loginCommand": None,
         "versionCommand": "{exe} --version",
         "statusCommand": None,
@@ -160,6 +169,7 @@ def base_state(provider_id: str) -> dict:
             "status": cached.get("status", "unchecked"),
             "lastChecked": cached.get("lastChecked"),
             "lastLog": cached.get("lastLog", ""),
+            "installing": is_installing(provider_id),
         }
     )
     return d
@@ -221,6 +231,7 @@ async def check_provider(provider_id: str) -> dict:
 
     full = dict(d)
     full.update(result)
+    full["installing"] = is_installing(provider_id)
     return full
 
 
@@ -229,6 +240,66 @@ async def check_all() -> list[dict]:
     for pid in PROVIDER_IDS:
         out.append(await check_provider(pid))
     return out
+
+
+# provider id -> run id of an in-flight one-click install
+_installs: dict[str, str] = {}
+
+
+def is_installing(provider_id: str) -> bool:
+    run_id = _installs.get(provider_id)
+    if not run_id:
+        return False
+    record = RUNNER.runs.get(run_id)
+    if record is None or record.status != "running":
+        _installs.pop(provider_id, None)
+        return False
+    return True
+
+
+async def install_provider(provider_id: str) -> dict:
+    """One-click install: run the provider's real install command in the background."""
+    d = _definition(provider_id)
+
+    if which(provider_id) is not None:
+        return {"status": "already_installed", "message": f"{d['displayName']} is already installed."}
+    if is_installing(provider_id):
+        return {"status": "already_installing", "message": f"{d['displayName']} is already being installed."}
+
+    command = d.get("installCommand")
+    if not command:
+        return {
+            "status": "no_installer",
+            "message": f"No one-click installer for {d['displayName']}. {d['installHint']}",
+        }
+
+    argv = shlex.split(command)
+    if shutil.which(argv[0]) is None:
+        return {
+            "status": "error",
+            "message": f"`{argv[0]}` is not available on this machine — run manually: {command}",
+        }
+
+    async def on_complete(record) -> None:
+        _installs.pop(provider_id, None)
+        refreshed = await check_provider(provider_id)  # refresh cache with the new reality
+        ok = record.status == "succeeded" and refreshed["installed"]
+        add_log_entry(
+            "agent-install",
+            f"install {d['displayName']}: {'succeeded' if ok else record.status} "
+            f"(exit {record.exit_code}, {(record.duration_ms or 0) / 1000:.0f}s)",
+            provider=provider_id,
+            status="info" if ok else "error",
+            output=(record.stdout + "\n" + record.stderr)[-3000:],
+        )
+
+    record, _task = await RUNNER.start(argv, Path.home(), provider=provider_id, step="install", on_complete=on_complete)
+    if record.status == "error":
+        return {"status": "error", "message": f"Could not start installer: {record.stderr.strip()[:300]}"}
+
+    _installs[provider_id] = record.id
+    add_log_entry("agent-install", f"installing {d['displayName']}: $ {command}", provider=provider_id)
+    return {"status": "started", "runId": record.id, "command": command}
 
 
 def login_provider(provider_id: str, workspace: Optional[Path]) -> dict:

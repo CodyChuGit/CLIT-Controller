@@ -33,7 +33,7 @@ AgentFlow shells out to the official CLIs you already have installed and logged 
 - `ollama` — optional, future local routing
 - `omlx` (local Apple MLX LLM server; also detects `mlx_lm.*` / `mlx-omni-server`) — optional, future on-device routing on Apple Silicon
 
-Missing CLIs are handled gracefully: the step's prompt is saved into the task folder, the exact command is shown for copy/paste, and the Agents page shows an install hint.
+Missing CLIs are handled gracefully: the step's prompt is saved into the task folder, the exact command is shown for copy/paste, and the Agents page shows an install hint. Providers with a known installer (npm/brew) support **one-click install** — click the "not installed" badge or the Install button and the real install command runs in the background (npm installs use an isolated cache at `/tmp/agentflow-npm-cache` to dodge broken `~/.npm` permissions); the card flips to its detected version when done.
 
 ## Install
 

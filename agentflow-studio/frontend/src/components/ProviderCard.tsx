@@ -8,13 +8,14 @@ interface Props {
   provider: Provider;
   onCheck: (id: string) => Promise<void>;
   onLogin: (id: string) => Promise<string>;
+  onInstall: (id: string) => Promise<string>;
 }
 
 function copyText(text: string) {
   if (navigator.clipboard?.writeText) void navigator.clipboard.writeText(text);
 }
 
-export default function ProviderCard({ provider: p, onCheck, onLogin }: Props) {
+export default function ProviderCard({ provider: p, onCheck, onLogin, onInstall }: Props) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [showLog, setShowLog] = useState(false);
@@ -40,6 +41,35 @@ export default function ProviderCard({ provider: p, onCheck, onLogin }: Props) {
     }
   };
 
+  const install = async () => {
+    setBusy(true);
+    setNote(null);
+    try {
+      setNote(await onInstall(p.id));
+    } catch (e) {
+      setNote(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const badge = p.installing ? (
+    <StatusBadge state="running" label="installing…" />
+  ) : p.installed ? (
+    <StatusBadge state={p.status} label={p.status === "unchecked" ? "unchecked" : p.status} />
+  ) : (
+    // One-click install: the "not installed" badge itself is the trigger.
+    <button
+      onClick={install}
+      disabled={busy}
+      title={p.installCommand ? `Install now: ${p.installCommand}` : p.installHint}
+      aria-label={`Install ${p.displayName}`}
+      className="focusable cursor-pointer rounded-full transition-transform duration-150 hover:scale-105 active:scale-95"
+    >
+      <StatusBadge state="missing" label="not installed · install" />
+    </button>
+  );
+
   return (
     <div className="card flex flex-col p-4">
       <div className="mb-2 flex items-start justify-between gap-2">
@@ -47,10 +77,7 @@ export default function ProviderCard({ provider: p, onCheck, onLogin }: Props) {
           <div className="text-sm font-semibold">{p.displayName}</div>
           <div className="font-mono text-[11px] text-neutral-400">{p.executableNames.join(", ")}</div>
         </div>
-        <StatusBadge
-          state={p.installed ? p.status : "missing"}
-          label={!p.installed ? "not installed" : p.status === "unchecked" ? "unchecked" : p.status}
-        />
+        {badge}
       </div>
 
       <dl className="mb-3 space-y-1 text-xs text-neutral-600 dark:text-neutral-400">
@@ -91,9 +118,15 @@ export default function ProviderCard({ provider: p, onCheck, onLogin }: Props) {
         </div>
       </dl>
 
-      {!p.installed && (
+      {!p.installed && !p.installing && (
         <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
           Install: <code className="font-mono">{p.installHint}</code>
+        </div>
+      )}
+      {p.installing && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:bg-blue-950/50 dark:text-blue-300">
+          <Spinner className="h-3.5 w-3.5" />
+          Installing in the background — status updates automatically.
         </div>
       )}
       {note && (
@@ -103,7 +136,12 @@ export default function ProviderCard({ provider: p, onCheck, onLogin }: Props) {
       )}
 
       <div className="mt-auto flex flex-wrap gap-2">
-        <button className="btn-secondary" onClick={check} disabled={busy}>
+        {!p.installed && !p.installing && p.installCommand && (
+          <button className="btn-primary" onClick={install} disabled={busy}>
+            Install
+          </button>
+        )}
+        <button className="btn-secondary" onClick={check} disabled={busy || p.installing}>
           {busy && <Spinner className="h-3.5 w-3.5" />}
           {busy ? "Checking…" : "Check"}
         </button>

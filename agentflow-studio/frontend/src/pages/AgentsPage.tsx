@@ -20,6 +20,14 @@ export default function AgentsPage() {
     void load();
   }, [load]);
 
+  // While any one-click install is running, poll so cards flip to "installed" on their own.
+  const anyInstalling = providers.some((p) => p.installing);
+  useEffect(() => {
+    if (!anyInstalling) return;
+    const id = window.setInterval(load, 3000);
+    return () => window.clearInterval(id);
+  }, [anyInstalling, load]);
+
   const checkOne = async (id: string) => {
     const updated = await api.checkAgent(id);
     setProviders((prev) => prev.map((p) => (p.id === id ? updated : p)));
@@ -41,6 +49,15 @@ export default function AgentsPage() {
     return res.message;
   };
 
+  const install = async (id: string) => {
+    const res = await api.installAgent(id);
+    await load();
+    if (res.status === "started") {
+      return `Installing in the background: ${res.command}`;
+    }
+    return res.message ?? res.status;
+  };
+
   return (
     <div className="space-y-5 p-8">
       <header className="flex items-end justify-between">
@@ -59,7 +76,7 @@ export default function AgentsPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
         {providers.map((p) => (
-          <ProviderCard key={p.id} provider={p} onCheck={checkOne} onLogin={login} />
+          <ProviderCard key={p.id} provider={p} onCheck={checkOne} onLogin={login} onInstall={install} />
         ))}
         {providers.length === 0 &&
           !error &&

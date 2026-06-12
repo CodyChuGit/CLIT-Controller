@@ -4,6 +4,7 @@ import type {
   CurrentProject,
   FileContent,
   GitInfo,
+  InstallResult,
   LoginResult,
   LogsResponse,
   OrchestrationMode,
@@ -70,6 +71,7 @@ export const api = {
   checkAgent: (id: string) => post<Provider>("/agents/check", { id }),
   checkAllAgents: () => post<Provider[]>("/agents/check-all"),
   loginAgent: (id: string) => post<LoginResult>("/agents/login", { id }),
+  installAgent: (id: string) => post<InstallResult>("/agents/install", { id }),
 
   // tasks
   tasks: () => get<TaskMeta[]>("/tasks"),

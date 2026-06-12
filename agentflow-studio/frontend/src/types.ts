@@ -37,9 +37,18 @@ export interface Provider {
   lastChecked: string | null;
   lastLog: string;
   installHint: string;
+  installCommand: string | null;
+  installing: boolean;
   loginCommand: string | null;
   versionCommand: string;
   statusCommand: string | null;
+}
+
+export interface InstallResult {
+  status: string;
+  message?: string;
+  runId?: string;
+  command?: string;
 }
 
 export interface TreeNode {

@@ -45,3 +45,10 @@ def login(body: AgentActionRequest):
     if body.id not in provider_probe.PROVIDER_IDS:
         raise HTTPException(status_code=404, detail=f"Unknown provider: {body.id}")
     return provider_probe.login_provider(body.id, config.get_current_workspace())
+
+
+@router.post("/install")
+async def install(body: AgentActionRequest):
+    if body.id not in provider_probe.PROVIDER_IDS:
+        raise HTTPException(status_code=404, detail=f"Unknown provider: {body.id}")
+    return await provider_probe.install_provider(body.id)
