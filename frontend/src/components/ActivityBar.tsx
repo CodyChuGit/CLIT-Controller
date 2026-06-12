@@ -94,7 +94,7 @@ interface Props {
 export default function ActivityBar({ page, onNavigate }: Props) {
   return (
     <aside
-      className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-neutral-200 bg-white/70 py-2 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/70"
+      className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-neutral-200 bg-white py-2 dark:border-neutral-800 dark:bg-neutral-900"
       aria-label="Main navigation"
     >
       <div

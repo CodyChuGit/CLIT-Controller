@@ -92,7 +92,7 @@ export default function ProjectsPage({
       <aside
         ref={asideRef}
         style={{ width: panelW }}
-        className="flex shrink-0 flex-col border-r border-neutral-200 bg-white/60 dark:border-neutral-800 dark:bg-neutral-900/60"
+        className="flex shrink-0 flex-col border-r border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
       >
         <PanelSection title="Workspace" defaultOpen>
           <div className="space-y-2 px-3 pb-3">
@@ -249,7 +249,7 @@ function IconButton({
       onClick={onClick}
       title={label}
       aria-label={label}
-      className="focusable mx-1 cursor-pointer rounded p-1 text-neutral-400 transition-colors duration-150 hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
+      className="icon-btn mx-1"
     >
       {children}
     </button>

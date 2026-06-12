@@ -55,8 +55,10 @@ Edge-to-edge layouts (Explorer, Tasks console) own their scroll areas; centered 
 
 ## Layout primitives
 
-- **App shell:** activity bar (48px icon rail, left) · main content · chat dock (320px, right) ·
-  status bar (24px, bottom). All separated by hairline borders.
+- **App shell:** activity bar (48px icon rail, left) · main content · chat dock (resizable, right) ·
+  status bar (24px, bottom — solid accent blue with white text, VS Code-style; rose when the
+  backend is offline). Panels are solid surfaces separated by hairline borders; centered pages
+  use `max-w-5xl p-6`.
 - **Panel section** (Explorer sidebar pattern): collapsible header row — chevron + uppercase
   micro-label + optional mono badge + right-aligned icon actions — then content, then
   `border-b`. No outer margin; sections stack flush.
@@ -66,10 +68,9 @@ Edge-to-edge layouts (Explorer, Tasks console) own their scroll areas; centered 
 
 ## Components
 
-- **Buttons:** `.btn-primary` (accent) / `.btn-secondary` (bordered) / `.btn-danger`. Compact
-  variant for rows: `px-2 py-0.5 text-[11px]`. One primary action per view.
-- **Icon buttons:** 1.5px-stroke icon in a `p-1 rounded` hover square, always with
-  `title` + `aria-label`.
+- **Buttons:** `.btn-primary` (accent) / `.btn-secondary` (bordered) / `.btn-danger`; add `.btn-xs`
+  for compact row actions. One primary action per view.
+- **Icon buttons:** use `.icon-btn` (hover square, focus ring), always with `title` + `aria-label`.
 - **Status badge:** dot + lowercase label pill (`StatusBadge`). Health = three-dot
   traffic light (`UsageHealthBadge`).
 - **Chips:** `.chip` for provider/meta; artifact chips are bordered minis (`text-[10px]

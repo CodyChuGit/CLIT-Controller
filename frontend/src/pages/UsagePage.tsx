@@ -121,7 +121,7 @@ export default function UsagePage() {
                   onClick={() => void load()}
                   title="Refresh"
                   aria-label="Refresh usage"
-                  className="focusable cursor-pointer rounded p-1 text-neutral-400 transition-colors duration-150 hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
+                  className="icon-btn"
                 >
                   <Refresh className="h-3.5 w-3.5" />
                 </button>

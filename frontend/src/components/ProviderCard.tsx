@@ -149,11 +149,11 @@ export default function ProviderCard({ provider: p, onCheck, onLogin, onInstall,
 
         {p.usageHealth && <UsageHealthBadge value={p.usageHealth} name={p.id} />}
 
-        <button className="btn-secondary px-2 py-0.5 text-[11px]" onClick={() => void run(() => onCheck(p.id))} disabled={busy || p.installing}>
+        <button className="btn-secondary btn-xs" onClick={() => void run(() => onCheck(p.id))} disabled={busy || p.installing}>
           {busy ? <Spinner className="h-3 w-3" /> : "Check"}
         </button>
         {p.loginCommand && p.installed && (
-          <button className="btn-secondary px-2 py-0.5 text-[11px]" onClick={() => void run(() => onLogin(p.id))} disabled={busy}>
+          <button className="btn-secondary btn-xs" onClick={() => void run(() => onLogin(p.id))} disabled={busy}>
             Login
           </button>
         )}
@@ -194,7 +194,7 @@ export default function ProviderCard({ provider: p, onCheck, onLogin, onInstall,
 
           <div className="mt-2 flex flex-wrap gap-1.5">
             <button
-              className="btn-secondary px-2 py-0.5 text-[11px]"
+              className="btn-secondary btn-xs"
               onClick={() => {
                 copyText(p.loginCommand ?? p.versionCommand);
                 setNote(`Copied: ${p.loginCommand ?? p.versionCommand}`);
@@ -203,7 +203,7 @@ export default function ProviderCard({ provider: p, onCheck, onLogin, onInstall,
               Copy command
             </button>
             {p.lastLog && (
-              <button className="btn-secondary px-2 py-0.5 text-[11px]" onClick={() => setShowLog(!showLog)} aria-expanded={showLog}>
+              <button className="btn-secondary btn-xs" onClick={() => setShowLog(!showLog)} aria-expanded={showLog}>
                 {showLog ? "Hide log" : "Last log"}
               </button>
             )}

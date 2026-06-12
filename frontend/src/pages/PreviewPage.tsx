@@ -60,11 +60,11 @@ export default function PreviewPage() {
       {/* toolbar */}
       <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-neutral-200 px-3 py-1.5 dark:border-neutral-800">
         {state?.running ? (
-          <button className="btn-danger px-2 py-0.5 text-[11px]" onClick={() => void stop()}>
+          <button className="btn-danger btn-xs" onClick={() => void stop()}>
             <StopSquare className="h-3 w-3" /> Stop
           </button>
         ) : (
-          <button className="btn-primary px-2 py-0.5 text-[11px]" onClick={() => void start()}>
+          <button className="btn-primary btn-xs" onClick={() => void start()}>
             Start
           </button>
         )}
@@ -93,13 +93,13 @@ export default function PreviewPage() {
           onClick={() => setFrameKey((k) => k + 1)}
           title="Reload preview"
           aria-label="Reload preview"
-          className="focusable cursor-pointer rounded p-1 text-neutral-400 transition-colors duration-150 hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
+          className="icon-btn"
         >
           <Refresh className="h-3.5 w-3.5" />
         </button>
         <button
           onClick={() => window.open(state?.url ?? urlInput, "_blank")}
-          className="btn-secondary px-2 py-0.5 text-[11px]"
+          className="btn-secondary btn-xs"
         >
           Open
         </button>

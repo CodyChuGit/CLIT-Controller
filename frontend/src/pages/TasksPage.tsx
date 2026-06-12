@@ -252,18 +252,18 @@ function StepDetail({
           </span>
         )}
         <span className="flex-1" />
-        <button className="btn-secondary px-2 py-0.5 text-[11px]" onClick={togglePrompt}>
+        <button className="btn-secondary btn-xs" onClick={togglePrompt}>
           {show === "prompt" ? "Hide" : "Prompt"}
         </button>
         {run && (run.stdout || run.stderr) && (
           <button
-            className="btn-secondary px-2 py-0.5 text-[11px]"
+            className="btn-secondary btn-xs"
             onClick={() => setShow(show === "output" ? null : "output")}
           >
             {show === "output" ? "Hide" : "Output"}
           </button>
         )}
-        <button className="btn-primary px-2 py-0.5 text-[11px]" onClick={onRun} disabled={state.status === "running"}>
+        <button className="btn-primary btn-xs" onClick={onRun} disabled={state.status === "running"}>
           {state.status === "running" ? "Running…" : "Run"}
         </button>
       </div>
@@ -351,12 +351,12 @@ function QueueStrip({
           )}
           <span className="flex-1" />
           {(item.status === "blocked" || item.status === "awaiting_approval") && (
-            <button className="btn-primary px-2 py-0.5 text-[11px]" onClick={() => onApprove(item.id)}>
+            <button className="btn-primary btn-xs" onClick={() => onApprove(item.id)}>
               Approve
             </button>
           )}
           {item.status === "failed" && (
-            <button className="btn-secondary px-2 py-0.5 text-[11px]" onClick={() => onApprove(item.id)}>
+            <button className="btn-secondary btn-xs" onClick={() => onApprove(item.id)}>
               Retry
             </button>
           )}
@@ -438,10 +438,10 @@ function AgentReview({
                   {new Date(run.startedAt).toLocaleTimeString()} · {fmtDuration(run.durationMs)} · exit {run.exitCode ?? "—"}
                 </span>
                 <span className="flex-1" />
-                <button className="btn-secondary px-2 py-0.5 text-[11px]" onClick={() => void toggle(run, "prompt")}>
+                <button className="btn-secondary btn-xs" onClick={() => void toggle(run, "prompt")}>
                   {open[run.id] === "prompt" ? "Hide" : "Prompt"}
                 </button>
-                <button className="btn-secondary px-2 py-0.5 text-[11px]" onClick={() => void toggle(run, "output")}>
+                <button className="btn-secondary btn-xs" onClick={() => void toggle(run, "output")}>
                   {open[run.id] === "output" ? "Hide" : "Output"}
                 </button>
               </div>
@@ -622,7 +622,7 @@ export default function TasksPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-4xl space-y-3 p-6">
+      <div className="mx-auto max-w-5xl space-y-3 p-6">
         <header className="flex flex-wrap items-center gap-2">
           <h1 className="text-xl font-semibold">Tasks</h1>
           {tasks.length > 0 && (
