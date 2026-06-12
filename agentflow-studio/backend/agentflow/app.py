@@ -11,7 +11,16 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__, paths, queue_service
-from .api import routes_agents, routes_chat, routes_logs, routes_projects, routes_queue, routes_tasks, routes_usage
+from .api import (
+    routes_agents,
+    routes_chat,
+    routes_logs,
+    routes_preview,
+    routes_projects,
+    routes_queue,
+    routes_tasks,
+    routes_usage,
+)
 
 
 @asynccontextmanager
@@ -44,6 +53,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_logs.router, prefix="/api/logs", tags=["logs"])
     app.include_router(routes_chat.router, prefix="/api/chat", tags=["chat"])
     app.include_router(routes_queue.router, prefix="/api/queue", tags=["queue"])
+    app.include_router(routes_preview.router, prefix="/api/preview", tags=["preview"])
 
     @app.get("/api/health")
     def health() -> dict:

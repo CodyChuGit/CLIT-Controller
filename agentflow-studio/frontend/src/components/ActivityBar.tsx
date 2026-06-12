@@ -1,4 +1,4 @@
-export type PageId = "projects" | "agents" | "tasks" | "usage" | "logs" | "settings";
+export type PageId = "projects" | "agents" | "tasks" | "preview" | "usage" | "logs" | "settings";
 
 interface NavItem {
   id: PageId;
@@ -25,6 +25,16 @@ const MAIN_NAV: NavItem[] = [
     ),
   },
   { id: "tasks", label: "Tasks", icon: <path d="M5 7h10M5 12h14M5 17h8M19 5l-2 2" /> },
+  {
+    id: "preview",
+    label: "Preview",
+    icon: (
+      <>
+        <rect x="3" y="5" width="18" height="13" rx="2" />
+        <path d="M9 21h6M10 9.5l4 2-4 2v-4z" />
+      </>
+    ),
+  },
   { id: "usage", label: "Usage", icon: <path d="M5 19V11M10 19V5M15 19v-6M20 19V9" /> },
   { id: "logs", label: "Logs", icon: <path d="M5 6l4 4-4 4M11 16h8" /> },
 ];

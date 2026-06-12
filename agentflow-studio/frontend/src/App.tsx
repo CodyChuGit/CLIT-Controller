@@ -5,9 +5,10 @@ import ChatPanel from "./components/ChatPanel";
 import StatusBar from "./components/StatusBar";
 import { loadState, saveState } from "./persist";
 
-const PAGE_IDS: PageId[] = ["projects", "agents", "tasks", "usage", "logs", "settings"];
+const PAGE_IDS: PageId[] = ["projects", "agents", "tasks", "preview", "usage", "logs", "settings"];
 import AgentsPage from "./pages/AgentsPage";
 import LogsPage from "./pages/LogsPage";
+import PreviewPage from "./pages/PreviewPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import SettingsPage from "./pages/SettingsPage";
 import TasksPage from "./pages/TasksPage";
@@ -225,6 +226,7 @@ export default function App() {
               )}
               {page === "agents" && <AgentsPage />}
               {page === "tasks" && <TasksPage />}
+              {page === "preview" && <PreviewPage />}
               {page === "usage" && <UsagePage />}
               {page === "logs" && <LogsPage />}
               {page === "settings" && <SettingsPage />}

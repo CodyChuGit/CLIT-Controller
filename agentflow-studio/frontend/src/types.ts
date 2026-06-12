@@ -310,6 +310,16 @@ export interface QueueItem {
   runId: string | null;
 }
 
+export interface PreviewState {
+  running: boolean;
+  runId: string | null;
+  command: string;
+  url: string;
+  output: string;
+  status: string | null;
+  exitCode: number | null;
+}
+
 export interface QueueState {
   items: QueueItem[];
   mode: string;

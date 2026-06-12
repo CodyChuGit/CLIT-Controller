@@ -9,6 +9,7 @@ import type {
   InstallResult,
   LoginResult,
   LogsResponse,
+  PreviewState,
   QueueState,
   OrchestrationMode,
   Provider,
@@ -121,6 +122,13 @@ export const api = {
     post<{ status: string; message?: string; queue: QueueState }>("/queue/approve", { itemId }),
   queueRemove: (itemId: string) => post<QueueState>("/queue/remove", { itemId }),
   queueClear: () => post<QueueState>("/queue/clear"),
+
+  // preview
+  preview: () => get<PreviewState>("/preview"),
+  previewCheck: () => get<{ ok: boolean }>("/preview/check"),
+  previewSetUrl: (url: string) => post<PreviewState>("/preview/url", { url }),
+  previewStart: (command?: string) => post<PreviewState & { status?: string; message?: string }>("/preview/start", { command }),
+  previewStop: () => post<PreviewState & { stopped: boolean }>("/preview/stop"),
 
   // chat
   chat: () => get<ChatState>("/chat"),

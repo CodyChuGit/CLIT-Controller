@@ -174,6 +174,18 @@ def set_workspace(path_str: str) -> dict:
     return cfg
 
 
+def get_workspace_setting(workspace: Path, key: str, default):
+    cfg = read_json(paths.workspace_config_file(workspace), {}) or {}
+    return cfg.get(key, default)
+
+
+def set_workspace_setting(workspace: Path, key: str, value) -> None:
+    cfg = read_json(paths.workspace_config_file(workspace), {}) or {}
+    cfg[key] = value
+    cfg.setdefault("workspacePath", str(workspace))
+    write_json(paths.workspace_config_file(workspace), cfg)
+
+
 def get_workspace_routing(workspace: Path) -> dict:
     cfg = read_json(paths.workspace_config_file(workspace), {}) or {}
     routing = dict(DEFAULT_ROUTING)
