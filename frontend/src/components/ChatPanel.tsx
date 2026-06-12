@@ -854,8 +854,8 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
               !hasWorkspace
                 ? "Open a workspace first"
                 : isOrch
-                  ? "Ask the orchestrator… (Enter to send)"
-                  : `Message ${TAB_SHORT[channel] ?? channel} directly… (Enter to send)`
+                  ? "Ask the orchestrator…"
+                  : `Message ${TAB_SHORT[channel] ?? channel} directly…`
             }
             value={input}
             disabled={!hasWorkspace || sending}
