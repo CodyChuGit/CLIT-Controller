@@ -101,6 +101,12 @@ def parse_queue_directive(text: str) -> Optional[tuple[str, list[str]]]:
     return task_ref, steps
 
 
+def _slug(task_id: str) -> str:
+    """Human part of a task id: 20260612-201312-create-simple-calendar-app → create-simple-calendar-app."""
+    parts = task_id.split("-", 2)
+    return parts[2] if len(parts) == 3 else task_id
+
+
 def _resolve_task_ref(workspace: Path, ref: str) -> Optional[str]:
     tasks = task_service.list_tasks(workspace)
     if not tasks:
@@ -255,11 +261,11 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
                     title, goal, queue_steps = directive
                     try:
                         meta = task_service.create_task(workspace, title, goal, orchestrated=True)
-                        note = f"Task created by the orchestrator: {meta['id']}"
+                        note = f"Created \u201c{title}\u201d"
                         if queue_steps:
                             queue_service.add_steps(workspace, meta["id"], queue_steps, source="orchestrator")
-                            note += f" — {len(queue_steps)} step(s) queued; the system will cue each agent"
-                        append_message(workspace, "system", note + ". Review it on the Tasks tab.", provider=provider)
+                            note += f" · queued {', '.join(queue_steps)}"
+                        append_message(workspace, "system", note, provider=provider)
                         add_log_entry(
                             "chat", f"orchestrator created task {meta['id']}: {title}",
                             provider=provider, task_id=meta["id"],
@@ -275,15 +281,14 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
                         if task_id is None:
                             append_message(
                                 workspace, "system",
-                                f"Could not queue steps: no task matches `{ref}`.", provider=provider,
+                                f"Couldn\u2019t queue steps — no task matches `{ref}`.", provider=provider,
                             )
                         else:
                             task_service.set_orchestrated(workspace, task_id)
                             queue_service.add_steps(workspace, task_id, steps, source="orchestrator")
                             append_message(
                                 workspace, "system",
-                                f"Orchestrator queued {len(steps)} step(s) for {task_id}: "
-                                f"{', '.join(steps)} — the system will cue each agent in order.",
+                                f"Queued {', '.join(steps)} · {_slug(task_id)}",
                                 provider=provider,
                             )
                     except Exception as exc:  # noqa: BLE001
@@ -406,7 +411,7 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
                 )
                 append_message(
                     workspace, "system",
-                    f"Orchestrator reviewed `{trigger[:60]}` → queued {', '.join(steps)} for {task_id}.",
+                    f"Reviewed {trigger.split(' via ')[0]} → queued {', '.join(steps)}",
                     provider=provider,
                 )
             elif done_reason is not None:
@@ -421,7 +426,7 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
                 )
                 append_message(
                     workspace, "system",
-                    f"Orchestrator marked {task_id} complete: {done_reason}",
+                    f"\u201c{_slug(task_id)}\u201d complete — {done_reason}",
                     provider=provider,
                 )
             elif user_reason is not None:
@@ -432,7 +437,7 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
                 )
                 append_message(
                     workspace, "system",
-                    f"Orchestrator needs your input on {task_id}: {user_reason}",
+                    f"Needs your input — {user_reason}",
                     provider=provider,
                 )
             else:
