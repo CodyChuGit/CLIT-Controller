@@ -223,10 +223,14 @@ class ProcessRunner:
         record = self._new_record(
             argv, cwd, task_id=task_id, step=step, provider=provider, log_file=log_file
         )
+        # Children must not inherit OUR port assignment: dev servers honor PORT and
+        # would bind on top of the AgentFlow backend, hijacking localhost:8787.
+        child_env = {k: v for k, v in os.environ.items() if k not in ("PORT", "AGENTFLOW_PORT")}
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
                 cwd=str(cwd),
+                env=child_env,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 stdin=asyncio.subprocess.DEVNULL,

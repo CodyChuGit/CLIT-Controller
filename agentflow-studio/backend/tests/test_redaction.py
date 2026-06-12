@@ -32,3 +32,15 @@ def test_leaves_normal_text_alone():
 def test_handles_none_and_empty():
     assert redact(None) == ""
     assert redact("") == ""
+
+
+def test_children_do_not_inherit_port(monkeypatch, tmp_path):
+    """Dev servers honor PORT; inheriting AgentFlow's would hijack localhost:8787."""
+    import asyncio
+
+    from agentflow.process_runner import ProcessRunner
+
+    monkeypatch.setenv("PORT", "8787")
+    runner = ProcessRunner()
+    record = asyncio.run(runner.run_and_wait(["printenv", "PORT"], tmp_path, timeout=10))
+    assert record.exit_code != 0 or record.stdout.strip() == ""
