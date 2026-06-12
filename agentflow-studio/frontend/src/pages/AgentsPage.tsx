@@ -70,9 +70,6 @@ export default function AgentsPage() {
       <div className="mx-auto max-w-5xl space-y-4 p-6">
         <header className="flex items-center gap-3">
           <h1 className="text-xl font-semibold">Agents</h1>
-          <p className="text-xs text-neutral-500">
-            Official CLI auth only — no API keys are stored.
-          </p>
           <span className="flex-1" />
           <button className="btn-primary" onClick={checkAll} disabled={checkingAll}>
             {checkingAll && <Spinner className="h-3.5 w-3.5" />}

@@ -48,7 +48,6 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-3xl space-y-4 p-6">
       <header>
         <h1 className="text-xl font-semibold">Settings</h1>
-        <p className="text-xs text-neutral-500">Routing defaults, command templates, models, and paths.</p>
       </header>
 
       <section className="card p-5">

@@ -36,10 +36,7 @@ export default function LogsPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-4 p-6">
       <header className="flex items-end justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Logs</h1>
-          <p className="text-xs text-neutral-500">Redacted activity log — auto-refreshes every 3 seconds.</p>
-        </div>
+        <h1 className="text-xl font-semibold">Logs</h1>
         <div className="flex items-center gap-2">
           <select className="input w-40" value={filter} onChange={(e) => setFilter(e.target.value)}>
             <option value="all">All providers</option>
@@ -68,9 +65,6 @@ export default function LogsPage() {
           <LogConsole entries={entries} running={data?.running ?? []} />
         </div>
       </div>
-      <p className="text-[11px] text-neutral-400">
-        Clearing the view does not delete saved log files in task folders.
-      </p>
     </div>
   );
 }

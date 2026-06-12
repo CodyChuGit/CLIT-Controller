@@ -55,11 +55,8 @@ export default function UsagePage() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-5xl space-y-4 p-6">
-        <header className="flex items-center gap-3">
+        <header>
           <h1 className="text-xl font-semibold">Usage</h1>
-          <p className="text-xs text-neutral-500">
-            Approximate, subscription-first tracking — set health manually when a provider hits its quota.
-          </p>
         </header>
 
         {usage && (
