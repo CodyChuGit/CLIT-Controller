@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shlex
 import shutil
 from pathlib import Path
@@ -18,6 +19,30 @@ REPLAY_CLIP_CHARS = 1500  # per-message clip when replaying
 
 # workspace path -> run id of the in-flight chat response
 _pending: dict[str, str] = {}
+
+_TASK_DIRECTIVE_RE = re.compile(r"```agentflow-task\s*\n(.*?)```", re.DOTALL)
+
+
+def parse_task_directive(text: str) -> Optional[tuple[str, str]]:
+    """Extract (title, goal) from an ```agentflow-task``` block in a model reply."""
+    m = _TASK_DIRECTIVE_RE.search(text or "")
+    if not m:
+        return None
+    title, goal_lines, in_goal = None, [], False
+    for line in m.group(1).splitlines():
+        lower = line.lower()
+        if lower.startswith("title:") and title is None:
+            title = line[6:].strip()
+            in_goal = False
+        elif lower.startswith("goal:"):
+            goal_lines.append(line[5:].strip())
+            in_goal = True
+        elif in_goal and line.strip():
+            goal_lines.append(line.strip())
+    goal = " ".join(goal_lines).strip()
+    if not title or not goal:
+        return None
+    return title[:200], goal
 
 
 def _chat_file(workspace: Path) -> Path:
@@ -147,6 +172,23 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
             if record.status == "succeeded" and out:
                 append_message(workspace, "assistant", out, provider=provider,
                                durationMs=record.duration_ms)
+                # The orchestrator can create tasks via an ```agentflow-task``` block.
+                directive = parse_task_directive(out)
+                if directive is not None:
+                    title, goal = directive
+                    try:
+                        meta = task_service.create_task(workspace, title, goal)
+                        append_message(
+                            workspace, "system",
+                            f"Task created by the orchestrator: {meta['id']} — review it on the Tasks tab.",
+                            provider=provider,
+                        )
+                        add_log_entry(
+                            "chat", f"orchestrator created task {meta['id']}: {title}",
+                            provider=provider, task_id=meta["id"],
+                        )
+                    except Exception as exc:  # noqa: BLE001 — never break the chat loop
+                        append_message(workspace, "system", f"Could not create the task: {exc}", provider=provider)
             elif record.status == "cancelled":
                 append_message(workspace, "system", "Response stopped.", provider=provider)
             else:
