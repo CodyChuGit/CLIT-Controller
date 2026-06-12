@@ -54,3 +54,27 @@ def test_task_listing_and_detail(tmp_path):
     assert detail["task"]["id"] == meta["id"]
     assert len(detail["files"]) == len(TASK_FILES)
     assert set(detail["stepPreviews"]) == set(task_service.STEP_DEFS)
+
+
+def test_step_exchanges_rebuilt_from_log_files(tmp_path):
+    from agentflow import config, paths, task_service
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    config.ensure_workspace(ws)
+    meta = task_service.create_task(ws, "Demo", "demo goal")
+    logs = paths.task_logs_dir(ws, meta["id"])
+    logs.mkdir(parents=True, exist_ok=True)
+    (logs / "20260612-201313-codex_spec.prompt.txt").write_text("spec prompt sk-secret12345678", encoding="utf-8")
+    (logs / "20260612-201313-codex_spec.log").write_text("spec output", encoding="utf-8")
+    (logs / "20260612-201825-codex_spec.prompt.txt").write_text("second prompt", encoding="utf-8")
+    (logs / "20260612-201825-codex_spec.log").write_text("second output", encoding="utf-8")
+    # orphaned prompt without a log (run never started) must not break parsing
+    (logs / "20260612-201502-claude_implement.prompt.txt").write_text("orphan", encoding="utf-8")
+
+    ex = task_service.step_exchanges(ws, meta["id"])
+    spec = ex["codex_spec"]
+    assert [e["stamp"] for e in spec] == ["20260612-201313", "20260612-201825"]  # oldest first
+    assert spec[0]["output"] == "spec output"
+    assert "[REDACTED]" in spec[0]["prompt"] and "sk-secret" not in spec[0]["prompt"]
+    assert ex["claude_implement"][0]["output"] == ""

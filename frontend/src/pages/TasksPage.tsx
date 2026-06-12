@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { Close, FileIcon, Folder, Inbox, Spinner, StopSquare } from "../components/icons";
 import StatusBadge from "../components/StatusBadge";
 import { loadState, saveState } from "../persist";
-import type { QueueState, RunInfo, StepState, TaskDetail, TaskEvent, TaskMeta } from "../types";
+import type { Exchange, QueueState, StepState, TaskDetail, TaskEvent, TaskMeta } from "../types";
 
 const STEP_ORDER = ["codex_spec", "claude_implement", "gemini_qa", "codex_review", "claude_fix"];
 const SHORT_LABELS: Record<string, string> = {
@@ -36,13 +36,6 @@ const EVENT_DOT: Record<string, string> = {
   needs_user: "bg-amber-500",
   queued: "bg-neutral-400",
 };
-
-function fmtDuration(ms?: number | null): string {
-  if (ms === undefined || ms === null) return "";
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 90_000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${Math.round(ms / 60_000)}m${Math.round((ms % 60_000) / 1000)}s`;
-}
 
 function ArtifactChip({ name, onOpen }: { name: string; onOpen?: (name: string) => void }) {
   const special = SPECIAL_ARTIFACTS[name];
@@ -95,16 +88,15 @@ const NODE_STYLE: Record<string, { ring: string; fill: string; mark: string }> =
 };
 
 /** One horizontal chain — only the steps this task actually uses light up.
- *  The orchestrator decides which: a task may be implement-only, spec-only, QA-only… */
+ *  Fixed-width nodes + equal flex connectors keep the spacing even.
+ *  Clicking a node scrolls to that step's conversation. */
 function FlowChart({
   detail,
   queue,
-  selected,
   onSelect,
 }: {
   detail: TaskDetail;
   queue: QueueState | null;
-  selected: string | null;
   onSelect: (step: string) => void;
 }) {
   const overlay: Record<string, string> = {};
@@ -115,18 +107,17 @@ function FlowChart({
   }
 
   return (
-    <div className="card flex items-start justify-between gap-0 px-4 py-3">
+    <div className="card flex items-start px-4 py-3">
       {STEP_ORDER.map((step, i) => {
         const preview = detail.stepPreviews[step];
         const state = (overlay[step] ?? detail.task.steps[step]?.status ?? "idle") as NodeState;
         const involved = state !== "idle";
         const style = NODE_STYLE[state];
-        const isSelected = selected === step;
         return (
-          <div key={step} className="flex flex-1 items-start">
+          <Fragment key={step}>
             {i > 0 && (
               <div
-                className={`mt-3.5 h-px flex-1 ${
+                className={`mt-3.5 h-px min-w-4 flex-1 ${
                   involved ? "bg-neutral-300 dark:bg-neutral-600" : "bg-neutral-200 dark:bg-neutral-800"
                 }`}
                 aria-hidden="true"
@@ -135,7 +126,7 @@ function FlowChart({
             <button
               onClick={() => onSelect(step)}
               title={`${preview?.label ?? step} — ${state.replace(/_/g, " ")}`}
-              className="focusable group flex cursor-pointer flex-col items-center gap-1 rounded px-1.5"
+              className="focusable flex w-20 shrink-0 cursor-pointer flex-col items-center gap-1 rounded"
             >
               <span
                 className={`flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs font-bold transition-all duration-150 ${
@@ -144,7 +135,7 @@ function FlowChart({
                     : involved && style
                       ? `${style.ring} ${style.fill}`
                       : "border-neutral-200 dark:border-neutral-800"
-                } ${isSelected ? "ring-2 ring-accent/60 ring-offset-1 dark:ring-offset-neutral-900" : ""}`}
+                }`}
               >
                 {state === "running" ? (
                   <Spinner className="h-3.5 w-3.5 text-blue-500" />
@@ -170,113 +161,164 @@ function FlowChart({
                 {SHORT_LABELS[step]}
               </span>
               <span
-                className={`font-mono text-[9px] leading-none ${
+                className={`max-w-full truncate font-mono text-[9px] leading-none ${
                   involved ? "text-neutral-400" : "text-neutral-300 dark:text-neutral-700"
                 }`}
               >
                 {preview?.provider}
               </span>
             </button>
-          </div>
+          </Fragment>
         );
       })}
     </div>
   );
 }
 
-/* ------------------------------------------------------ selected step detail */
+/* -------------------------------------------------------- step conversations */
 
-function StepDetail({
+const STEP_COLOR: Record<string, { dot: string; border: string }> = {
+  codex_spec: { dot: "bg-sky-500", border: "border-t-sky-400" },
+  claude_implement: { dot: "bg-indigo-500", border: "border-t-indigo-400" },
+  gemini_qa: { dot: "bg-teal-500", border: "border-t-teal-400" },
+  codex_review: { dot: "bg-fuchsia-500", border: "border-t-fuchsia-400" },
+  claude_fix: { dot: "bg-orange-500", border: "border-t-orange-400" },
+};
+
+/** Long mono text that starts clamped — chats stay skimmable. */
+function LongText({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const long = text.length > 600;
+  return (
+    <div>
+      <pre
+        className={`whitespace-pre-wrap break-words font-mono text-[10px] leading-relaxed text-neutral-700 dark:text-neutral-300 ${
+          long && !expanded ? "max-h-28 overflow-hidden" : ""
+        }`}
+      >
+        {text}
+      </pre>
+      {long && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="focusable mt-1 cursor-pointer rounded text-[10px] font-medium text-blue-600 hover:underline dark:text-blue-400"
+        >
+          {expanded ? "Show less" : "Show more"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function fmtStamp(stamp: string): string {
+  // 20260612-201938 → 20:19:38
+  const t = stamp.split("-")[1] ?? "";
+  return t.length === 6 ? `${t.slice(0, 2)}:${t.slice(2, 4)}:${t.slice(4, 6)}` : stamp;
+}
+
+/** One step's conversation: every prompt AgentFlow sent (right) and what the
+ *  agent returned (left), oldest first, scrollable. Exchanges come from the
+ *  task's logs dir, so they survive backend restarts. */
+function StepChat({
   detail,
   step,
+  exchanges,
   onRun,
   onOpenFile,
-  onReview,
 }: {
   detail: TaskDetail;
   step: string;
+  exchanges: Exchange[];
   onRun: () => void;
   onOpenFile: (name: string) => void;
-  onReview: (provider: string) => void;
 }) {
-  const [show, setShow] = useState<"prompt" | "output" | null>(null);
-  const [prompt, setPrompt] = useState<string | null>(null);
   const preview = detail.stepPreviews[step];
   const state: StepState = detail.task.steps[step] ?? { status: "idle" };
-  const runs = detail.runs.filter((r) => r.step === step);
-  const run: RunInfo | undefined = runs[runs.length - 1];
+  const liveRun = detail.runs.find((r) => r.step === step && r.status === "running");
+  const involved = state.status !== "idle" || exchanges.length > 0;
+  const color = STEP_COLOR[step];
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setShow(null);
-    setPrompt(null);
-  }, [step]);
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [exchanges.length, liveRun?.stdout]);
 
-  const togglePrompt = async () => {
-    if (show === "prompt") return setShow(null);
-    if (prompt === null) {
-      const file = (run?.logFile ?? state.logFile)?.split("/").pop()?.replace(/\.log$/, ".prompt.txt") ?? state.promptFile;
-      try {
-        const res = file ? await api.taskFile(detail.task.id, `logs/${file}`) : { content: preview.commandPreview };
-        setPrompt(res.content);
-      } catch {
-        setPrompt(preview.commandPreview);
-      }
-    }
-    setShow("prompt");
-  };
-
-  if (!preview) return null;
   return (
-    <div className="card px-3 py-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold">{preview.label}</span>
-        <button
-          onClick={() => onReview(preview.provider)}
-          title={`Review everything ${preview.provider} did in this task`}
-          className="focusable chip cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
-        >
-          {preview.provider}
-        </button>
-        <StatusBadge state={state.status} />
-        {run?.durationMs != null && (
-          <span className="text-[10px] tabular-nums text-neutral-400">
-            {fmtDuration(run.durationMs)} · exit {run.exitCode ?? "—"}
-          </span>
-        )}
-        {(state.artifactsWritten ?? []).map((a) => (
-          <ArtifactChip key={a} name={a} onOpen={onOpenFile} />
-        ))}
-        {(state.codeChanged?.length ?? 0) > 0 && (
-          <span className="rounded border border-violet-300 bg-violet-50 px-1.5 py-0.5 font-mono text-[10px] text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300" title={state.codeChanged?.join("\n")}>
-            code: {state.codeChanged?.length}
-          </span>
-        )}
+    <section
+      id={`step-${step}`}
+      className={`card flex flex-col overflow-hidden border-t-2 ${color.border} ${involved ? "" : "opacity-50"}`}
+    >
+      <header className="flex shrink-0 items-center gap-2 border-b border-neutral-200 px-3 py-1.5 dark:border-neutral-800">
+        <span className={`h-2 w-2 rounded-full ${color.dot}`} aria-hidden="true" />
+        <span className="text-xs font-semibold">{SHORT_LABELS[step]}</span>
+        <span className="font-mono text-[10px] text-neutral-400">{preview?.provider}</span>
+        {state.status !== "idle" && <StatusBadge state={state.status} />}
         <span className="flex-1" />
-        <button className="btn-secondary btn-xs" onClick={togglePrompt}>
-          {show === "prompt" ? "Hide" : "Prompt"}
-        </button>
-        {run && (run.stdout || run.stderr) && (
-          <button
-            className="btn-secondary btn-xs"
-            onClick={() => setShow(show === "output" ? null : "output")}
-          >
-            {show === "output" ? "Hide" : "Output"}
-          </button>
-        )}
-        <button className="btn-primary btn-xs" onClick={onRun} disabled={state.status === "running"}>
+        <button className="btn-secondary btn-xs" onClick={onRun} disabled={state.status === "running"}>
           {state.status === "running" ? "Running…" : "Run"}
         </button>
+      </header>
+
+      {((state.artifactsWritten?.length ?? 0) > 0 || (state.codeChanged?.length ?? 0) > 0) && (
+        <div className="flex flex-wrap items-center gap-1 border-b border-neutral-100 px-3 py-1.5 dark:border-neutral-800/60">
+          {(state.artifactsWritten ?? []).map((a) => (
+            <ArtifactChip key={a} name={a} onOpen={onOpenFile} />
+          ))}
+          {(state.codeChanged?.length ?? 0) > 0 && (
+            <span
+              className="rounded border border-violet-300 bg-violet-50 px-1.5 py-0.5 font-mono text-[10px] text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300"
+              title={state.codeChanged?.join("\n")}
+            >
+              code: {state.codeChanged?.length}
+            </span>
+          )}
+        </div>
+      )}
+
+      <div ref={scrollRef} className="max-h-96 min-h-24 flex-1 space-y-2 overflow-y-auto p-3">
+        {exchanges.length === 0 && !liveRun ? (
+          <p className="text-[11px] text-neutral-400">
+            {involved ? "Queued — nothing sent yet." : "Not used in this task."}
+          </p>
+        ) : (
+          exchanges.map((ex) => (
+            <Fragment key={ex.stamp}>
+              <div className="flex justify-end">
+                <div className="max-w-[94%] rounded-lg rounded-br-sm border border-blue-200 bg-blue-50/60 px-2.5 py-1.5 dark:border-blue-900 dark:bg-blue-950/30">
+                  <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-blue-600/80 dark:text-blue-300/80">
+                    prompt · {fmtStamp(ex.stamp)}
+                  </div>
+                  <LongText text={ex.prompt} />
+                </div>
+              </div>
+              <div className="flex justify-start">
+                <div className="max-w-[94%] rounded-lg rounded-bl-sm border border-neutral-200 bg-white px-2.5 py-1.5 dark:border-neutral-700 dark:bg-neutral-900">
+                  <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-neutral-400">
+                    {preview?.provider} · reply
+                  </div>
+                  <LongText text={ex.output || "(no output)"} />
+                </div>
+              </div>
+            </Fragment>
+          ))
+        )}
+        {liveRun && (
+          <div className="flex justify-start">
+            <div className="max-w-[94%] rounded-lg rounded-bl-sm border border-blue-200 bg-white px-2.5 py-1.5 dark:border-blue-900 dark:bg-neutral-900">
+              <div className="mb-1 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-wide text-blue-500">
+                <Spinner className="h-3 w-3" /> {liveRun.provider} · working…
+              </div>
+              {liveRun.stdout && (
+                <pre className="max-h-28 overflow-hidden whitespace-pre-wrap break-words font-mono text-[10px] leading-relaxed text-neutral-500">
+                  {liveRun.stdout.slice(-1200)}
+                </pre>
+              )}
+            </div>
+          </div>
+        )}
       </div>
-      {show === "prompt" && prompt !== null && (
-        <pre className="mono-block mt-2 max-h-48 whitespace-pre-wrap text-[10px]">{prompt}</pre>
-      )}
-      {show === "output" && run && (
-        <pre className="mono-block mt-2 max-h-64 whitespace-pre-wrap text-[10px]">
-          {run.stdout}
-          {run.stderr && `\n--- stderr ---\n${run.stderr}`}
-        </pre>
-      )}
-    </div>
+    </section>
   );
 }
 
@@ -376,103 +418,16 @@ function QueueStrip({
   );
 }
 
-/* ----------------------------------------------------------- agent review */
-
-function AgentReview({
-  provider,
-  detail,
-  onClose,
-}: {
-  provider: string;
-  detail: TaskDetail;
-  onClose: () => void;
-}) {
-  const runs = detail.runs.filter((r) => r.provider === provider);
-  const [open, setOpen] = useState<Record<string, "prompt" | "output" | null>>({});
-  const [prompts, setPrompts] = useState<Record<string, string>>({});
-
-  const toggle = async (run: RunInfo, what: "prompt" | "output") => {
-    if (open[run.id] === what) {
-      setOpen({ ...open, [run.id]: null });
-      return;
-    }
-    if (what === "prompt" && !prompts[run.id]) {
-      const file = run.logFile?.split("/").pop()?.replace(/\.log$/, ".prompt.txt");
-      try {
-        const res = file ? await api.taskFile(detail.task.id, `logs/${file}`) : { content: run.commandPreview };
-        setPrompts((p) => ({ ...p, [run.id]: res.content }));
-      } catch {
-        setPrompts((p) => ({ ...p, [run.id]: run.commandPreview }));
-      }
-    }
-    setOpen({ ...open, [run.id]: what });
-  };
-
-  return (
-    <section className="card border-blue-200 p-4 dark:border-blue-900">
-      <div className="mb-2 flex items-center gap-2">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-          Agent review — <span className="font-mono lowercase">{provider}</span>
-        </h3>
-        <span className="text-xs text-neutral-400">{runs.length} run(s)</span>
-        <span className="flex-1" />
-        <button
-          onClick={onClose}
-          aria-label="Close agent review"
-          className="focusable cursor-pointer rounded p-1 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
-        >
-          <Close className="h-3.5 w-3.5" />
-        </button>
-      </div>
-
-      {runs.length === 0 ? (
-        <p className="text-xs text-neutral-500">No runs in this task yet.</p>
-      ) : (
-        <div className="space-y-2">
-          {[...runs].reverse().map((run) => (
-            <div key={run.id} className="rounded-lg border border-neutral-200 p-2.5 dark:border-neutral-800">
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="font-medium">{run.step}</span>
-                <StatusBadge state={run.status} />
-                <span className="tabular-nums text-neutral-400">
-                  {new Date(run.startedAt).toLocaleTimeString()} · {fmtDuration(run.durationMs)} · exit {run.exitCode ?? "—"}
-                </span>
-                <span className="flex-1" />
-                <button className="btn-secondary btn-xs" onClick={() => void toggle(run, "prompt")}>
-                  {open[run.id] === "prompt" ? "Hide" : "Prompt"}
-                </button>
-                <button className="btn-secondary btn-xs" onClick={() => void toggle(run, "output")}>
-                  {open[run.id] === "output" ? "Hide" : "Output"}
-                </button>
-              </div>
-              {open[run.id] === "prompt" && (
-                <pre className="mono-block mt-2 max-h-64 whitespace-pre-wrap text-[10px]">{prompts[run.id] ?? "loading…"}</pre>
-              )}
-              {open[run.id] === "output" && (
-                <pre className="mono-block mt-2 max-h-64 whitespace-pre-wrap text-[10px]">
-                  {run.stdout || "(no stdout)"}
-                  {run.stderr && `\n--- stderr ---\n${run.stderr}`}
-                </pre>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
 /* ---------------------------------------------------------------- the page */
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<TaskMeta[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<TaskDetail | null>(null);
-  const [selectedStep, setSelectedStep] = useState<string | null>(null);
+  const [exchanges, setExchanges] = useState<Record<string, Exchange[]>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [taskFile, setTaskFile] = useState<{ name: string; content: string } | null>(null);
-  const [reviewAgent, setReviewAgent] = useState<string | null>(null);
   const [queue, setQueue] = useState<QueueState | null>(null);
   const fileViewerRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<number | null>(null);
@@ -505,7 +460,9 @@ export default function TasksPage() {
 
   const loadDetail = useCallback(async (id: string) => {
     try {
-      setDetail(await api.task(id));
+      const [d, ex] = await Promise.all([api.task(id), api.taskExchanges(id)]);
+      setDetail(d);
+      setExchanges(ex.steps);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -530,22 +487,11 @@ export default function TasksPage() {
     if (selectedId) {
       saveState("lastTask", selectedId);
       setTaskFile(null);
-      setReviewAgent(null);
-      setSelectedStep(null);
       void loadDetail(selectedId);
     } else {
       setDetail(null);
     }
   }, [selectedId, loadDetail]);
-
-  // Default node selection: the running step, else the last one that did something.
-  useEffect(() => {
-    if (!detail || selectedStep) return;
-    const states = detail.task.steps;
-    const running = STEP_ORDER.find((s) => states[s]?.status === "running");
-    const lastActive = [...STEP_ORDER].reverse().find((s) => states[s] && states[s].status !== "idle");
-    setSelectedStep(running ?? lastActive ?? null);
-  }, [detail, selectedStep]);
 
   const anythingRunning =
     detail !== null &&
@@ -622,39 +568,50 @@ export default function TasksPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-5xl space-y-3 p-6">
-        <header className="flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-semibold">Tasks</h1>
-          {tasks.length > 0 && (
-            <select
-              className="input w-auto min-w-0 max-w-md flex-1 font-mono text-xs"
-              value={selectedId ?? ""}
-              onChange={(e) => setSelectedId(e.target.value)}
-              aria-label="Select task"
-            >
-              {tasks.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title}
-                </option>
-              ))}
-            </select>
-          )}
-          <span className="flex-1" />
-          {detail && (
-            <>
-              <button className="btn-secondary" onClick={runFull}>Run all</button>
-              <button className="btn-danger px-2" onClick={stopAll} title="Stop running processes" aria-label="Stop">
-                <StopSquare className="h-3.5 w-3.5" />
-              </button>
-              <button
-                className="btn-secondary px-2"
-                onClick={() => void api.openTaskFolder(detail.task.id)}
-                title="Open task folder"
-                aria-label="Open task folder"
+      <div className="mx-auto max-w-5xl space-y-3 p-6 pt-0">
+        {/* Sticky task header — stays put while you scroll the conversations. */}
+        <header className="sticky top-0 z-10 -mx-6 space-y-1.5 border-b border-neutral-200 bg-surface px-6 pb-2.5 pt-5 dark:border-neutral-800 dark:bg-neutral-950">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-semibold">Tasks</h1>
+            {tasks.length > 0 && (
+              <select
+                className="input w-auto min-w-0 max-w-md flex-1 font-mono text-xs"
+                value={selectedId ?? ""}
+                onChange={(e) => setSelectedId(e.target.value)}
+                aria-label="Select task"
               >
-                <Folder className="h-3.5 w-3.5" />
-              </button>
-            </>
+                {tasks.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title}
+                  </option>
+                ))}
+              </select>
+            )}
+            <span className="flex-1" />
+            {detail && (
+              <>
+                <button className="btn-secondary" onClick={runFull}>Run all</button>
+                <button className="btn-danger px-2" onClick={stopAll} title="Stop running processes" aria-label="Stop">
+                  <StopSquare className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  className="btn-secondary px-2"
+                  onClick={() => void api.openTaskFolder(detail.task.id)}
+                  title="Open task folder"
+                  aria-label="Open task folder"
+                >
+                  <Folder className="h-3.5 w-3.5" />
+                </button>
+              </>
+            )}
+          </div>
+          {detail && (
+            <div className="flex items-center gap-2 text-xs">
+              <StatusBadge state={detail.task.status} />
+              <p className="min-w-0 flex-1 truncate text-neutral-500" title={detail.task.goal}>
+                {detail.task.goal}
+              </p>
+            </div>
           )}
         </header>
 
@@ -674,21 +631,30 @@ export default function TasksPage() {
 
         {detail && (
           <>
-            <FlowChart detail={detail} queue={queue} selected={selectedStep} onSelect={setSelectedStep} />
-
-            {selectedStep && (
-              <StepDetail
-                detail={detail}
-                step={selectedStep}
-                onRun={() => void runStep(selectedStep)}
-                onOpenFile={openFile}
-                onReview={setReviewAgent}
-              />
-            )}
+            <FlowChart
+              detail={detail}
+              queue={queue}
+              onSelect={(s) =>
+                document.getElementById(`step-${s}`)?.scrollIntoView({ behavior: "smooth", block: "center" })
+              }
+            />
 
             {queue && <QueueStrip queue={queue} onApprove={(id) => void approveItem(id)} onRemove={(id) => void removeItem(id)} />}
 
-            {reviewAgent && <AgentReview provider={reviewAgent} detail={detail} onClose={() => setReviewAgent(null)} />}
+            {/* One conversation per pipeline step: what was sent, what came back. */}
+            <div className="grid gap-3 md:grid-cols-2">
+              {STEP_ORDER.map((step, i) => (
+                <div key={step} className={i === STEP_ORDER.length - 1 ? "md:col-span-2" : ""}>
+                  <StepChat
+                    detail={detail}
+                    step={step}
+                    exchanges={exchanges[step] ?? []}
+                    onRun={() => void runStep(step)}
+                    onOpenFile={openFile}
+                  />
+                </div>
+              ))}
+            </div>
 
             <section className="card p-4">
               <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">

@@ -67,6 +67,11 @@ def open_folder(task_id: str):
     return {"ok": True}
 
 
+@router.get("/{task_id}/exchanges")
+def task_exchanges(task_id: str):
+    return {"steps": task_service.step_exchanges(require_workspace(), task_id)}
+
+
 @router.get("/{task_id}/logs")
 def task_logs(task_id: str):
     return {

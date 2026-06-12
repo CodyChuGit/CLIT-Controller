@@ -482,8 +482,7 @@ function EngineSelect({
         aria-expanded={open}
         className="focusable flex h-[38px] cursor-pointer items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2 font-mono text-[10px] text-neutral-600 transition-colors duration-150 hover:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:border-neutral-600"
       >
-        <ProviderMark id={value} className="h-3.5 w-3.5" />
-        <span className="max-w-[52px] truncate">{value}</span>
+        <ProviderMark id={value} className="h-4 w-4" />
         <ChevronDown className={`h-3 w-3 text-neutral-400 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (

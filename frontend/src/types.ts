@@ -285,6 +285,13 @@ export interface LoginResult {
   message: string;
 }
 
+/** One archived prompt → output pair for a step, rebuilt from the task's logs dir. */
+export interface Exchange {
+  stamp: string;
+  prompt: string;
+  output: string;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;

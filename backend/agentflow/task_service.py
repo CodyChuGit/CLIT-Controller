@@ -235,6 +235,37 @@ def read_task_file(workspace: Path, task_id: str, name: str) -> dict:
     return {"name": name, "content": redact(content)}
 
 
+def step_exchanges(workspace: Path, task_id: str) -> dict[str, list[dict]]:
+    """Archived prompt → output pairs per step, rebuilt from the task's logs dir
+    (survives backend restarts; in-memory run records do not)."""
+    logs_dir = paths.task_logs_dir(workspace, task_id)
+    out: dict[str, list[dict]] = {}
+    if not logs_dir.is_dir():
+        return out
+    for pf in sorted(logs_dir.glob("*.prompt.txt")):
+        stem = pf.name[: -len(".prompt.txt")]
+        parts = stem.split("-")
+        if len(parts) < 3:  # <date>-<time>-<step>
+            continue
+        step = parts[-1]
+        stamp = "-".join(parts[:-1])
+        try:
+            prompt = pf.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        output = ""
+        log_file = logs_dir / f"{stem}.log"
+        if log_file.is_file():
+            try:
+                output = log_file.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                output = ""
+        out.setdefault(step, []).append(
+            {"stamp": stamp, "prompt": redact(prompt[-20_000:]), "output": redact(output[-20_000:])}
+        )
+    return out
+
+
 def list_task_logs(workspace: Path, task_id: str) -> list[dict]:
     logs_dir = paths.task_logs_dir(workspace, task_id)
     out = []
