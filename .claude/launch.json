@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "agentflow-backend",
+      "runtimeExecutable": "agentflow-studio/.venv/bin/python",
+      "runtimeArgs": ["-m", "agentflow"],
+      "port": 8787,
+      "autoPort": false
+    }
+  ]
+}

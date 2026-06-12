@@ -1,0 +1,202 @@
+export type Health = "green" | "yellow" | "red";
+export type OrchestrationMode =
+  | "maximum_quality"
+  | "balanced"
+  | "budget_saver"
+  | "manual_approval";
+
+export interface CurrentProject {
+  workspacePath: string | null;
+  name?: string;
+  agentflowDir?: string;
+  routing?: RoutingConfig;
+}
+
+export interface RoutingConfig {
+  orchestrator: string;
+  pm: string;
+  engineer: string;
+  qa: string;
+}
+
+export interface Provider {
+  id: string;
+  displayName: string;
+  role: string;
+  executableNames: string[];
+  installed: boolean;
+  executablePath: string | null;
+  version: string | null;
+  status: string;
+  authMode: string;
+  usageMode: string;
+  usageHealth: Health | null;
+  callsToday: number;
+  manualBudgetLevel: string | null;
+  preferredUse: string;
+  lastChecked: string | null;
+  lastLog: string;
+  installHint: string;
+  loginCommand: string | null;
+  versionCommand: string;
+  statusCommand: string | null;
+}
+
+export interface TreeNode {
+  name: string;
+  path: string;
+  type: "dir" | "file";
+  size?: number;
+  previewable?: boolean;
+  children?: TreeNode[];
+}
+
+export interface Tree {
+  root: string;
+  children: TreeNode[];
+  fileCount: number;
+  truncated: boolean;
+}
+
+export interface FileContent {
+  path: string;
+  size: number;
+  truncated: boolean;
+  content: string;
+}
+
+export interface GitInfo {
+  installed: boolean;
+  isRepo: boolean;
+  branch?: string;
+  statusShort?: string;
+  diffStat?: string;
+  changedFiles?: string[];
+  changedFileCount?: number;
+  error?: string;
+}
+
+export interface StepState {
+  status: string;
+  provider?: string;
+  runId?: string;
+  exitCode?: number | null;
+  updatedAt?: string;
+}
+
+export interface TaskMeta {
+  id: string;
+  title: string;
+  goal: string;
+  createdAt: string;
+  status: string;
+  steps: Record<string, StepState>;
+  fullSequence: { status: string; currentStep: string | null };
+}
+
+export interface StepPreview {
+  step: string;
+  label: string;
+  provider: string;
+  providerInstalled: boolean;
+  commandPreview: string;
+  promptChars: number;
+}
+
+export interface RunInfo {
+  id: string;
+  taskId: string | null;
+  step: string | null;
+  provider: string | null;
+  status: string;
+  exitCode: number | null;
+  startedAt: string;
+  endedAt: string | null;
+  durationMs: number | null;
+  commandPreview: string;
+  cwd: string;
+  stdout: string;
+  stderr: string;
+  logFile: string | null;
+}
+
+export interface Recommendation {
+  mode: OrchestrationMode;
+  modeLabel: string;
+  budgetContext: string;
+  lines: string[];
+  warnings: string[];
+  selectedProvider: string;
+  manualApprovalRecommended: boolean;
+  cheaperRouteRecommended: boolean;
+  health: Record<string, Health>;
+}
+
+export interface TaskDetail {
+  task: TaskMeta;
+  taskDir: string;
+  files: { name: string; size: number; modifiedAt: string }[];
+  runs: RunInfo[];
+  stepPreviews: Record<string, StepPreview>;
+  recommendation: Recommendation;
+}
+
+export interface RunStepResult extends Partial<StepPreview> {
+  status: string;
+  runId?: string;
+  warning?: string;
+  message?: string;
+  savedPromptTo?: string;
+  previews?: StepPreview[];
+}
+
+export interface ProviderUsage {
+  callsToday: number;
+  manualBudgetLevel: string;
+  health: Health;
+  preferredUse: string;
+  estimatedPromptChars: number;
+  estimatedOutputChars: number;
+  lastCommandDuration: number;
+  lastStatus: string;
+}
+
+export interface Usage {
+  mode: string;
+  orchestrationMode: OrchestrationMode;
+  providers: Record<string, ProviderUsage>;
+  expensiveCallsAvoided: number;
+  localStepsCompleted: number;
+}
+
+export interface LogEntry {
+  id: string;
+  time: string;
+  source: string;
+  provider: string | null;
+  taskId: string | null;
+  step: string | null;
+  status: string;
+  summary: string;
+  output: string;
+}
+
+export interface LogsResponse {
+  entries: LogEntry[];
+  running: RunInfo[];
+}
+
+export interface Settings {
+  routing: RoutingConfig;
+  commandTemplates: Record<string, string>;
+  workspacePath: string | null;
+  globalConfigPath: string;
+  workspaceConfigPath: string | null;
+  usageFilePath: string | null;
+}
+
+export interface LoginResult {
+  launched: boolean;
+  command: string | null;
+  message: string;
+}
