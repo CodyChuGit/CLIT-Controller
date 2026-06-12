@@ -24,7 +24,7 @@ def login_scripts_dir() -> Path:
 
 
 def repo_root() -> Path:
-    # backend/agentflow/paths.py -> agentflow-studio/
+    # backend/agentflow/paths.py -> repo root
     return Path(__file__).resolve().parents[2]
 
 

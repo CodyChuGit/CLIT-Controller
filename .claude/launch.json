@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "agentflow-backend",
-      "runtimeExecutable": "agentflow-studio/.venv/bin/python",
+      "runtimeExecutable": ".venv/bin/python",
       "runtimeArgs": ["-m", "agentflow"],
       "port": 8787,
       "autoPort": false
