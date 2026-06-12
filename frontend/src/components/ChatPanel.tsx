@@ -6,6 +6,7 @@ import { loadState, saveState } from "../persist";
 import {
   AntigravityMark,
   ChatBubble,
+  ChevronDown,
   ChevronRight,
   ClaudeMark,
   Close,
@@ -447,6 +448,75 @@ function AgentActivity({ queue, running }: { queue: QueueState | null; running: 
   );
 }
 
+/* ----------------------------------------------------------- engine select */
+
+/** Orchestrator engine picker with brand marks — native selects can't render SVGs. */
+function EngineSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: { id: string; installed: boolean }[];
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        onClick={() => setOpen(!open)}
+        title="CLI that runs the orchestrator"
+        aria-label="Orchestrator CLI"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="focusable flex h-[38px] cursor-pointer items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2 font-mono text-[10px] text-neutral-600 transition-colors duration-150 hover:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:border-neutral-600"
+      >
+        <ProviderMark id={value} className="h-3.5 w-3.5" />
+        <span className="max-w-[52px] truncate">{value}</span>
+        <ChevronDown className={`h-3 w-3 text-neutral-400 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div
+          role="listbox"
+          aria-label="Orchestrator CLI options"
+          className="absolute bottom-full left-0 z-20 mb-1 w-44 overflow-hidden rounded-md border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
+        >
+          {options.map((p) => (
+            <button
+              key={p.id}
+              role="option"
+              aria-selected={p.id === value}
+              onClick={() => {
+                onChange(p.id);
+                setOpen(false);
+              }}
+              className={`focusable flex w-full cursor-pointer items-center gap-2 px-2.5 py-1.5 text-left font-mono text-[11px] transition-colors duration-150 hover:bg-neutral-100 dark:hover:bg-neutral-800 ${
+                p.id === value ? "text-neutral-900 dark:text-neutral-100" : "text-neutral-500 dark:text-neutral-400"
+              }`}
+            >
+              <ProviderMark id={p.id} className="h-3.5 w-3.5" />
+              <span className="flex-1">{p.id}</span>
+              {!p.installed && <span className="text-[9px] text-neutral-400">not installed</span>}
+              {p.id === value && <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------- panel */
 
 const ORCH = "orchestrator";
@@ -770,20 +840,11 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
         )}
         <div className="flex items-end gap-1.5">
           {isOrch && (
-            <select
-              className="focusable h-[38px] max-w-[96px] shrink-0 cursor-pointer rounded-md border border-neutral-200 bg-white px-1 font-mono text-[10px] text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+            <EngineSelect
               value={selected}
-              onChange={(e) => setProvider(e.target.value)}
-              title="CLI that runs the orchestrator"
-              aria-label="Orchestrator CLI"
-            >
-              {(data?.providers ?? [{ id: selected, installed: true }]).map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.id}
-                  {!p.installed ? " (not installed)" : ""}
-                </option>
-              ))}
-            </select>
+              options={data?.providers ?? [{ id: selected, installed: true }]}
+              onChange={setProvider}
+            />
           )}
           <textarea
             className="input max-h-32 min-h-[38px] flex-1 resize-none text-xs"
