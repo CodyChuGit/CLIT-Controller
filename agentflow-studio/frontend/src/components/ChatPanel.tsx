@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import type { ChatMessage, ChatState } from "../types";
-import { ChatBubble, ChevronLeft, Close, Send, Spinner, StopSquare } from "./icons";
+import { ChatBubble, ChevronRight, Close, Send, Spinner, StopSquare } from "./icons";
 
 const OPEN_KEY = "agentflow.chatOpen";
 
@@ -97,7 +97,7 @@ export default function ChatPanel({ hasWorkspace }: { hasWorkspace: boolean }) {
 
   if (!open) {
     return (
-      <div className="flex w-10 shrink-0 flex-col items-center border-r border-neutral-200 bg-white/60 py-2 dark:border-neutral-800 dark:bg-neutral-900/60">
+      <div className="flex w-10 shrink-0 flex-col items-center border-l border-neutral-200 bg-white/60 py-2 dark:border-neutral-800 dark:bg-neutral-900/60">
         <button
           onClick={() => toggle(true)}
           title="Open orchestrator chat"
@@ -120,7 +120,7 @@ export default function ChatPanel({ hasWorkspace }: { hasWorkspace: boolean }) {
 
   return (
     <section
-      className="flex w-80 shrink-0 flex-col border-r border-neutral-200 bg-white/60 dark:border-neutral-800 dark:bg-neutral-900/60"
+      className="flex w-80 shrink-0 flex-col border-l border-neutral-200 bg-white/60 dark:border-neutral-800 dark:bg-neutral-900/60"
       aria-label="Orchestrator chat"
     >
       {/* header */}
@@ -158,7 +158,7 @@ export default function ChatPanel({ hasWorkspace }: { hasWorkspace: boolean }) {
           aria-label="Collapse chat"
           className="focusable cursor-pointer rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
         >
-          <ChevronLeft className="h-3.5 w-3.5" />
+          <ChevronRight className="h-3.5 w-3.5" />
         </button>
       </div>
 

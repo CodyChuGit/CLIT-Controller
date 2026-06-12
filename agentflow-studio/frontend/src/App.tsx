@@ -103,7 +103,6 @@ export default function App() {
 
       <div className="flex min-h-0 flex-1">
         <ActivityBar page={page} onNavigate={setPage} />
-        <ChatPanel hasWorkspace={Boolean(project?.workspacePath)} />
 
         <main id="main" className="min-w-0 flex-1 overflow-y-auto">
           {!backendUp && (
@@ -146,6 +145,8 @@ export default function App() {
             </>
           )}
         </main>
+
+        <ChatPanel hasWorkspace={Boolean(project?.workspacePath)} />
       </div>
 
       <StatusBar backendUp={backendUp} project={project} git={git} usage={usage} onNavigate={setPage} />
