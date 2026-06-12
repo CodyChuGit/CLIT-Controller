@@ -102,3 +102,29 @@ export const Refresh = (p: SVGProps<SVGSVGElement>) => (
     <path d="M20 5v6h-6" />
   </Icon>
 );
+
+export const ChevronLeft = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="m15 18-6-6 6-6" />
+  </Icon>
+);
+
+export const ChatBubble = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M21 12a8 8 0 0 1-8 8H4l2.5-2.5A8 8 0 1 1 21 12z" />
+    <path d="M8.5 11h.01M12 11h.01M15.5 11h.01" />
+  </Icon>
+);
+
+export const Send = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M4 12 20 4l-4 16-4.5-6.5L4 12z" />
+    <path d="M11.5 13.5 20 4" />
+  </Icon>
+);
+
+export const StopSquare = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <rect x="7" y="7" width="10" height="10" rx="1.5" />
+  </Icon>
+);

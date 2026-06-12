@@ -95,6 +95,25 @@ After fixing, append to 04_CLAUDE_IMPLEMENTATION_SUMMARY.md.
     )
 
 
+def orchestrator_chat_prompt(usage: dict, workspace_summary: str, transcript: str, message: str) -> str:
+    """Prompt for the persistent orchestrator chat. Compact by design."""
+    convo = f"Conversation so far:\n{transcript}\n\n" if transcript else ""
+    return (
+        f"{budget_context_header(usage)}\n\n"
+        "You are the orchestration model for AgentFlow Studio, a local cockpit that routes coding work "
+        "between CLI agents: codex (specs/plans/reviews), claude (implementation/bug fixing), "
+        "gemini (QA/broad checks), plus free local git checks.\n\n"
+        f"{workspace_summary}\n\n"
+        "Your job: help the user plan work, decide routing, draft task goals, and interpret agent results. "
+        "Be compact and concrete — prefer specific next actions in AgentFlow (create a task, run a step "
+        "with a given agent, run a local git check) over long prose. You advise; you do not execute "
+        "anything yourself. Respect the budget context above when recommending providers.\n\n"
+        f"{convo}"
+        f"user: {message}\n\n"
+        "Reply as the assistant."
+    )
+
+
 STEP_PROMPTS = {
     "codex_spec": codex_spec_prompt,
     "claude_implement": claude_implement_prompt,

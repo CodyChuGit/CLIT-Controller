@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__, paths
-from .api import routes_agents, routes_logs, routes_projects, routes_tasks, routes_usage
+from .api import routes_agents, routes_chat, routes_logs, routes_projects, routes_tasks, routes_usage
 
 
 def create_app() -> FastAPI:
@@ -31,6 +31,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_tasks.router, prefix="/api/tasks", tags=["tasks"])
     app.include_router(routes_usage.router, prefix="/api/usage", tags=["usage"])
     app.include_router(routes_logs.router, prefix="/api/logs", tags=["logs"])
+    app.include_router(routes_chat.router, prefix="/api/chat", tags=["chat"])
 
     @app.get("/api/health")
     def health() -> dict:

@@ -209,3 +209,31 @@ export interface LoginResult {
   command: string | null;
   message: string;
 }
+
+export interface ChatMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+  time: string;
+  provider?: string;
+  durationMs?: number;
+}
+
+export interface ChatPending {
+  runId: string;
+  status: string;
+  outputTail: string;
+}
+
+export interface ChatState {
+  messages: ChatMessage[];
+  pending: ChatPending | null;
+  defaultProvider: string;
+  providers: { id: string; installed: boolean }[];
+}
+
+export interface ChatSendResult {
+  status: string;
+  message?: string;
+  runId?: string;
+  provider?: string;
+}

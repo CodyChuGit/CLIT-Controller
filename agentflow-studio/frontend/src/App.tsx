@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
 import ActivityBar, { type PageId } from "./components/ActivityBar";
+import ChatPanel from "./components/ChatPanel";
 import StatusBar from "./components/StatusBar";
 import AgentsPage from "./pages/AgentsPage";
 import LogsPage from "./pages/LogsPage";
@@ -102,6 +103,7 @@ export default function App() {
 
       <div className="flex min-h-0 flex-1">
         <ActivityBar page={page} onNavigate={setPage} />
+        <ChatPanel hasWorkspace={Boolean(project?.workspacePath)} />
 
         <main id="main" className="min-w-0 flex-1 overflow-y-auto">
           {!backendUp && (

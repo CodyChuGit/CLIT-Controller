@@ -1,4 +1,6 @@
 import type {
+  ChatSendResult,
+  ChatState,
   CurrentProject,
   FileContent,
   GitInfo,
@@ -98,4 +100,11 @@ export const api = {
   // logs
   logs: () => get<LogsResponse>("/logs"),
   clearLogView: () => post<{ ok: boolean }>("/logs/clear-view"),
+
+  // chat
+  chat: () => get<ChatState>("/chat"),
+  chatSend: (message: string, provider: string | null) =>
+    post<ChatSendResult>("/chat/send", { message, provider: provider ?? undefined }),
+  chatStop: () => post<{ stopped: boolean }>("/chat/stop"),
+  chatClear: () => post<{ ok: boolean }>("/chat/clear"),
 };
