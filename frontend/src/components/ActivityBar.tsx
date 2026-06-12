@@ -59,7 +59,7 @@ function RailButton({ item, active, onClick }: { item: NavItem; active: boolean;
       title={item.label}
       aria-label={item.label}
       aria-current={active ? "page" : undefined}
-      className={`focusable relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg transition-colors duration-150 ${
+      className={`focusable relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg transition-colors duration-150 ${
         active
           ? "bg-accent/10 text-blue-700 dark:bg-accent/20 dark:text-blue-300"
           : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
@@ -67,7 +67,7 @@ function RailButton({ item, active, onClick }: { item: NavItem; active: boolean;
     >
       {active && (
         <span
-          className="absolute -left-1.5 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-accent"
+          className="absolute -left-[3px] top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-accent"
           aria-hidden="true"
         />
       )}
@@ -96,7 +96,7 @@ interface Props {
 export default function ActivityBar({ page, onNavigate }: Props) {
   return (
     <aside
-      className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-neutral-200 bg-white py-2 dark:border-neutral-800 dark:bg-neutral-900"
+      className="flex w-10 shrink-0 flex-col items-center gap-1 border-r border-neutral-200 bg-white py-2 dark:border-neutral-800 dark:bg-neutral-900"
       aria-label="Main navigation"
     >
       <div

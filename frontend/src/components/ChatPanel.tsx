@@ -519,7 +519,6 @@ function EngineSelect({
 /* ------------------------------------------------------------------- panel */
 
 const ORCH = "orchestrator";
-const TAB_SHORT: Record<string, string> = { antigravity: "agy" };
 const FALLBACK_AGENTS = ["codex", "claude", "antigravity"];
 
 /** Persistent chat dock — the orchestrator plus a direct line to each agent. */
@@ -749,7 +748,7 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
                 )}
                 {/* The active channel announces itself; the rest are just their marks. */}
                 {active && (
-                  <span className={id === ORCH ? "font-medium" : "font-mono"}>{TAB_SHORT[id] ?? id}</span>
+                  <span className={id === ORCH ? "font-medium" : "font-mono"}>{id}</span>
                 )}
                 {!active && hasUnread(id) && (
                   <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
@@ -855,7 +854,7 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
                 ? "Open a workspace first"
                 : isOrch
                   ? "Ask the orchestrator…"
-                  : `Message ${TAB_SHORT[channel] ?? channel} directly…`
+                  : `Message ${channel} directly…`
             }
             value={input}
             disabled={!hasWorkspace || sending}
