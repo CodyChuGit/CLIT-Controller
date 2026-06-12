@@ -3,6 +3,9 @@ import { api } from "./api";
 import ActivityBar, { type PageId } from "./components/ActivityBar";
 import ChatPanel from "./components/ChatPanel";
 import StatusBar from "./components/StatusBar";
+import { loadState, saveState } from "./persist";
+
+const PAGE_IDS: PageId[] = ["projects", "agents", "tasks", "usage", "logs", "settings"];
 import AgentsPage from "./pages/AgentsPage";
 import LogsPage from "./pages/LogsPage";
 import ProjectsPage from "./pages/ProjectsPage";
@@ -12,7 +15,14 @@ import UsagePage from "./pages/UsagePage";
 import type { CurrentProject, EditorFile, GitInfo, Usage } from "./types";
 
 export default function App() {
-  const [page, setPage] = useState<PageId>("projects");
+  const [page, setPageState] = useState<PageId>(() => {
+    const saved = loadState<PageId>("page", "projects");
+    return PAGE_IDS.includes(saved) ? saved : "projects";
+  });
+  const setPage = useCallback((next: PageId) => {
+    setPageState(next);
+    saveState("page", next);
+  }, []);
   const [project, setProject] = useState<CurrentProject | null>(null);
   const [backendUp, setBackendUp] = useState(true);
   const [git, setGit] = useState<GitInfo | null>(null);
@@ -70,13 +80,48 @@ export default function App() {
     return () => window.clearInterval(id);
   }, [refreshShell, page]);
 
-  // Switching workspaces invalidates open editor tabs and all per-workspace shell data.
+  // Switching workspaces invalidates per-workspace shell data, then restores that
+  // workspace's remembered editor tabs (paths only — contents are re-read fresh).
+  const restoringRef = useRef(false);
   useEffect(() => {
     setOpenFiles([]);
     setActivePath(null);
     setGit(null);
     setUsage(null);
+    const ws = project?.workspacePath;
+    if (!ws) return;
+    const saved = loadState<{ paths: string[]; active: string | null }>(`tabs:${ws}`, { paths: [], active: null });
+    if (saved.paths.length === 0) return;
+    restoringRef.current = true;
+    void (async () => {
+      const files: EditorFile[] = [];
+      for (const path of saved.paths) {
+        try {
+          files.push(await api.file(path));
+        } catch {
+          /* file disappeared since last session — drop the tab */
+        }
+      }
+      restoringRef.current = false;
+      if (wsRef.current !== ws) return; // workspace changed again mid-restore
+      setOpenFiles(files);
+      setActivePath(
+        saved.active && files.some((f) => f.path === saved.active)
+          ? saved.active
+          : files[files.length - 1]?.path ?? null,
+      );
+    })();
   }, [project?.workspacePath]);
+
+  // Remember open tabs (skip transient diff views) for the next session.
+  useEffect(() => {
+    const ws = project?.workspacePath;
+    if (!ws || restoringRef.current) return;
+    saveState(`tabs:${ws}`, {
+      paths: openFiles.filter((f) => f.kind !== "diff").map((f) => f.path),
+      active: activePath,
+    });
+  }, [openFiles, activePath, project?.workspacePath]);
 
   const openFile = useCallback(async (path: string) => {
     setActivePath(path);

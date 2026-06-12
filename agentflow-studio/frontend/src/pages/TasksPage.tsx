@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { ArrowRight, Close, FileIcon, Inbox, Spinner, StopSquare } from "../components/icons";
 import StatusBadge from "../components/StatusBadge";
+import { loadState, saveState } from "../persist";
 import type { QueueState, RunInfo, StepPreview, StepState, TaskDetail, TaskEvent, TaskMeta } from "../types";
 
 const STEP_ORDER = ["codex_spec", "claude_implement", "gemini_qa", "codex_review", "claude_fix"];
@@ -521,12 +522,16 @@ export default function TasksPage() {
 
   useEffect(() => {
     void loadTasks().then((list) => {
-      if (list.length > 0) setSelectedId((cur) => cur ?? list[0].id);
+      if (list.length > 0) {
+        const remembered = loadState<string | null>("lastTask", null);
+        setSelectedId((cur) => cur ?? (remembered && list.some((t) => t.id === remembered) ? remembered : list[0].id));
+      }
     });
   }, [loadTasks]);
 
   useEffect(() => {
     if (selectedId) {
+      saveState("lastTask", selectedId);
       setTaskFile(null);
       setReviewAgent(null);
       void loadDetail(selectedId);

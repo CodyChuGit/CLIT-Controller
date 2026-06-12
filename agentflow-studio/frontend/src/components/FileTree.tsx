@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { TreeNode } from "../types";
 import FileTypeIcon from "./FileTypeIcon";
 import { ChevronDown, ChevronRight, Folder } from "./icons";
@@ -8,10 +7,13 @@ interface NodeProps {
   depth: number;
   onOpenFile: (path: string) => void;
   selected: string | null;
+  expanded: Record<string, boolean>;
+  onToggleDir: (path: string, open: boolean) => void;
 }
 
-function Node({ node, depth, onOpenFile, selected }: NodeProps) {
-  const [open, setOpen] = useState(depth < 1);
+function Node({ node, depth, onOpenFile, selected, expanded, onToggleDir }: NodeProps) {
+  // Remembered per workspace; top-level folders start open by default.
+  const open = expanded[node.path] ?? depth < 1;
   const pad = { paddingLeft: `${depth * 14 + 8}px` };
 
   if (node.type === "dir") {
@@ -19,7 +21,7 @@ function Node({ node, depth, onOpenFile, selected }: NodeProps) {
       <div className="relative">
         <button
           style={pad}
-          onClick={() => setOpen(!open)}
+          onClick={() => onToggleDir(node.path, !open)}
           aria-expanded={open}
           className="focusable flex w-full cursor-pointer items-center gap-1.5 rounded py-0.5 pr-2 text-left text-[13px] text-neutral-700 transition-colors duration-150 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
         >
@@ -40,7 +42,15 @@ function Node({ node, depth, onOpenFile, selected }: NodeProps) {
               style={{ left: `${depth * 14 + 13}px` }}
             />
             {node.children?.map((c) => (
-              <Node key={c.path} node={c} depth={depth + 1} onOpenFile={onOpenFile} selected={selected} />
+              <Node
+                key={c.path}
+                node={c}
+                depth={depth + 1}
+                onOpenFile={onOpenFile}
+                selected={selected}
+                expanded={expanded}
+                onToggleDir={onToggleDir}
+              />
             ))}
           </div>
         )}
@@ -76,16 +86,26 @@ interface Props {
   onOpenFile: (path: string) => void;
   selected: string | null;
   truncated?: boolean;
+  expanded: Record<string, boolean>;
+  onToggleDir: (path: string, open: boolean) => void;
 }
 
-export default function FileTree({ nodes, onOpenFile, selected, truncated }: Props) {
+export default function FileTree({ nodes, onOpenFile, selected, truncated, expanded, onToggleDir }: Props) {
   if (nodes.length === 0) {
     return <p className="p-4 text-sm text-neutral-500 dark:text-neutral-400">Empty folder.</p>;
   }
   return (
     <div className="py-1" role="tree">
       {nodes.map((n) => (
-        <Node key={n.path} node={n} depth={0} onOpenFile={onOpenFile} selected={selected} />
+        <Node
+          key={n.path}
+          node={n}
+          depth={0}
+          onOpenFile={onOpenFile}
+          selected={selected}
+          expanded={expanded}
+          onToggleDir={onToggleDir}
+        />
       ))}
       {truncated && (
         <p className="px-3 py-2 text-[11px] text-neutral-500">Tree truncated (depth 8 / 2000 files max).</p>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import type { GitFileEntry, GitStatus } from "../types";
 import FileTypeIcon from "./FileTypeIcon";
+import { loadState, saveState } from "../persist";
 import { ChevronDown, ChevronRight, GitBranch, Refresh, Spinner } from "./icons";
 
 const CODE_COLORS: Record<string, string> = {
@@ -68,7 +69,11 @@ interface Props {
 
 /** VS Code-style source control: live status, stage/unstage, commit, click-to-diff. */
 export default function SourceControlPanel({ workspacePath, onOpenDiff }: Props) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpenState] = useState(() => loadState("scOpen", true));
+  const setOpen = (next: boolean) => {
+    setOpenState(next);
+    saveState("scOpen", next);
+  };
   const [status, setStatus] = useState<GitStatus | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);

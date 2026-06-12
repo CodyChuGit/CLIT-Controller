@@ -4,6 +4,7 @@ import CodeReader from "../components/CodeReader";
 import FileTree from "../components/FileTree";
 import LogConsole from "../components/LogConsole";
 import SourceControlPanel from "../components/SourceControlPanel";
+import { loadState, saveState } from "../persist";
 import { ChevronDown, ChevronRight, Close, FileIcon, Refresh } from "../components/icons";
 import type { CurrentProject, EditorFile, LogsResponse, Tree } from "../types";
 
@@ -33,8 +34,23 @@ export default function ProjectsPage({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tree, setTree] = useState<Tree | null>(null);
+  const [treeExpanded, setTreeExpanded] = useState<Record<string, boolean>>({});
 
   const hasWorkspace = Boolean(project?.workspacePath);
+  const wsKey = project?.workspacePath ?? "";
+
+  // Folder open/closed state is remembered per workspace.
+  useEffect(() => {
+    setTreeExpanded(loadState<Record<string, boolean>>(`tree:${wsKey}`, {}));
+  }, [wsKey]);
+
+  const toggleDir = (path: string, open: boolean) => {
+    setTreeExpanded((prev) => {
+      const next = { ...prev, [path]: open };
+      saveState(`tree:${wsKey}`, next);
+      return next;
+    });
+  };
   const activeFile = openFiles.find((f) => f.path === activePath) ?? null;
 
   const refreshTree = useCallback(async () => {
@@ -118,7 +134,14 @@ export default function ProjectsPage({
             </div>
             <div className="min-h-0 flex-1 overflow-auto">
               {tree ? (
-                <FileTree nodes={tree.children} onOpenFile={onOpenFile} selected={activePath} truncated={tree.truncated} />
+                <FileTree
+                  nodes={tree.children}
+                  onOpenFile={onOpenFile}
+                  selected={activePath}
+                  truncated={tree.truncated}
+                  expanded={treeExpanded}
+                  onToggleDir={toggleDir}
+                />
               ) : (
                 <div className="space-y-2 p-3" aria-hidden="true">
                   {[0, 1, 2, 3, 4].map((i) => (
@@ -226,7 +249,12 @@ function PanelSection({
   defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const storageKey = `section:${title}`;
+  const [open, setOpenState] = useState(() => loadState(storageKey, defaultOpen));
+  const setOpen = (next: boolean) => {
+    setOpenState(next);
+    saveState(storageKey, next);
+  };
   return (
     <div className="shrink-0 border-b border-neutral-200 dark:border-neutral-800">
       <div className="flex items-center">
@@ -247,7 +275,11 @@ function PanelSection({
 }
 
 function OutputPanel() {
-  const [open, setOpen] = useState(true);
+  const [open, setOpenState] = useState(() => loadState("outputOpen", true));
+  const setOpen = (next: boolean) => {
+    setOpenState(next);
+    saveState("outputOpen", next);
+  };
   const [data, setData] = useState<LogsResponse | null>(null);
 
   const load = useCallback(async () => {
