@@ -741,13 +741,15 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
               >
                 {active && <span className="absolute inset-x-0 top-0 h-0.5 bg-accent" aria-hidden="true" />}
                 {id === ORCH ? (
-                  <TopHat className="h-3.5 w-3.5 text-accent-subtle" />
+                  <>
+                    <TopHat className="h-3.5 w-3.5 text-accent-subtle" />
+                    <span className="font-medium">orchestrator</span>
+                  </>
                 ) : (
                   <span className={`${chPending ? "animate-pulse" : ""} ${installed ? "" : "opacity-40"}`}>
-                    <ProviderMark id={id} className="h-3 w-3" />
+                    <ProviderMark id={id} className="h-4 w-4" />
                   </span>
                 )}
-                <span className={id === ORCH ? "font-medium" : "font-mono"}>{TAB_SHORT[id] ?? id}</span>
                 {!active && hasUnread(id) && (
                   <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
                 )}
