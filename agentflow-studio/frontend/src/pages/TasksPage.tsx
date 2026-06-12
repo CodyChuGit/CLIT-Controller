@@ -312,8 +312,8 @@ function AgentReview({
   return (
     <section className="card border-blue-200 p-4 dark:border-blue-900">
       <div className="mb-2 flex items-center gap-2">
-        <h3 className="text-sm font-semibold">
-          Agent review — <span className="font-mono">{provider}</span>
+        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+          Agent review — <span className="font-mono lowercase">{provider}</span>
         </h3>
         <span className="text-xs text-neutral-400">{runs.length} run(s)</span>
         <span className="flex-1" />
@@ -543,7 +543,7 @@ export default function TasksPage() {
         {detail && (
           <>
             <section className="card p-4">
-              <h2 className="mb-2 text-sm font-semibold">Orchestrator log</h2>
+              <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Orchestrator log</h2>
               <HandoffLog events={detail.task.events ?? []} onOpenFile={openFile} />
             </section>
 

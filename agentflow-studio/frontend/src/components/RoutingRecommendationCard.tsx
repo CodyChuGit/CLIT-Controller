@@ -6,7 +6,9 @@ export default function RoutingRecommendationCard({ rec }: { rec: Recommendation
   return (
     <div className="card p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Routing recommendation</h3>
+        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+          Routing recommendation
+        </h3>
         <div className="flex items-center gap-2">
           {rec.cheaperRouteRecommended && (
             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">

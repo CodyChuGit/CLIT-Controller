@@ -45,14 +45,14 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-5 p-8">
+    <div className="mx-auto max-w-3xl space-y-4 p-6">
       <header>
         <h1 className="text-xl font-semibold">Settings</h1>
-        <p className="text-sm text-neutral-500">Routing defaults and command templates.</p>
+        <p className="text-xs text-neutral-500">Routing defaults, command templates, models, and paths.</p>
       </header>
 
       <section className="card p-5">
-        <h2 className="mb-3 text-sm font-semibold">Routing defaults</h2>
+        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Routing defaults</h2>
         <div className="grid grid-cols-2 gap-4">
           {(Object.keys(ROLE_LABELS) as (keyof RoutingConfig)[]).map((role) => (
             <div key={role}>
@@ -72,7 +72,7 @@ export default function SettingsPage() {
       </section>
 
       <section className="card p-5">
-        <h2 className="mb-1 text-sm font-semibold">Command templates</h2>
+        <h2 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Command templates</h2>
         <p className="mb-3 text-xs text-neutral-500">
           <code className="font-mono">{"{prompt}"}</code> is replaced with the generated prompt (passed as a
           single argument, never through a shell string).
@@ -98,7 +98,7 @@ export default function SettingsPage() {
       </div>
 
       <section className="card p-5">
-        <h2 className="mb-3 text-sm font-semibold">Paths</h2>
+        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Paths</h2>
         <dl className="space-y-2 text-xs">
           {[
             ["Workspace", settings.workspacePath ?? "not set"],
