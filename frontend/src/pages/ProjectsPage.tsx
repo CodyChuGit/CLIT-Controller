@@ -3,6 +3,7 @@ import { api } from "../api";
 import CodeReader from "../components/CodeReader";
 import DragHandle from "../components/DragHandle";
 import FileTree from "../components/FileTree";
+import FileTypeIcon from "../components/FileTypeIcon";
 import LogConsole from "../components/LogConsole";
 import SourceControlPanel from "../components/SourceControlPanel";
 import { loadState, saveState } from "../persist";
@@ -178,7 +179,7 @@ export default function ProjectsPage({
       <section className="flex min-w-0 flex-1 flex-col">
         {openFiles.length > 0 && (
           <div
-            className="flex h-9 shrink-0 items-stretch overflow-x-auto border-b border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-950"
+            className="flex h-8 shrink-0 items-stretch overflow-x-auto border-b border-neutral-200 bg-surface dark:border-neutral-800 dark:bg-neutral-950"
             role="tablist"
             aria-label="Open files"
           >
@@ -188,22 +189,23 @@ export default function ProjectsPage({
               return (
                 <div
                   key={f.path}
-                  className={`flex shrink-0 items-center border-r border-neutral-200 dark:border-neutral-800 ${
+                  className={`relative flex shrink-0 items-center border-r border-neutral-200 transition-colors duration-150 dark:border-neutral-800 ${
                     active
-                      ? "border-t-2 border-t-accent bg-white dark:bg-neutral-900"
-                      : "border-t-2 border-t-transparent hover:bg-neutral-50 dark:hover:bg-neutral-900/60"
+                      ? "bg-white dark:bg-neutral-900"
+                      : "hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
                   }`}
                 >
+                  {active && <span className="absolute inset-x-0 top-0 h-0.5 bg-accent" aria-hidden="true" />}
                   <button
                     role="tab"
                     aria-selected={active}
                     title={f.path}
                     onClick={() => onActivateFile(f.path)}
-                    className={`focusable flex cursor-pointer items-center gap-1.5 py-1.5 pl-3 pr-1 font-mono text-xs ${
-                      active ? "text-neutral-900 dark:text-neutral-100" : "text-neutral-500 dark:text-neutral-400"
+                    className={`focusable flex cursor-pointer items-center gap-1.5 py-1.5 pl-2.5 pr-1 font-mono text-[11px] ${
+                      active ? "text-neutral-800 dark:text-neutral-100" : "text-neutral-500 dark:text-neutral-400"
                     }`}
                   >
-                    <FileIcon className="h-3 w-3 shrink-0 text-neutral-400" />
+                    <FileTypeIcon name={name} className="shrink-0" />
                     {name}
                     {f.error && <span className="text-rose-500">!</span>}
                   </button>
