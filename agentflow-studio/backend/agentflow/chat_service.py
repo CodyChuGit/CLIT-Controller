@@ -24,8 +24,101 @@ _TASK_DIRECTIVE_RE = re.compile(r"```agentflow-task\s*\n(.*?)```", re.DOTALL)
 _QUEUE_DIRECTIVE_RE = re.compile(r"```agentflow-queue\s*\n(.*?)```", re.DOTALL)
 _DONE_DIRECTIVE_RE = re.compile(r"```agentflow-done\s*\n(.*?)```", re.DOTALL)
 _NEEDS_USER_DIRECTIVE_RE = re.compile(r"```agentflow-needs-user\s*\n(.*?)```", re.DOTALL)
+_RUN_DIRECTIVE_RE = re.compile(r"```agentflow-run\s*\n(.*?)```", re.DOTALL)
 
 MAX_CONSULTS_PER_TASK = 6
+MAX_RUN_DIRECTIVES = 3
+RUN_WAIT_SECONDS = 15  # quick commands report their result; longer ones keep running
+
+
+def parse_run_directives(text: str) -> list[str]:
+    """All `command:` lines from ```agentflow-run``` blocks (capped)."""
+    commands: list[str] = []
+    for m in _RUN_DIRECTIVE_RE.finditer(text or ""):
+        for line in m.group(1).splitlines():
+            if line.lower().startswith("command:"):
+                cmd = line[8:].strip()
+                if cmd:
+                    commands.append(cmd)
+    return commands[:MAX_RUN_DIRECTIVES]
+
+
+def command_denied(command: str) -> Optional[str]:
+    """Direct execution is exec-only and refuses the obviously dangerous."""
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return "unparseable quoting"
+    if not tokens:
+        return "empty command"
+    if tokens[0] in ("sudo", "su", "sh", "bash", "zsh", "shutdown", "reboot", "halt", "mkfs", "dd"):
+        return f"`{tokens[0]}` is not allowed for direct execution"
+    if tokens[0] == "rm" and any(t.startswith("-") and "r" in t and "f" in t for t in tokens) and any(
+        t == "/" or t.startswith("/ ") for t in tokens
+    ):
+        return "refusing recursive force-delete on /"
+    if any(ch in command for ch in ("|", ">", "<", ";", "&&", "`", "$(")):
+        return "shell operators are not supported — one plain command only"
+    return None
+
+
+async def execute_run_directive(
+    workspace: Path, command: str, provider: str, task_id: Optional[str] = None
+) -> None:
+    """The orchestrator runs simple operational commands directly — no task, no roles."""
+    import asyncio
+
+    denied = command_denied(command)
+    if denied:
+        append_message(workspace, "system", f"Didn't run `{command}` — {denied}.", provider=provider)
+        return
+
+    usage = usage_service.ensure_usage(workspace)
+    if usage.get("orchestrationMode") == "manual_approval":
+        append_message(
+            workspace, "system",
+            f"Manual Approval mode — run it yourself: `{command}`", provider=provider,
+        )
+        return
+
+    argv = shlex.split(command)
+    resolved = resolve_executable(argv[0])
+    if resolved is None:
+        append_message(workspace, "system", f"Didn't run `{command}` — `{argv[0]}` not found.", provider=provider)
+        return
+    argv[0] = resolved
+
+    record, consume = await RUNNER.start(argv, workspace, step="run", provider="shell", task_id=task_id)
+    if record.status == "error":
+        append_message(workspace, "system", f"`{command}` failed to start: {record.stderr.strip()[:200]}", provider=provider)
+        return
+    try:
+        await asyncio.wait_for(asyncio.shield(consume), timeout=RUN_WAIT_SECONDS)
+    except asyncio.TimeoutError:
+        pass
+
+    usage_service.increment_local_steps(workspace)
+    if record.status == "running":
+        note = f"$ {command} — running in the background (Logs · Stop via Tasks)"
+    else:
+        tail = redact((record.stdout + "\n" + record.stderr).strip()[-300:])
+        note = f"$ {command} → exit {record.exit_code}" + (f"\n{tail}" if tail else "")
+    append_message(workspace, "system", note, provider=provider)
+    if task_id:
+        try:
+            task_service._add_event(
+                workspace, task_id, "run",
+                f"orchestrator ran `{command}` → {record.status}"
+                + (f" (exit {record.exit_code})" if record.exit_code is not None else ""),
+                provider=provider,
+            )
+        except FileNotFoundError:
+            pass
+    add_log_entry(
+        "run", f"orchestrator ran: $ {command} → {record.status}",
+        provider="shell", task_id=task_id,
+        output=(record.stdout + "\n" + record.stderr)[-2000:],
+    )
 
 
 def _parse_reason_block(regex: re.Pattern[str], text: str) -> Optional[str]:
@@ -293,6 +386,12 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
                             )
                     except Exception as exc:  # noqa: BLE001
                         append_message(workspace, "system", f"Could not queue steps: {exc}", provider=provider)
+
+                for cmd in parse_run_directives(out):
+                    try:
+                        await execute_run_directive(workspace, cmd, provider)
+                    except Exception as exc:  # noqa: BLE001
+                        append_message(workspace, "system", f"`{cmd}` failed: {exc}", provider=provider)
             elif record.status == "cancelled":
                 append_message(workspace, "system", "Response stopped.", provider=provider)
             else:
@@ -398,8 +497,16 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
             queued = parse_queue_directive(out)
             done_reason = parse_done_directive(out)
             user_reason = parse_needs_user_directive(out)
+            commands = parse_run_directives(out)
             reasoning = _TASK_DIRECTIVE_RE.sub("", _QUEUE_DIRECTIVE_RE.sub("", out))
+            reasoning = _RUN_DIRECTIVE_RE.sub("", reasoning)
             reasoning = _DONE_DIRECTIVE_RE.sub("", _NEEDS_USER_DIRECTIVE_RE.sub("", reasoning)).strip()[:240]
+
+            for cmd in commands:
+                try:
+                    await execute_run_directive(workspace, cmd, provider, task_id=task_id)
+                except Exception as exc:  # noqa: BLE001
+                    append_message(workspace, "system", f"`{cmd}` failed: {exc}", provider=provider)
 
             if queued is not None:
                 _ref, steps = queued
@@ -440,7 +547,7 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
                     f"Needs your input — {user_reason}",
                     provider=provider,
                 )
-            else:
+            elif not commands:
                 task_service._add_event(
                     workspace, task_id, "needs_user",
                     "orchestrator replied without an actionable block — decide the next step manually"

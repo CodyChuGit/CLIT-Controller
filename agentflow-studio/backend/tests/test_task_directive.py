@@ -56,3 +56,27 @@ def test_done_and_needs_user_directives():
     assert parse_done_directive("nothing here") is None
     assert parse_needs_user_directive("```agentflow-needs-user\nreason: budget call\n```") == "budget call"
     assert parse_needs_user_directive("```agentflow-done\nreason: x\n```") is None
+
+
+def test_run_directives_parse_and_cap():
+    from agentflow.chat_service import parse_run_directives
+
+    text = (
+        "Starting it now.\n```agentflow-run\ncommand: npm run dev\n```\n"
+        "```agentflow-run\ncommand: git push\n```"
+    )
+    assert parse_run_directives(text) == ["npm run dev", "git push"]
+    many = "\n".join("```agentflow-run\ncommand: echo %d\n```" % i for i in range(5))
+    assert len(parse_run_directives(many)) == 3  # capped
+    assert parse_run_directives("no blocks") == []
+
+
+def test_command_denylist():
+    from agentflow.chat_service import command_denied
+
+    assert command_denied("npm run dev") is None
+    assert command_denied("git push") is None
+    assert command_denied("sudo rm -rf /") is not None
+    assert command_denied("bash -c 'echo hi'") is not None
+    assert command_denied("npm test && rm -rf /") is not None  # shell operators refused
+    assert command_denied("cat foo > bar") is not None

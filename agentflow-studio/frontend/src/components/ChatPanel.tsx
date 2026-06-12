@@ -74,6 +74,7 @@ const DIRECTIVE_META: Record<string, { label: string; field: string }> = {
   "agentflow-queue": { label: "Queued steps", field: "steps" },
   "agentflow-done": { label: "Task complete", field: "reason" },
   "agentflow-needs-user": { label: "Needs your decision", field: "reason" },
+  "agentflow-run": { label: "Ran command", field: "command" },
 };
 
 /** AgentFlow directive blocks render as action cards instead of raw code. */
@@ -94,6 +95,7 @@ function DirectiveCard({ lang, code }: { lang: string; code: string }) {
         {meta?.label ?? lang}
       </div>
       {fields.title && <div className="mt-0.5 text-xs font-medium">{fields.title}</div>}
+      {fields.command && <div className="mt-0.5 font-mono text-[11px]">$ {fields.command}</div>}
       {fields.reason && <div className="mt-0.5 text-xs">{fields.reason}</div>}
       {fields.goal && <div className="mt-0.5 text-[11px] text-neutral-600 dark:text-neutral-400">{fields.goal}</div>}
       {steps.length > 0 && (
