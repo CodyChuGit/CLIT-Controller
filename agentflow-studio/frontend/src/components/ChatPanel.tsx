@@ -1,6 +1,8 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import type { ChatMessage, ChatState, QueueState, RunInfo } from "../types";
+import DragHandle from "./DragHandle";
+import { loadState, saveState } from "../persist";
 import { ChatBubble, ChevronRight, Close, Send, Spinner, StopSquare } from "./icons";
 
 const OPEN_KEY = "agentflow.chatOpen";
@@ -419,6 +421,8 @@ function AgentActivity({ queue, running }: { queue: QueueState | null; running: 
 export default function ChatPanel({ workspacePath }: { workspacePath: string | null }) {
   const hasWorkspace = Boolean(workspacePath);
   const [open, setOpen] = useState(() => localStorage.getItem(OPEN_KEY) !== "0");
+  const [width, setWidth] = useState(() => loadState("chatW", 384));
+  const widthRef = useRef(width);
   const [data, setData] = useState<ChatState | null>(null);
   const [queue, setQueue] = useState<QueueState | null>(null);
   const [running, setRunning] = useState<RunInfo[]>([]);
@@ -519,10 +523,22 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
   const selected = provider ?? fallback;
 
   return (
-    <section
-      className="flex w-96 shrink-0 flex-col border-l border-neutral-200 bg-white/60 dark:border-neutral-800 dark:bg-neutral-900/60"
-      aria-label="Orchestrator chat"
-    >
+    <div className="flex shrink-0">
+      <DragHandle
+        orientation="vertical"
+        label="Resize orchestrator panel"
+        onMove={(x) => {
+          const w = Math.min(640, Math.max(300, window.innerWidth - x));
+          widthRef.current = w;
+          setWidth(w);
+        }}
+        onDone={() => saveState("chatW", widthRef.current)}
+      />
+      <section
+        style={{ width }}
+        className="flex shrink-0 flex-col border-l border-neutral-200 bg-white/60 dark:border-neutral-800 dark:bg-neutral-900/60"
+        aria-label="Orchestrator chat"
+      >
       {/* header */}
       <div className="flex shrink-0 items-center gap-1.5 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
         <ChatBubble className="h-4 w-4 text-accent-subtle" />
@@ -648,6 +664,7 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
           )}
         </div>
       </div>
-    </section>
+      </section>
+    </div>
   );
 }

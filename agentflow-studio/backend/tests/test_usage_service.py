@@ -43,3 +43,22 @@ def test_record_call_and_counters(tmp_path):
     assert codex["lastCommandDuration"] == 4500
     assert data["expensiveCallsAvoided"] == 1
     assert data["localStepsCompleted"] == 1
+
+
+def test_window_reset_and_limits(tmp_path):
+    from datetime import datetime, timedelta, timezone
+
+    ws = make_ws(tmp_path)
+    usage_service.set_provider_limit(ws, "claude", 20, 5)
+    usage_service.record_call(ws, "claude", 100, 50, 1000, "succeeded")
+    data = usage_service.get_usage(ws)
+    assert data["providers"]["claude"]["limitCalls"] == 20
+    assert data["providers"]["claude"]["callsToday"] == 1
+
+    # age the window past its 5 hours -> counters reset on next read
+    stale = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat(timespec="seconds")
+    data["providers"]["claude"]["windowStartedAt"] = stale
+    usage_service._save(ws, data)
+    fresh = usage_service.ensure_usage(ws)
+    assert fresh["providers"]["claude"]["callsToday"] == 0
+    assert fresh["providers"]["claude"]["limitCalls"] == 20  # limit survives resets

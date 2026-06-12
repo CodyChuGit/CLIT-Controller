@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import CodeReader from "../components/CodeReader";
+import DragHandle from "../components/DragHandle";
 import FileTree from "../components/FileTree";
 import LogConsole from "../components/LogConsole";
 import SourceControlPanel from "../components/SourceControlPanel";
@@ -35,6 +36,9 @@ export default function ProjectsPage({
   const [error, setError] = useState<string | null>(null);
   const [tree, setTree] = useState<Tree | null>(null);
   const [treeExpanded, setTreeExpanded] = useState<Record<string, boolean>>({});
+  const [panelW, setPanelW] = useState(() => loadState("explorerW", 288));
+  const panelWRef = useRef(panelW);
+  const asideRef = useRef<HTMLElement | null>(null);
 
   const hasWorkspace = Boolean(project?.workspacePath);
   const wsKey = project?.workspacePath ?? "";
@@ -85,7 +89,11 @@ export default function ProjectsPage({
   return (
     <div className="flex h-full overflow-hidden">
       {/* ---------- Explorer side panel ---------- */}
-      <aside className="flex w-72 shrink-0 flex-col border-r border-neutral-200 bg-white/60 dark:border-neutral-800 dark:bg-neutral-900/60">
+      <aside
+        ref={asideRef}
+        style={{ width: panelW }}
+        className="flex shrink-0 flex-col border-r border-neutral-200 bg-white/60 dark:border-neutral-800 dark:bg-neutral-900/60"
+      >
         <PanelSection title="Workspace" defaultOpen>
           <div className="space-y-2 px-3 pb-3">
             <input
@@ -153,6 +161,18 @@ export default function ProjectsPage({
           </div>
         )}
       </aside>
+
+      <DragHandle
+        orientation="vertical"
+        label="Resize explorer panel"
+        onMove={(x) => {
+          const left = asideRef.current?.getBoundingClientRect().left ?? 0;
+          const w = Math.min(520, Math.max(200, x - left));
+          panelWRef.current = w;
+          setPanelW(w);
+        }}
+        onDone={() => saveState("explorerW", panelWRef.current)}
+      />
 
       {/* ---------- Editor + output ---------- */}
       <section className="flex min-w-0 flex-1 flex-col">
@@ -280,6 +300,9 @@ function OutputPanel() {
     setOpenState(next);
     saveState("outputOpen", next);
   };
+  const [height, setHeight] = useState(() => loadState("outputH", 160));
+  const heightRef = useRef(height);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
   const [data, setData] = useState<LogsResponse | null>(null);
 
   const load = useCallback(async () => {
@@ -299,6 +322,19 @@ function OutputPanel() {
 
   return (
     <div className="shrink-0 border-t border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+      {open && (
+        <DragHandle
+          orientation="horizontal"
+          label="Resize output panel"
+          onMove={(_, y) => {
+            const bottom = bodyRef.current?.getBoundingClientRect().bottom ?? window.innerHeight;
+            const h = Math.min(480, Math.max(80, bottom - y));
+            heightRef.current = h;
+            setHeight(h);
+          }}
+          onDone={() => saveState("outputH", heightRef.current)}
+        />
+      )}
       <div className="flex h-8 items-center gap-2 px-3">
         <button
           onClick={() => setOpen(!open)}
@@ -329,7 +365,7 @@ function OutputPanel() {
         )}
       </div>
       {open && (
-        <div className="h-40 overflow-auto border-t border-neutral-100 px-3 dark:border-neutral-800">
+        <div ref={bodyRef} style={{ height }} className="overflow-auto border-t border-neutral-100 px-3 dark:border-neutral-800">
           <LogConsole entries={data?.entries ?? []} running={data?.running ?? []} />
         </div>
       )}

@@ -216,6 +216,9 @@ export interface RunStepResult extends Partial<StepPreview> {
 }
 
 export interface ProviderUsage {
+  limitCalls: number | null;
+  windowHours: number;
+  windowStartedAt: string | null;
   callsToday: number;
   manualBudgetLevel: string;
   health: Health;

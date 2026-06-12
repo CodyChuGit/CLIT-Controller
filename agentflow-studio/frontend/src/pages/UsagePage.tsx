@@ -13,6 +13,55 @@ function fmtDuration(ms: number): string {
   return `${Math.round(ms / 60_000)}m${Math.round((ms % 60_000) / 1000)}s`;
 }
 
+function resetsIn(windowStartedAt: string | null, windowHours: number): string {
+  if (!windowStartedAt) return "—";
+  const end = Date.parse(windowStartedAt) + windowHours * 3_600_000;
+  const ms = end - Date.now();
+  if (ms <= 0) return "now";
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.round((ms % 3_600_000) / 60_000);
+  return h > 0 ? `in ${h}h ${m}m` : `in ${m}m`;
+}
+
+function usedColor(used: number, limit: number | null): string {
+  if (!limit) return "text-neutral-700 dark:text-neutral-300";
+  const left = (limit - used) / limit;
+  if (left <= 0.1) return "text-rose-600 dark:text-rose-400";
+  if (left <= 0.35) return "text-amber-600 dark:text-amber-400";
+  return "text-emerald-600 dark:text-emerald-400";
+}
+
+/** Inline editor for a provider's call limit + reset window. */
+function LimitCell({
+  id,
+  usage,
+  onSave,
+}: {
+  id: string;
+  usage: { limitCalls: number | null; windowHours: number; callsToday: number };
+  onSave: (limit: number | null, hours: number | null) => void;
+}) {
+  const [draft, setDraft] = useState(usage.limitCalls?.toString() ?? "");
+  useEffect(() => setDraft(usage.limitCalls?.toString() ?? ""), [usage.limitCalls]);
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <span className={`tabular-nums font-semibold ${usedColor(usage.callsToday, usage.limitCalls)}`}>
+        {usage.callsToday}
+      </span>
+      <span className="text-neutral-400">/</span>
+      <input
+        className="input w-12 px-1 py-0 text-right font-mono text-[11px]"
+        placeholder="∞"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, ""))}
+        onBlur={() => onSave(draft ? Number(draft) : null, null)}
+        onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+        aria-label={`${id} call limit`}
+      />
+    </div>
+  );
+}
+
 export default function UsagePage() {
   const [usage, setUsage] = useState<Usage | null>(null);
   const [rec, setRec] = useState<Recommendation | null>(null);
@@ -31,6 +80,8 @@ export default function UsagePage() {
 
   useEffect(() => {
     void load();
+    const id = window.setInterval(load, 60_000);
+    return () => window.clearInterval(id);
   }, [load]);
 
   const setMode = async (mode: OrchestrationMode) => {
@@ -41,6 +92,10 @@ export default function UsagePage() {
   const setHealth = async (provider: string, health: Health) => {
     setUsage(await api.setProviderHealth(provider, health));
     setRec(await api.recommendations());
+  };
+
+  const setLimit = async (provider: string, limit: number | null, hours: number | null) => {
+    setUsage(await api.setProviderLimit(provider, limit, hours));
   };
 
   if (error) {
@@ -88,9 +143,9 @@ export default function UsagePage() {
                   <tr className="border-b border-neutral-200 text-left text-[10px] uppercase tracking-wide text-neutral-400 dark:border-neutral-800">
                     <th className="px-3 py-1.5 font-semibold">Provider</th>
                     <th className="px-2 py-1.5 font-semibold">Health</th>
-                    <th className="px-2 py-1.5 text-right font-semibold">Calls</th>
-                    <th className="px-2 py-1.5 text-right font-semibold">Prompt chars</th>
-                    <th className="px-2 py-1.5 text-right font-semibold">Output chars</th>
+                    <th className="px-2 py-1.5 text-right font-semibold">Used / limit</th>
+                    <th className="px-2 py-1.5 font-semibold">Resets</th>
+                    <th className="px-2 py-1.5 text-right font-semibold">Chars in / out</th>
                     <th className="px-2 py-1.5 text-right font-semibold">Last run</th>
                     <th className="px-3 py-1.5 font-semibold">Status</th>
                   </tr>
@@ -105,9 +160,41 @@ export default function UsagePage() {
                       <td className="px-2 py-1.5">
                         <UsageHealthBadge value={p.health} onChange={(h) => void setHealth(id, h)} name={id} />
                       </td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">{p.callsToday}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">{p.estimatedPromptChars.toLocaleString()}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">{p.estimatedOutputChars.toLocaleString()}</td>
+                      <td className="px-2 py-1.5">
+                        <LimitCell id={id} usage={p} onSave={(l, h) => void setLimit(id, l, h)} />
+                        {p.limitCalls != null && (
+                          <div className="ml-auto mt-1 h-1 w-20 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+                            <div
+                              className={`h-full rounded-full ${
+                                usedColor(p.callsToday, p.limitCalls).includes("rose")
+                                  ? "bg-rose-500"
+                                  : usedColor(p.callsToday, p.limitCalls).includes("amber")
+                                    ? "bg-amber-500"
+                                    : "bg-emerald-500"
+                              }`}
+                              style={{ width: `${Math.min(100, (p.callsToday / p.limitCalls) * 100)}%` }}
+                            />
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <select
+                            className="input w-auto cursor-pointer px-1 py-0 font-mono text-[10px]"
+                            value={String(p.windowHours)}
+                            onChange={(e) => void setLimit(id, p.limitCalls, Number(e.target.value))}
+                            aria-label={`${id} reset window`}
+                          >
+                            <option value="5">5h</option>
+                            <option value="24">24h</option>
+                            <option value="168">7d</option>
+                          </select>
+                          <span className="tabular-nums text-neutral-500">{resetsIn(p.windowStartedAt, p.windowHours)}</span>
+                        </div>
+                      </td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">
+                        {p.estimatedPromptChars.toLocaleString()} / {p.estimatedOutputChars.toLocaleString()}
+                      </td>
                       <td className="px-2 py-1.5 text-right tabular-nums">{fmtDuration(p.lastCommandDuration)}</td>
                       <td className="px-3 py-1.5">
                         <StatusBadge state={p.lastStatus} />

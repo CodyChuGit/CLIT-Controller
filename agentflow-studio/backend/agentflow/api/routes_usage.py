@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from .. import git_service, routing_service, usage_service
-from ..models import ModeUpdateRequest, ProviderHealthRequest
+from ..models import ModeUpdateRequest, ProviderHealthRequest, ProviderLimitRequest
 from ..process_runner import add_log_entry
 from .routes_projects import require_workspace
 
@@ -29,6 +29,11 @@ def set_health(body: ProviderHealthRequest):
     data = usage_service.set_provider_health(require_workspace(), body.provider, body.health)
     add_log_entry("system", f"{body.provider} usage health set to {body.health}")
     return data
+
+
+@router.post("/provider-limit")
+def set_limit(body: ProviderLimitRequest):
+    return usage_service.set_provider_limit(require_workspace(), body.provider, body.limitCalls, body.windowHours)
 
 
 @router.get("/recommendations")

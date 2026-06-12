@@ -55,6 +55,12 @@ class ProviderHealthRequest(BaseModel):
     health: Health
 
 
+class ProviderLimitRequest(BaseModel):
+    provider: str
+    limitCalls: Optional[int] = None
+    windowHours: Optional[float] = None
+
+
 class RoutingConfig(BaseModel):
     orchestrator: str = "antigravity"
     pm: str = "codex"
