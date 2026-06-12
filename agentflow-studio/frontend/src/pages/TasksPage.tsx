@@ -80,6 +80,11 @@ function QueuePanel({
                 Approve
               </button>
             )}
+            {(item.status === "failed" || item.status === "skipped") && (
+              <button className="btn-secondary px-2 py-0.5 text-[11px]" onClick={() => onApprove(item.id)}>
+                Retry
+              </button>
+            )}
             {item.status !== "running" && (
               <button
                 onClick={() => onRemove(item.id)}

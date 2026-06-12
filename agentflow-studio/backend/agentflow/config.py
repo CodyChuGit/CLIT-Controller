@@ -22,15 +22,20 @@ DEFAULT_ROUTING = {
 # {model} expands to `--model <configured model>` or disappears when unset.
 # Note: for agy, {model} must come before -p because -p takes the prompt as its value.
 DEFAULT_COMMAND_TEMPLATES = {
-    "codex": "codex exec {model} {prompt}",
-    "claude": "claude -p {model} {prompt}",
+    # --skip-git-repo-check: workspaces aren't always git repos (the user picked the
+    # folder deliberately). --sandbox workspace-write: codex must be able to write the
+    # handoff files; writes stay inside the workspace.
+    "codex": "codex exec --skip-git-repo-check --sandbox workspace-write {model} {prompt}",
+    # acceptEdits: claude may write/edit files without interactive approval (required in
+    # headless -p mode); shell commands still follow normal permission rules.
+    "claude": "claude -p --permission-mode acceptEdits {model} {prompt}",
     "antigravity": "agy {model} -p {prompt}",
 }
 
 # Previous defaults we upgrade automatically when seen in stored config.
 _STALE_TEMPLATES = {
-    "codex": {"codex exec {prompt}"},
-    "claude": {"claude -p {prompt}"},
+    "codex": {"codex exec {prompt}", "codex exec {model} {prompt}"},
+    "claude": {"claude -p {prompt}", "claude -p {model} {prompt}"},
     "antigravity": {"antigravity {prompt}", "antigravity -p {prompt}", "agy -p {prompt}"},
 }
 
