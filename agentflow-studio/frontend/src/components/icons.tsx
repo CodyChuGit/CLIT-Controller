@@ -80,3 +80,25 @@ export const Inbox = (p: SVGProps<SVGSVGElement>) => (
     <path d="M4 13h5a3 3 0 0 0 6 0h5" />
   </Icon>
 );
+
+export const Close = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M6 6l12 12M18 6L6 18" />
+  </Icon>
+);
+
+export const GitBranch = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <circle cx="6" cy="5" r="2.2" />
+    <circle cx="6" cy="19" r="2.2" />
+    <circle cx="18" cy="8" r="2.2" />
+    <path d="M6 7.2v9.6M18 10.2c0 4-5 3.8-9.5 5.3" />
+  </Icon>
+);
+
+export const Refresh = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M20 11a8 8 0 1 0-2 6.3" />
+    <path d="M20 5v6h-6" />
+  </Icon>
+);

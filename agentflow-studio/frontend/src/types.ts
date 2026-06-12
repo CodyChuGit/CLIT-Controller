@@ -65,6 +65,15 @@ export interface FileContent {
   content: string;
 }
 
+/** A file open in the editor (content null while errored). */
+export interface EditorFile {
+  path: string;
+  content: string | null;
+  size?: number;
+  truncated?: boolean;
+  error?: string;
+}
+
 export interface GitInfo {
   installed: boolean;
   isRepo: boolean;

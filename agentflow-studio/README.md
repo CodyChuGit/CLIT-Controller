@@ -31,6 +31,7 @@ AgentFlow shells out to the official CLIs you already have installed and logged 
 - `claude` (Claude Code) — `npm install -g @anthropic-ai/claude-code`
 - `antigravity` (Google Antigravity) — optional
 - `ollama` — optional, future local routing
+- `omlx` (local Apple MLX LLM server; also detects `mlx_lm.*` / `mlx-omni-server`) — optional, future on-device routing on Apple Silicon
 
 Missing CLIs are handled gracefully: the step's prompt is saved into the task folder, the exact command is shown for copy/paste, and the Agents page shows an install hint.
 
@@ -55,7 +56,7 @@ Backend alone: `.venv/bin/python -m agentflow`. If you build the frontend once (
 
 ## Beta workflow
 
-1. **Projects** → enter a workspace folder path and save. The backend creates `<workspace>/.agentflow/` (config, usage.json, tasks/). Local folder paths are resolved by the Python backend — browsers can't pick arbitrary folders.
+1. **Explorer** → enter a workspace folder path and open it. The backend creates `<workspace>/.agentflow/` (config, usage.json, tasks/). The explorer is laid out like an IDE: side panel (workspace, source control, files), tabbed read-only editor with line numbers, a collapsible Output/Logs panel, and a status bar (backend, workspace, branch, orchestration mode). Local folder paths are resolved by the Python backend — browsers can't pick arbitrary folders.
 2. **Agents** → Check All. See versions, auth status (`gh auth status`), and launch login/setup commands in Terminal (macOS) or copy them.
 3. **Usage** → pick an orchestration mode and set provider health (green/yellow/red) to match your real quota state.
 4. **Tasks** → create a task (title + goal). AgentFlow writes the task folder with all markdown handoff files (`00_USER_GOAL.md` … `07_CODEX_FINAL_REVIEW.md`, `ROUTING_DECISIONS.md`).

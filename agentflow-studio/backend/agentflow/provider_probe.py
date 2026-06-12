@@ -1,4 +1,4 @@
-"""Detect installed CLIs (git, gh, codex, gemini, antigravity, claude, ollama)."""
+"""Detect installed CLIs (git, gh, codex, gemini, antigravity, claude, ollama, mlx)."""
 
 from __future__ import annotations
 
@@ -106,6 +106,19 @@ PROVIDERS: list[dict] = [
         "versionCommand": "ollama --version",
         "statusCommand": None,
     },
+    {
+        "id": "omlx",
+        "displayName": "omlx · Apple MLX (optional)",
+        "role": "local models",
+        "executableNames": ["omlx", "mlx_lm.server", "mlx_lm.generate", "mlx_lm", "mlx-omni-server"],
+        "authMode": "none",
+        "usageMode": "free/local",
+        "preferredUse": "local LLM server on Apple Silicon — future on-device summarization and cheap routing",
+        "installHint": "ensure `omlx` is on your PATH (or: pip install mlx-lm / mlx-omni-server)",
+        "loginCommand": None,
+        "versionCommand": "{exe} --version",
+        "statusCommand": None,
+    },
 ]
 
 PROVIDER_IDS = [p["id"] for p in PROVIDERS]
@@ -171,15 +184,18 @@ async def check_provider(provider_id: str) -> dict:
 
     if path is not None:
         logs: list[str] = []
-        version_argv = d["versionCommand"].split()
-        rec = await RUNNER.run_and_wait(version_argv, Path.home(), timeout=15, provider=provider_id)
+        # "{exe}" lets multi-binary providers (e.g. MLX) probe whichever binary was found.
+        version_cmd = d["versionCommand"].replace("{exe}", path)
+        rec = await RUNNER.run_and_wait(version_cmd.split(), Path.home(), timeout=15, provider=provider_id)
         out = (rec.stdout + rec.stderr).strip()
-        logs.append(f"$ {d['versionCommand']}\n{out}")
+        logs.append(f"$ {version_cmd}\n{out}")
         if rec.exit_code == 0 and out:
             result["version"] = out.splitlines()[0][:120]
             result["status"] = "ok"
         else:
-            result["status"] = "error"
+            # Binary exists but doesn't answer --version cleanly (common for
+            # mlx_lm.* entry points): installed, version unknown.
+            result["status"] = "version_unknown"
 
         if d.get("statusCommand"):
             rec2 = await RUNNER.run_and_wait(d["statusCommand"].split(), Path.home(), timeout=15, provider=provider_id)

@@ -2,41 +2,57 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import CodeReader from "../components/CodeReader";
 import FileTree from "../components/FileTree";
-import StatusBadge from "../components/StatusBadge";
-import type { CurrentProject, FileContent, GitInfo, Tree } from "../types";
+import LogConsole from "../components/LogConsole";
+import { ChevronDown, ChevronRight, Close, FileIcon, GitBranch, Refresh } from "../components/icons";
+import type { CurrentProject, EditorFile, GitInfo, LogsResponse, Tree } from "../types";
 
 interface Props {
   project: CurrentProject | null;
   onProjectChange: () => void;
+  git: GitInfo | null;
+  onRefreshShell: () => Promise<void>;
+  openFiles: EditorFile[];
+  activePath: string | null;
+  onOpenFile: (path: string) => void;
+  onCloseFile: (path: string) => void;
+  onActivateFile: (path: string) => void;
 }
 
-export default function ProjectsPage({ project, onProjectChange }: Props) {
+/** VS Code-style explorer: side panel (workspace, source control, files) + tabbed editor + output panel. */
+export default function ProjectsPage({
+  project,
+  onProjectChange,
+  git,
+  onRefreshShell,
+  openFiles,
+  activePath,
+  onOpenFile,
+  onCloseFile,
+  onActivateFile,
+}: Props) {
   const [pathInput, setPathInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tree, setTree] = useState<Tree | null>(null);
-  const [git, setGit] = useState<GitInfo | null>(null);
-  const [file, setFile] = useState<FileContent | null>(null);
-  const [fileError, setFileError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
 
   const hasWorkspace = Boolean(project?.workspacePath);
+  const activeFile = openFiles.find((f) => f.path === activePath) ?? null;
 
-  const refresh = useCallback(async () => {
+  const refreshTree = useCallback(async () => {
     if (!hasWorkspace) return;
     try {
-      const [t, g] = await Promise.all([api.tree(), api.git()]);
-      setTree(t);
-      setGit(g);
+      setTree(await api.tree());
+      setError(null);
     } catch (e) {
-      setError(String(e));
+      setError(e instanceof Error ? e.message : String(e));
     }
   }, [hasWorkspace]);
 
   useEffect(() => {
     setPathInput(project?.workspacePath ?? "");
-    void refresh();
-  }, [project?.workspacePath, refresh]);
+    setTree(null);
+    void refreshTree();
+  }, [project?.workspacePath, refreshTree]);
 
   const save = async () => {
     setSaving(true);
@@ -51,116 +67,278 @@ export default function ProjectsPage({ project, onProjectChange }: Props) {
     }
   };
 
-  const openFile = async (path: string) => {
-    setSelected(path);
-    setFileError(null);
-    try {
-      setFile(await api.file(path));
-    } catch (e) {
-      setFile(null);
-      setFileError(e instanceof Error ? e.message : String(e));
-    }
-  };
-
   return (
-    <div className="space-y-5 p-8">
-      <header>
-        <h1 className="text-xl font-semibold">Projects</h1>
-        <p className="text-sm text-neutral-500">Choose a workspace folder for AgentFlow to orchestrate.</p>
-      </header>
-
-      <div className="card p-5">
-        <label className="label">Workspace folder path</label>
-        <div className="flex gap-2">
-          <input
-            className="input font-mono"
-            placeholder="/Users/you/code/my-project"
-            value={pathInput}
-            onChange={(e) => setPathInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && void save()}
-          />
-          <button className="btn-primary shrink-0" onClick={save} disabled={saving || !pathInput.trim()}>
-            {saving ? "Saving…" : "Save workspace"}
-          </button>
-          {hasWorkspace && (
-            <button className="btn-secondary shrink-0" onClick={() => void api.openWorkspaceFolder()}>
-              Open in Finder
-            </button>
-          )}
-        </div>
-        <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
-          Local folder path is resolved by the Python backend. Saving creates{" "}
-          <code className="font-mono">.agentflow/</code> inside the workspace.
-        </p>
-        {error && (
-          <p className="mt-2 text-xs text-rose-600 dark:text-rose-400" role="alert">
-            {error}
-          </p>
-        )}
-        {hasWorkspace && (
-          <p className="mt-2 truncate text-xs text-neutral-500">
-            Current: <code className="font-mono">{project?.workspacePath}</code>
-          </p>
-        )}
-      </div>
-
-      {hasWorkspace && (
-        <>
-          <div className="card p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Git</h2>
-              <div className="flex items-center gap-2">
-                {git?.isRepo && <StatusBadge state="ok" label={`branch ${git.branch}`} />}
-                <button className="btn-secondary" onClick={refresh}>Refresh</button>
-              </div>
+    <div className="flex h-full overflow-hidden">
+      {/* ---------- Explorer side panel ---------- */}
+      <aside className="flex w-72 shrink-0 flex-col border-r border-neutral-200 bg-white/60 dark:border-neutral-800 dark:bg-neutral-900/60">
+        <PanelSection title="Workspace" defaultOpen>
+          <div className="space-y-2 px-3 pb-3">
+            <input
+              className="input font-mono text-xs"
+              placeholder="/Users/you/code/my-project"
+              value={pathInput}
+              onChange={(e) => setPathInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && void save()}
+              aria-label="Workspace folder path"
+            />
+            <div className="flex gap-2">
+              <button className="btn-primary flex-1 justify-center" onClick={save} disabled={saving || !pathInput.trim()}>
+                {saving ? "Saving…" : hasWorkspace ? "Switch" : "Open"}
+              </button>
+              {hasWorkspace && (
+                <button className="btn-secondary" onClick={() => void api.openWorkspaceFolder()}>
+                  Finder
+                </button>
+              )}
             </div>
-            {!git ? (
-              <div className="grid gap-4 md:grid-cols-2" aria-hidden="true">
-                <div className="skeleton h-24" />
-                <div className="skeleton h-24" />
-              </div>
-            ) : !git.installed ? (
-              <p className="text-sm text-rose-500">git is not installed.</p>
-            ) : !git.isRepo ? (
-              <p className="text-sm text-neutral-500">This folder is not a git repository.</p>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <div className="label">git status --short</div>
-                  <pre className="mono-block max-h-44 whitespace-pre-wrap">{git.statusShort || "clean"}</pre>
-                </div>
-                <div>
-                  <div className="label">git diff --stat</div>
-                  <pre className="mono-block max-h-44 whitespace-pre-wrap">{git.diffStat || "no unstaged changes"}</pre>
-                </div>
-              </div>
+            <p className="text-[11px] leading-snug text-neutral-500 dark:text-neutral-400">
+              Paths are resolved by the local Python backend; saving creates{" "}
+              <code className="font-mono">.agentflow/</code>.
+            </p>
+            {error && (
+              <p className="text-xs text-rose-600 dark:text-rose-400" role="alert">
+                {error}
+              </p>
             )}
           </div>
+        </PanelSection>
 
-          <div className="card grid min-h-[420px] grid-cols-[260px_1fr] overflow-hidden" style={{ height: "52vh" }}>
-            <div className="overflow-auto border-r border-neutral-200 dark:border-neutral-800">
-              <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-2.5 dark:border-neutral-800">
-                <span className="text-xs font-semibold">Files {tree ? `(${tree.fileCount})` : ""}</span>
-              </div>
+        {hasWorkspace && (
+          <PanelSection
+            title="Source Control"
+            defaultOpen
+            badge={
+              git?.isRepo ? (
+                <span className="flex items-center gap-1 font-mono text-[10px] normal-case text-neutral-500">
+                  <GitBranch className="h-3 w-3" />
+                  {git.branch}
+                  {(git.changedFileCount ?? 0) > 0 && (
+                    <span className="tabular-nums text-amber-600 dark:text-amber-400">±{git.changedFileCount}</span>
+                  )}
+                </span>
+              ) : undefined
+            }
+            action={
+              <IconButton label="Refresh git status" onClick={() => void onRefreshShell()}>
+                <Refresh className="h-3.5 w-3.5" />
+              </IconButton>
+            }
+          >
+            <div className="space-y-2 px-3 pb-3">
+              {!git ? (
+                <div className="skeleton h-16" aria-hidden="true" />
+              ) : !git.installed ? (
+                <p className="text-xs text-rose-600 dark:text-rose-400">git is not installed.</p>
+              ) : !git.isRepo ? (
+                <p className="text-xs text-neutral-500">Not a git repository.</p>
+              ) : (
+                <>
+                  <pre className="mono-block max-h-28 whitespace-pre-wrap text-[11px]">
+                    {git.statusShort || "working tree clean"}
+                  </pre>
+                  {git.diffStat && (
+                    <pre className="mono-block max-h-24 whitespace-pre-wrap text-[11px]">{git.diffStat}</pre>
+                  )}
+                </>
+              )}
+            </div>
+          </PanelSection>
+        )}
+
+        {hasWorkspace && (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex items-center justify-between px-3 py-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                Files{tree ? ` (${tree.fileCount})` : ""}
+              </span>
+              <IconButton label="Refresh file tree" onClick={() => void refreshTree()}>
+                <Refresh className="h-3.5 w-3.5" />
+              </IconButton>
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto">
               {tree ? (
-                <FileTree nodes={tree.children} onOpenFile={openFile} selected={selected} truncated={tree.truncated} />
+                <FileTree nodes={tree.children} onOpenFile={onOpenFile} selected={activePath} truncated={tree.truncated} />
               ) : (
                 <div className="space-y-2 p-3" aria-hidden="true">
                   {[0, 1, 2, 3, 4].map((i) => (
-                    <div key={i} className="skeleton h-5" style={{ width: `${85 - i * 9}%` }} />
+                    <div key={i} className="skeleton h-4" style={{ width: `${85 - i * 9}%` }} />
                   ))}
                 </div>
               )}
             </div>
-            <CodeReader
-              path={selected}
-              content={file?.content ?? null}
-              size={file?.size}
-              truncated={file?.truncated}
-              error={fileError}
-            />
           </div>
-        </>
+        )}
+      </aside>
+
+      {/* ---------- Editor + output ---------- */}
+      <section className="flex min-w-0 flex-1 flex-col">
+        {openFiles.length > 0 && (
+          <div
+            className="flex h-9 shrink-0 items-stretch overflow-x-auto border-b border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-950"
+            role="tablist"
+            aria-label="Open files"
+          >
+            {openFiles.map((f) => {
+              const active = f.path === activePath;
+              const name = f.path.split("/").pop() ?? f.path;
+              return (
+                <div
+                  key={f.path}
+                  className={`flex shrink-0 items-center border-r border-neutral-200 dark:border-neutral-800 ${
+                    active
+                      ? "border-t-2 border-t-accent bg-white dark:bg-neutral-900"
+                      : "border-t-2 border-t-transparent hover:bg-neutral-50 dark:hover:bg-neutral-900/60"
+                  }`}
+                >
+                  <button
+                    role="tab"
+                    aria-selected={active}
+                    title={f.path}
+                    onClick={() => onActivateFile(f.path)}
+                    className={`focusable flex cursor-pointer items-center gap-1.5 py-1.5 pl-3 pr-1 font-mono text-xs ${
+                      active ? "text-neutral-900 dark:text-neutral-100" : "text-neutral-500 dark:text-neutral-400"
+                    }`}
+                  >
+                    <FileIcon className="h-3 w-3 shrink-0 text-neutral-400" />
+                    {name}
+                    {f.error && <span className="text-rose-500">!</span>}
+                  </button>
+                  <IconButton label={`Close ${name}`} onClick={() => onCloseFile(f.path)}>
+                    <Close className="h-3 w-3" />
+                  </IconButton>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="min-h-0 flex-1">
+          {hasWorkspace ? (
+            <CodeReader file={activeFile} />
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-2 bg-white text-center dark:bg-neutral-900">
+              <FileIcon className="h-7 w-7 text-neutral-300 dark:text-neutral-600" />
+              <p className="text-sm text-neutral-500">Open a workspace folder to browse and read its files.</p>
+            </div>
+          )}
+        </div>
+
+        <OutputPanel />
+      </section>
+    </div>
+  );
+}
+
+/* ---------- helpers ---------- */
+
+function IconButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className="focusable mx-1 cursor-pointer rounded p-1 text-neutral-400 transition-colors duration-150 hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
+    >
+      {children}
+    </button>
+  );
+}
+
+function PanelSection({
+  title,
+  badge,
+  action,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  badge?: React.ReactNode;
+  action?: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="shrink-0 border-b border-neutral-200 dark:border-neutral-800">
+      <div className="flex items-center">
+        <button
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          className="focusable flex flex-1 cursor-pointer items-center gap-1 px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500 transition-colors hover:text-neutral-800 dark:hover:text-neutral-200"
+        >
+          {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          {title}
+          {badge && <span className="ml-1">{badge}</span>}
+        </button>
+        {action}
+      </div>
+      {open && children}
+    </div>
+  );
+}
+
+function OutputPanel() {
+  const [open, setOpen] = useState(true);
+  const [data, setData] = useState<LogsResponse | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setData(await api.logs());
+    } catch {
+      /* backend banner handles outages */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    void load();
+    const id = window.setInterval(load, 5000);
+    return () => window.clearInterval(id);
+  }, [open, load]);
+
+  return (
+    <div className="shrink-0 border-t border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="flex h-8 items-center gap-2 px-3">
+        <button
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          className="focusable flex cursor-pointer items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 transition-colors hover:text-neutral-800 dark:hover:text-neutral-200"
+        >
+          {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          Output · Logs
+        </button>
+        {data && data.running.length > 0 && (
+          <span className="rounded-full bg-blue-100 px-1.5 text-[10px] font-medium tabular-nums text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+            {data.running.length} running
+          </span>
+        )}
+        <span className="flex-1" />
+        {open && (
+          <>
+            <IconButton label="Refresh logs" onClick={() => void load()}>
+              <Refresh className="h-3.5 w-3.5" />
+            </IconButton>
+            <IconButton
+              label="Clear log view"
+              onClick={() => void api.clearLogView().then(load)}
+            >
+              <Close className="h-3.5 w-3.5" />
+            </IconButton>
+          </>
+        )}
+      </div>
+      {open && (
+        <div className="h-40 overflow-auto border-t border-neutral-100 px-3 dark:border-neutral-800">
+          <LogConsole entries={data?.entries ?? []} running={data?.running ?? []} />
+        </div>
       )}
     </div>
   );

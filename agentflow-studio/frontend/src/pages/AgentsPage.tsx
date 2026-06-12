@@ -63,7 +63,7 @@ export default function AgentsPage() {
         ))}
         {providers.length === 0 &&
           !error &&
-          [0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="skeleton h-56" aria-hidden="true" />)}
+          [0, 1, 2, 3, 4, 5, 6, 7].map((i) => <div key={i} className="skeleton h-56" aria-hidden="true" />)}
       </div>
     </div>
   );
