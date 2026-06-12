@@ -65,3 +65,11 @@ class RoutingConfig(BaseModel):
 class SettingsUpdateRequest(BaseModel):
     routing: Optional[RoutingConfig] = None
     commandTemplates: Optional[dict[str, str]] = None
+
+
+class GitPathRequest(BaseModel):
+    path: Optional[str] = None  # None means "all" for staging
+
+
+class GitCommitRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=5000)

@@ -81,6 +81,30 @@ export interface EditorFile {
   size?: number;
   truncated?: boolean;
   error?: string;
+  kind?: "file" | "diff";
+}
+
+export interface GitFileEntry {
+  path: string;
+  code: string; // M / A / D / R / U …
+}
+
+export interface GitStatus {
+  installed: boolean;
+  isRepo: boolean;
+  branch?: string | null;
+  upstream?: string | null;
+  ahead?: number;
+  behind?: number;
+  staged?: GitFileEntry[];
+  changes?: GitFileEntry[];
+}
+
+export interface FileDiff {
+  path: string;
+  staged: boolean;
+  diff: string;
+  truncated: boolean;
 }
 
 export interface GitInfo {

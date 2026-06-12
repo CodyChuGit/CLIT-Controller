@@ -3,17 +3,17 @@ import { api } from "../api";
 import CodeReader from "../components/CodeReader";
 import FileTree from "../components/FileTree";
 import LogConsole from "../components/LogConsole";
-import { ChevronDown, ChevronRight, Close, FileIcon, GitBranch, Refresh } from "../components/icons";
-import type { CurrentProject, EditorFile, GitInfo, LogsResponse, Tree } from "../types";
+import SourceControlPanel from "../components/SourceControlPanel";
+import { ChevronDown, ChevronRight, Close, FileIcon, Refresh } from "../components/icons";
+import type { CurrentProject, EditorFile, LogsResponse, Tree } from "../types";
 
 interface Props {
   project: CurrentProject | null;
   onProjectChange: () => void;
-  git: GitInfo | null;
-  onRefreshShell: () => Promise<void>;
   openFiles: EditorFile[];
   activePath: string | null;
   onOpenFile: (path: string) => void;
+  onOpenDiff: (path: string, staged: boolean) => void;
   onCloseFile: (path: string) => void;
   onActivateFile: (path: string) => void;
 }
@@ -22,11 +22,10 @@ interface Props {
 export default function ProjectsPage({
   project,
   onProjectChange,
-  git,
-  onRefreshShell,
   openFiles,
   activePath,
   onOpenFile,
+  onOpenDiff,
   onCloseFile,
   onActivateFile,
 }: Props) {
@@ -103,47 +102,7 @@ export default function ProjectsPage({
           </div>
         </PanelSection>
 
-        {hasWorkspace && (
-          <PanelSection
-            title="Source Control"
-            defaultOpen
-            badge={
-              git?.isRepo ? (
-                <span className="flex items-center gap-1 font-mono text-[10px] normal-case text-neutral-500">
-                  <GitBranch className="h-3 w-3" />
-                  {git.branch}
-                  {(git.changedFileCount ?? 0) > 0 && (
-                    <span className="tabular-nums text-amber-600 dark:text-amber-400">±{git.changedFileCount}</span>
-                  )}
-                </span>
-              ) : undefined
-            }
-            action={
-              <IconButton label="Refresh git status" onClick={() => void onRefreshShell()}>
-                <Refresh className="h-3.5 w-3.5" />
-              </IconButton>
-            }
-          >
-            <div className="space-y-2 px-3 pb-3">
-              {!git ? (
-                <div className="skeleton h-16" aria-hidden="true" />
-              ) : !git.installed ? (
-                <p className="text-xs text-rose-600 dark:text-rose-400">git is not installed.</p>
-              ) : !git.isRepo ? (
-                <p className="text-xs text-neutral-500">Not a git repository.</p>
-              ) : (
-                <>
-                  <pre className="mono-block max-h-28 whitespace-pre-wrap text-[11px]">
-                    {git.statusShort || "working tree clean"}
-                  </pre>
-                  {git.diffStat && (
-                    <pre className="mono-block max-h-24 whitespace-pre-wrap text-[11px]">{git.diffStat}</pre>
-                  )}
-                </>
-              )}
-            </div>
-          </PanelSection>
-        )}
+        {hasWorkspace && <SourceControlPanel onOpenDiff={onOpenDiff} />}
 
         {hasWorkspace && (
           <div className="flex min-h-0 flex-1 flex-col">

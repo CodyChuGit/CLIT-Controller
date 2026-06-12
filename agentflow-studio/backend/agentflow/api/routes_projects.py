@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 
 from .. import config, git_service, paths, workspace as workspace_service
-from ..models import SettingsUpdateRequest, WorkspaceRequest
+from ..models import GitCommitRequest, GitPathRequest, SettingsUpdateRequest, WorkspaceRequest
 from ..process_runner import add_log_entry
 
 router = APIRouter()
@@ -68,6 +68,45 @@ async def git():
 @router.get("/git/diff")
 async def git_diff():
     return await git_service.full_diff(require_workspace())
+
+
+@router.get("/git/status")
+async def git_status():
+    return await git_service.status_files(require_workspace())
+
+
+@router.get("/git/file-diff")
+async def git_file_diff(path: str, staged: bool = False):
+    return await git_service.file_diff(require_workspace(), path, staged)
+
+
+@router.post("/git/stage")
+async def git_stage(body: GitPathRequest):
+    result = await git_service.stage(require_workspace(), body.path)
+    add_log_entry("git", f"staged {body.path or 'all changes'}", provider="git")
+    return result
+
+
+@router.post("/git/unstage")
+async def git_unstage(body: GitPathRequest):
+    if not body.path:
+        raise HTTPException(status_code=400, detail="path is required")
+    result = await git_service.unstage(require_workspace(), body.path)
+    add_log_entry("git", f"unstaged {body.path}", provider="git")
+    return result
+
+
+@router.post("/git/commit")
+async def git_commit(body: GitCommitRequest):
+    result = await git_service.commit(require_workspace(), body.message.strip())
+    add_log_entry(
+        "git",
+        f"commit {'succeeded' if result['ok'] else 'failed'}: {body.message.strip()[:80]}",
+        provider="git",
+        status="info" if result["ok"] else "warn",
+        output=result["output"],
+    )
+    return result
 
 
 @router.post("/open-folder")

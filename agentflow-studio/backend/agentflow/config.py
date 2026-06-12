@@ -22,8 +22,12 @@ DEFAULT_ROUTING = {
 DEFAULT_COMMAND_TEMPLATES = {
     "codex": "codex exec {prompt}",
     "claude": "claude -p {prompt}",
-    "antigravity": "antigravity -p {prompt}",
+    "antigravity": "agy -p {prompt}",
 }
+
+# Old defaults we replace automatically when seen in stored config
+# (the real Antigravity CLI binary is `agy`, not `antigravity`).
+_STALE_ANTIGRAVITY_TEMPLATES = {"antigravity {prompt}", "antigravity -p {prompt}"}
 
 
 def _migrate_gemini(routing: dict) -> dict:
@@ -64,6 +68,8 @@ def load_global_config() -> dict:
     templates = dict(DEFAULT_COMMAND_TEMPLATES)
     templates.update(cfg.get("commandTemplates") or {})
     templates.pop("gemini", None)
+    if templates.get("antigravity") in _STALE_ANTIGRAVITY_TEMPLATES:
+        templates["antigravity"] = DEFAULT_COMMAND_TEMPLATES["antigravity"]
     cfg["commandTemplates"] = templates
     return cfg
 

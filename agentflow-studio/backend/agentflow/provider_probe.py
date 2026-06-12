@@ -59,18 +59,19 @@ PROVIDERS: list[dict] = [
         "statusCommand": None,
     },
     {
-        # Successor to the sunset Gemini CLI — one provider, the Antigravity CLI.
+        # Successor to the sunset Gemini CLI. Official installer puts the `agy`
+        # binary in ~/.local/bin (source: antigravity.google/download#antigravity-cli).
         "id": "antigravity",
         "displayName": "Google Antigravity CLI",
         "role": "orchestrator/qa",
-        "executableNames": ["antigravity"],
+        "executableNames": ["agy", "antigravity"],
         "authMode": "Google login preferred",
         "usageMode": "daily/quota preferred",
         "preferredUse": "orchestration, QA, broad checks",
-        "installHint": "Install Google Antigravity and ensure `antigravity` is on your PATH",
-        "installCommand": None,
-        "loginCommand": "antigravity",
-        "versionCommand": "antigravity --version",
+        "installHint": "curl -fsSL https://antigravity.google/cli/install.sh | bash  (installs `agy` to ~/.local/bin)",
+        "installCommand": "bash -c 'curl -fsSL https://antigravity.google/cli/install.sh | bash'",
+        "loginCommand": "agy",
+        "versionCommand": "{exe} --version",
         "statusCommand": None,
     },
     {
@@ -136,9 +137,26 @@ def _save_cache(cache: dict) -> None:
     config.write_json(paths.providers_cache_file(), cache)
 
 
+# Common user-bin dirs that may be missing from the backend's PATH
+# (the official Antigravity installer targets ~/.local/bin).
+EXTRA_BIN_DIRS = [Path.home() / ".local" / "bin", Path.home() / "bin"]
+
+
+def resolve_executable(name: str) -> Optional[str]:
+    """shutil.which plus well-known user bin dirs."""
+    found = shutil.which(name)
+    if found:
+        return found
+    for directory in EXTRA_BIN_DIRS:
+        candidate = directory / name
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return None
+
+
 def which(provider_id: str) -> Optional[str]:
     for name in _definition(provider_id)["executableNames"]:
-        found = shutil.which(name)
+        found = resolve_executable(name)
         if found:
             return found
     return None

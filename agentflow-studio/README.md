@@ -28,7 +28,7 @@ AgentFlow shells out to the official CLIs you already have installed and logged 
 - `git`, `gh` (GitHub CLI)
 - `codex` (OpenAI Codex CLI) — `npm install -g @openai/codex`
 - `claude` (Claude Code) — `npm install -g @anthropic-ai/claude-code`
-- `antigravity` (Google Antigravity CLI — successor to the sunset Gemini CLI) — orchestration and QA
+- `agy` (Google Antigravity CLI — successor to the sunset Gemini CLI) — orchestration and QA. Official install: `curl -fsSL https://antigravity.google/cli/install.sh | bash` (puts `agy` in `~/.local/bin`; the Agents page Install button runs exactly this)
 - `ollama` — optional, future local routing
 - `omlx` (local Apple MLX LLM server; also detects `mlx_lm.*` / `mlx-omni-server`) — optional, future on-device routing on Apple Silicon
 
@@ -55,7 +55,7 @@ Backend alone: `.venv/bin/python -m agentflow`. If you build the frontend once (
 
 ## Beta workflow
 
-1. **Explorer** → enter a workspace folder path and open it. The backend creates `<workspace>/.agentflow/` (config, usage.json, tasks/). The explorer is laid out like an IDE: side panel (workspace, source control, files), tabbed read-only editor with line numbers, a collapsible Output/Logs panel, and a status bar (backend, workspace, branch, orchestration mode). Local folder paths are resolved by the Python backend — browsers can't pick arbitrary folders.
+1. **Explorer** → enter a workspace folder path and open it. The backend creates `<workspace>/.agentflow/` (config, usage.json, tasks/). The explorer is laid out like an IDE: side panel (workspace, source control, files), tabbed read-only editor with line numbers, a collapsible Output/Logs panel, and a status bar (backend, workspace, branch, orchestration mode). The **Source Control** section works like VS Code's: live per-file status (M/A/D/U badges), click a file to open its color-coded diff in a tab, stage/unstage per file or Stage All, and commit with a message — staging and committing only ever happen when you click them. Local folder paths are resolved by the Python backend — browsers can't pick arbitrary folders.
 2. **Agents** → Check All. See versions, auth status (`gh auth status`), and launch login/setup commands in Terminal (macOS) or copy them.
 3. **Usage** → pick an orchestration mode and set provider health (green/yellow/red) to match your real quota state.
 4. **Tasks** → create a task (title + goal). AgentFlow writes the task folder with all markdown handoff files (`00_USER_GOAL.md` … `07_CODEX_FINAL_REVIEW.md`, `ROUTING_DECISIONS.md`).

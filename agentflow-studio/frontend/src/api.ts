@@ -3,7 +3,9 @@ import type {
   ChatState,
   CurrentProject,
   FileContent,
+  FileDiff,
   GitInfo,
+  GitStatus,
   InstallResult,
   LoginResult,
   LogsResponse,
@@ -58,6 +60,12 @@ export const api = {
   tree: () => get<Tree>("/projects/tree"),
   file: (path: string) => get<FileContent>(`/projects/file?path=${encodeURIComponent(path)}`),
   git: () => get<GitInfo>("/projects/git"),
+  gitStatus: () => get<GitStatus>("/projects/git/status"),
+  gitFileDiff: (path: string, staged: boolean) =>
+    get<FileDiff>(`/projects/git/file-diff?path=${encodeURIComponent(path)}&staged=${staged}`),
+  gitStage: (path: string | null) => post<{ ok: boolean; output: string }>("/projects/git/stage", { path }),
+  gitUnstage: (path: string) => post<{ ok: boolean; output: string }>("/projects/git/unstage", { path }),
+  gitCommit: (message: string) => post<{ ok: boolean; output: string }>("/projects/git/commit", { message }),
   openWorkspaceFolder: () => post<{ ok: boolean }>("/projects/open-folder"),
   settings: () => get<Settings>("/projects/settings"),
   saveSettings: (routing: RoutingConfig | null, commandTemplates: Record<string, string> | null) =>

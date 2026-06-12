@@ -9,7 +9,7 @@ from typing import Optional
 
 from . import config, git_service, paths, prompt_templates, task_service, usage_service
 from .process_runner import RUNNER, RunRecord, add_log_entry, now_iso
-from .provider_probe import AGENT_PROVIDER_IDS
+from .provider_probe import AGENT_PROVIDER_IDS, resolve_executable
 from .redaction import redact
 
 MAX_STORED_MESSAGES = 200
@@ -57,7 +57,7 @@ def provider_options() -> list[dict]:
     for pid in AGENT_PROVIDER_IDS:
         template = templates.get(pid, f"{pid} {{prompt}}")
         argv0 = shlex.split(template)[0]
-        out.append({"id": pid, "installed": shutil.which(argv0) is not None})
+        out.append({"id": pid, "installed": resolve_executable(argv0) is not None})
     return out
 
 
@@ -117,7 +117,7 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
 
     template = config.get_command_templates().get(provider, f"{provider} {{prompt}}")
     argv0 = shlex.split(template)[0]
-    if shutil.which(argv0) is None:
+    if resolve_executable(argv0) is None:
         note = (
             f"`{provider}` is not installed (`{argv0}` not on PATH). "
             "Switch the chat provider in the header, or install it and re-check on the Agents page."

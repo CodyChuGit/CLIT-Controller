@@ -77,6 +77,34 @@ export default function App() {
     }
   }, []);
 
+  // Open a git diff as an editor tab (refreshes in place when reopened).
+  const openDiff = useCallback(async (path: string, staged: boolean) => {
+    const key = `${path} ${staged ? "(staged)" : "(diff)"}`;
+    setActivePath(key);
+    let file: EditorFile;
+    try {
+      const d = await api.gitFileDiff(path, staged);
+      file = {
+        path: key,
+        content: d.diff.trim() ? d.diff : "(no diff content)",
+        kind: "diff",
+        size: d.diff.length,
+        truncated: d.truncated,
+      };
+    } catch (e) {
+      file = { path: key, content: null, kind: "diff", error: e instanceof Error ? e.message : String(e) };
+    }
+    setOpenFiles((prev) => {
+      const i = prev.findIndex((f) => f.path === key);
+      if (i >= 0) {
+        const next = [...prev];
+        next[i] = file;
+        return next;
+      }
+      return [...prev, file];
+    });
+  }, []);
+
   const closeFile = useCallback(
     (path: string) => {
       setOpenFiles((prev) => {
@@ -128,11 +156,10 @@ export default function App() {
                 <ProjectsPage
                   project={project}
                   onProjectChange={loadProject}
-                  git={git}
-                  onRefreshShell={refreshShell}
                   openFiles={openFiles}
                   activePath={activePath}
                   onOpenFile={openFile}
+                  onOpenDiff={openDiff}
                   onCloseFile={closeFile}
                   onActivateFile={setActivePath}
                 />

@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from . import config, git_service, paths, prompt_templates, routing_service, usage_service
+from . import config, git_service, paths, prompt_templates, provider_probe, routing_service, usage_service
 from .process_runner import RUNNER, RunRecord, add_log_entry, now_iso
 from .redaction import redact
 
@@ -170,6 +170,10 @@ def _build_argv(template: str, prompt: str) -> list[str]:
             argv.append(token)
     if not replaced:
         argv.append(prompt)
+    # Resolve binaries that live outside the backend's PATH (e.g. ~/.local/bin/agy).
+    resolved = provider_probe.resolve_executable(argv[0])
+    if resolved:
+        argv[0] = resolved
     return argv
 
 

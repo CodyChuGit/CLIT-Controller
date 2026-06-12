@@ -51,13 +51,34 @@ export default function CodeReader({ file }: { file: EditorFile | null }) {
               {lines.map((_, i) => i + 1).join("\n")}
             </pre>
           )}
-          <pre className="flex-1 whitespace-pre px-4 py-3 text-neutral-800 dark:text-neutral-200">
-            {file.content}
-          </pre>
+          {file.kind === "diff" ? (
+            <pre className="flex-1 whitespace-pre px-4 py-3">
+              {lines.map((line, i) => (
+                <span key={i} className={diffLineClass(line)}>
+                  {line}
+                  {"\n"}
+                </span>
+              ))}
+            </pre>
+          ) : (
+            <pre className="flex-1 whitespace-pre px-4 py-3 text-neutral-800 dark:text-neutral-200">
+              {file.content}
+            </pre>
+          )}
         </div>
       </div>
     </div>
   );
+}
+
+function diffLineClass(line: string): string {
+  if (line.startsWith("+++") || line.startsWith("---") || line.startsWith("diff ")) {
+    return "font-semibold text-neutral-500 dark:text-neutral-400";
+  }
+  if (line.startsWith("@@")) return "text-blue-600 dark:text-blue-400";
+  if (line.startsWith("+")) return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
+  if (line.startsWith("-")) return "bg-rose-500/10 text-rose-700 dark:text-rose-400";
+  return "text-neutral-700 dark:text-neutral-300";
 }
 
 function Breadcrumb({ file }: { file: EditorFile }) {
