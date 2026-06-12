@@ -4,11 +4,11 @@ from agentflow.routing_service import budget_context_header, recommend
 from agentflow.usage_service import DEFAULT_USAGE
 
 
-def usage_with(claude="green", gemini="green", codex="green", mode="balanced"):
+def usage_with(claude="green", antigravity="green", codex="green", mode="balanced"):
     data = copy.deepcopy(DEFAULT_USAGE)
     data["orchestrationMode"] = mode
     data["providers"]["claude"]["health"] = claude
-    data["providers"]["gemini"]["health"] = gemini
+    data["providers"]["antigravity"]["health"] = antigravity
     data["providers"]["codex"]["health"] = codex
     return data
 
@@ -35,7 +35,7 @@ def test_claude_green_standard_chain():
     rec = recommend(usage_with())
     assert rec["cheaperRouteRecommended"] is False
     assert any("standard chain" in line for line in rec["lines"])
-    assert any("Gemini" in line for line in rec["lines"])  # gemini green preference
+    assert any("Antigravity" in line for line in rec["lines"])  # antigravity green preference
 
 
 def test_manual_mode_flags_manual_approval():

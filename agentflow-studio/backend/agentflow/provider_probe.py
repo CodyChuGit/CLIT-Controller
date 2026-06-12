@@ -1,4 +1,4 @@
-"""Detect installed CLIs (git, gh, codex, gemini, antigravity, claude, ollama, mlx)."""
+"""Detect installed CLIs (git, gh, codex, antigravity, claude, ollama, omlx)."""
 
 from __future__ import annotations
 
@@ -59,27 +59,14 @@ PROVIDERS: list[dict] = [
         "statusCommand": None,
     },
     {
-        "id": "gemini",
-        "displayName": "Google Gemini CLI",
-        "role": "orchestrator/qa",
-        "executableNames": ["gemini"],
-        "authMode": "Google login preferred",
-        "usageMode": "daily/quota preferred",
-        "preferredUse": "orchestration, QA, broad checks",
-        "installHint": "npm install -g @google/gemini-cli",
-        "installCommand": "npm install -g @google/gemini-cli --no-fund --no-audit --cache /tmp/agentflow-npm-cache",
-        "loginCommand": "gemini",
-        "versionCommand": "gemini --version",
-        "statusCommand": None,
-    },
-    {
+        # Successor to the sunset Gemini CLI — one provider, the Antigravity CLI.
         "id": "antigravity",
-        "displayName": "Google Antigravity",
-        "role": "orchestrator",
+        "displayName": "Google Antigravity CLI",
+        "role": "orchestrator/qa",
         "executableNames": ["antigravity"],
         "authMode": "Google login preferred",
         "usageMode": "daily/quota preferred",
-        "preferredUse": "orchestration, UI checks",
+        "preferredUse": "orchestration, QA, broad checks",
         "installHint": "Install Google Antigravity and ensure `antigravity` is on your PATH",
         "installCommand": None,
         "loginCommand": "antigravity",
@@ -131,7 +118,7 @@ PROVIDERS: list[dict] = [
 ]
 
 PROVIDER_IDS = [p["id"] for p in PROVIDERS]
-AGENT_PROVIDER_IDS = ["codex", "claude", "gemini", "antigravity"]
+AGENT_PROVIDER_IDS = ["codex", "claude", "antigravity"]
 
 
 def _definition(provider_id: str) -> dict:

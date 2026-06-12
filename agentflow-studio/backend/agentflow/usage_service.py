@@ -28,7 +28,7 @@ DEFAULT_PROVIDER_USAGE = {
         "lastCommandDuration": 0,
         "lastStatus": "unknown",
     },
-    "gemini": {
+    "antigravity": {
         "callsToday": 0,
         "manualBudgetLevel": "high",
         "health": "green",
@@ -82,6 +82,13 @@ def ensure_usage(workspace: Path) -> dict:
     data.setdefault("providers", {})
     data.setdefault("expensiveCallsAvoided", 0)
     data.setdefault("localStepsCompleted", 0)
+    # Gemini CLI was sunset in favor of the Antigravity CLI — carry stats over.
+    if "gemini" in data["providers"]:
+        if "antigravity" not in data["providers"]:
+            data["providers"]["antigravity"] = data["providers"].pop("gemini")
+        else:
+            data["providers"].pop("gemini")
+        write_json(path, data)
     for pid, defaults in DEFAULT_PROVIDER_USAGE.items():
         entry = data["providers"].setdefault(pid, dict(defaults))
         for key, value in defaults.items():

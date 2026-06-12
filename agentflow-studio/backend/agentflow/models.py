@@ -56,10 +56,10 @@ class ProviderHealthRequest(BaseModel):
 
 
 class RoutingConfig(BaseModel):
-    orchestrator: str = "gemini"
+    orchestrator: str = "antigravity"
     pm: str = "codex"
     engineer: str = "claude"
-    qa: str = "gemini"
+    qa: str = "antigravity"
 
 
 class SettingsUpdateRequest(BaseModel):

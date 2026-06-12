@@ -104,13 +104,13 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
         return {"status": "busy", "message": "A response is already in progress. Stop it or wait."}
 
     routing = config.get_workspace_routing(workspace)
-    provider = provider or routing.get("orchestrator", "gemini")
+    provider = provider or routing.get("orchestrator", "antigravity")
     usage = usage_service.ensure_usage(workspace)
 
     if provider == "claude" and usage_service.provider_health(usage, "claude") == "red":
         return {
             "status": "claude_red",
-            "message": "Claude usage health is RED — pick a cheaper provider for chat (codex/gemini) or update its health on the Usage page.",
+            "message": "Claude usage health is RED — pick a cheaper provider for chat (codex/antigravity) or update its health on the Usage page.",
         }
 
     append_message(workspace, "user", message)
@@ -190,6 +190,6 @@ def chat_state(workspace: Path) -> dict:
     return {
         "messages": load_chat(workspace)["messages"],
         "pending": pending_state(workspace),
-        "defaultProvider": routing.get("orchestrator", "gemini"),
+        "defaultProvider": routing.get("orchestrator", "antigravity"),
         "providers": provider_options(),
     }

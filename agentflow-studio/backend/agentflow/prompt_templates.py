@@ -10,7 +10,7 @@ TASK_FILES = [
     "02_CODEX_IMPLEMENTATION_PLAN.md",
     "03_CLAUDE_PROMPT.md",
     "04_CLAUDE_IMPLEMENTATION_SUMMARY.md",
-    "05_GEMINI_QA_RESULTS.md",
+    "05_QA_RESULTS.md",
     "06_BUGS_FOR_CLAUDE.md",
     "07_CODEX_FINAL_REVIEW.md",
     "ROUTING_DECISIONS.md",
@@ -55,7 +55,7 @@ Keep changes minimal.
     )
 
 
-def gemini_qa_prompt(usage: dict, task_rel_dir: str) -> str:
+def qa_prompt(usage: dict, task_rel_dir: str) -> str:
     return _compose(
         usage,
         task_rel_dir,
@@ -63,7 +63,7 @@ def gemini_qa_prompt(usage: dict, task_rel_dir: str) -> str:
 Read the current git diff and {task_rel_dir}/04_CLAUDE_IMPLEMENTATION_SUMMARY.md.
 Run or write tests if appropriate.
 Do not modify production code unless explicitly approved.
-Write results to 05_GEMINI_QA_RESULTS.md.
+Write results to 05_QA_RESULTS.md.
 If production bugs are found, write 06_BUGS_FOR_CLAUDE.md.
 """,
     )
@@ -102,7 +102,7 @@ def orchestrator_chat_prompt(usage: dict, workspace_summary: str, transcript: st
         f"{budget_context_header(usage)}\n\n"
         "You are the orchestration model for AgentFlow Studio, a local cockpit that routes coding work "
         "between CLI agents: codex (specs/plans/reviews), claude (implementation/bug fixing), "
-        "gemini (QA/broad checks), plus free local git checks.\n\n"
+        "antigravity (QA/broad checks; successor to the sunset Gemini CLI), plus free local git checks.\n\n"
         f"{workspace_summary}\n\n"
         "Your job: help the user plan work, decide routing, draft task goals, and interpret agent results. "
         "Be compact and concrete — prefer specific next actions in AgentFlow (create a task, run a step "
@@ -117,7 +117,7 @@ def orchestrator_chat_prompt(usage: dict, workspace_summary: str, transcript: st
 STEP_PROMPTS = {
     "codex_spec": codex_spec_prompt,
     "claude_implement": claude_implement_prompt,
-    "gemini_qa": gemini_qa_prompt,
+    "gemini_qa": qa_prompt,
     "codex_review": codex_review_prompt,
     "claude_fix": claude_fix_prompt,
 }
@@ -133,7 +133,7 @@ def initial_task_files(title: str, goal: str, claude_prompt: str) -> dict[str, s
         "03_CLAUDE_PROMPT.md": "# Claude Prompt\n\n```text\n" + claude_prompt + "\n```\n",
         "04_CLAUDE_IMPLEMENTATION_SUMMARY.md": "# Claude Implementation Summary\n\n"
         + pending.format(who="`claude_implement`"),
-        "05_GEMINI_QA_RESULTS.md": "# Gemini QA Results\n\n" + pending.format(who="`gemini_qa`"),
+        "05_QA_RESULTS.md": "# QA Results\n\n" + pending.format(who="`gemini_qa`"),
         "06_BUGS_FOR_CLAUDE.md": "# Bugs for Claude\n\n_None reported yet._\n",
         "07_CODEX_FINAL_REVIEW.md": "# Codex Final Review\n\n" + pending.format(who="`codex_review`"),
     }

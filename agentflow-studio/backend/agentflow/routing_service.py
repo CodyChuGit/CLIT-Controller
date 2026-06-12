@@ -27,7 +27,7 @@ def budget_context_header(usage: dict) -> str:
         "Budget context:\n"
         f"- Current mode: {MODE_LABELS.get(mode, mode)}\n"
         f"- Claude usage: {provider_health(usage, 'claude')}\n"
-        f"- Gemini usage: {provider_health(usage, 'gemini')}\n"
+        f"- Antigravity usage: {provider_health(usage, 'antigravity')}\n"
         f"- Codex usage: {provider_health(usage, 'codex')}\n"
         "- Instruction: minimize full-file context, prefer diffs, file paths, and task markdown.\n"
         "- Do not call expensive agents unless required."
@@ -38,7 +38,7 @@ def recommend(usage: dict, task_type: str = "feature", diff_size: int | None = N
     """Apply the routing rules to current usage state."""
     mode = usage.get("orchestrationMode", "balanced")
     claude = provider_health(usage, "claude")
-    gemini = provider_health(usage, "gemini")
+    antigravity = provider_health(usage, "antigravity")
     codex = provider_health(usage, "codex")
 
     lines: list[str] = []
@@ -53,7 +53,7 @@ def recommend(usage: dict, task_type: str = "feature", diff_size: int | None = N
         lines += [
             "Avoid Claude unless production code changes are required.",
             "Write the spec and plan with Codex first.",
-            "Use Gemini for QA and broad checks.",
+            "Use Antigravity for QA and broad checks.",
             "Run local tests and git checks before any Claude call.",
         ]
     elif claude == "yellow":
@@ -61,15 +61,15 @@ def recommend(usage: dict, task_type: str = "feature", diff_size: int | None = N
         lines += [
             "Claude allowed for implementation only — not for planning or review.",
             "Keep Claude prompts small: send the plan and diffs, never whole files.",
-            "Use Codex for planning/review and Gemini for QA.",
+            "Use Codex for planning/review and Antigravity for QA.",
         ]
     else:
-        lines.append("Claude is green — standard chain: Codex spec → Claude implement → Gemini QA → Codex review.")
+        lines.append("Claude is green — standard chain: Codex spec → Claude implement → Antigravity QA → Codex review.")
 
-    if gemini == "green":
-        lines.append("Gemini is green — prefer Gemini for orchestration and QA.")
-    elif gemini == "red":
-        warnings.append("Gemini is RED — route QA to Codex or run local checks only.")
+    if antigravity == "green":
+        lines.append("Antigravity is green — prefer Antigravity for orchestration and QA.")
+    elif antigravity == "red":
+        warnings.append("Antigravity is RED — route QA to Codex or run local checks only.")
 
     if codex == "red":
         warnings.append("Codex is RED — skip spec/review steps or draft specs manually.")
@@ -98,13 +98,13 @@ def recommend(usage: dict, task_type: str = "feature", diff_size: int | None = N
         "selectedProvider": selected,
         "manualApprovalRecommended": mode == "manual_approval" or claude == "red",
         "cheaperRouteRecommended": cheaper,
-        "health": {"claude": claude, "gemini": gemini, "codex": codex},
+        "health": {"claude": claude, "antigravity": antigravity, "codex": codex},
     }
 
 
 def _decision_block(usage: dict, routing: dict, task_title: str) -> str:
     rec = recommend(usage)
-    claude, gemini, codex = rec["health"]["claude"], rec["health"]["gemini"], rec["health"]["codex"]
+    claude, antigravity, codex = rec["health"]["claude"], rec["health"]["antigravity"], rec["health"]["codex"]
     if claude == "red":
         decision = (
             f"Use {routing['pm']} for spec and plan, run local checks, use {routing['qa']} for QA. "
@@ -123,13 +123,13 @@ def _decision_block(usage: dict, routing: dict, task_title: str) -> str:
         f"- Mode: {rec['modeLabel']}\n"
         f"- Claude: {claude} / {HEALTH_NOTES[claude]}\n"
         f"- Codex: {codex} / {HEALTH_NOTES[codex]}\n"
-        f"- Gemini: {gemini} / {HEALTH_NOTES[gemini]}\n\n"
+        f"- Antigravity: {antigravity} / {HEALTH_NOTES[antigravity]}\n\n"
         "## Decision\n"
         f"{decision}\n\n"
         "## Usage Saving Strategy\n"
         "- Send task files and git diff instead of full repo.\n"
         "- Claude receives implementation plan only.\n"
-        "- Gemini handles QA instead of Claude.\n"
+        "- Antigravity handles QA instead of Claude.\n"
     )
 
 

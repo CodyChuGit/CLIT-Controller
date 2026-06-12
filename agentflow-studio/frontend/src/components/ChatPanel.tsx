@@ -115,7 +115,7 @@ export default function ChatPanel({ hasWorkspace }: { hasWorkspace: boolean }) {
     data?.providers.find((p) => p.id === data.defaultProvider && p.installed)?.id ??
     data?.providers.find((p) => p.installed)?.id ??
     data?.defaultProvider ??
-    "gemini";
+    "antigravity";
   const selected = provider ?? fallback;
 
   return (

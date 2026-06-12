@@ -25,7 +25,7 @@ export default function RoutingRecommendationCard({ rec }: { rec: Recommendation
       </div>
 
       <div className="mb-3 flex flex-wrap gap-4 text-xs text-neutral-500">
-        {(["claude", "codex", "gemini"] as const).map((p) => (
+        {(["claude", "codex", "antigravity"] as const).map((p) => (
           <span key={p} className="flex items-center gap-1.5 capitalize">
             {p} <UsageHealthBadge value={rec.health[p] ?? null} name={p} />
           </span>

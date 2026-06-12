@@ -9,7 +9,7 @@ const ROLE_LABELS: Record<keyof RoutingConfig, string> = {
   qa: "QA",
 };
 
-const PROVIDER_OPTIONS = ["codex", "claude", "gemini", "antigravity"];
+const PROVIDER_OPTIONS = ["codex", "claude", "antigravity"];
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);

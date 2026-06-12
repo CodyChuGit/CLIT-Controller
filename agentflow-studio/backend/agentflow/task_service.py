@@ -17,11 +17,12 @@ from .redaction import redact
 
 # step id -> (routing role, human label)
 STEP_DEFS: dict[str, dict] = {
-    "codex_spec": {"role": "pm", "label": "Write Spec with Codex"},
-    "claude_implement": {"role": "engineer", "label": "Implement with Claude"},
-    "gemini_qa": {"role": "qa", "label": "QA / Test with Gemini"},
-    "codex_review": {"role": "pm", "label": "Final Review with Codex"},
-    "claude_fix": {"role": "engineer", "label": "Fix Bugs with Claude"},
+    # Labels are provider-neutral; the routed provider is shown alongside in the UI.
+    "codex_spec": {"role": "pm", "label": "Write Spec"},
+    "claude_implement": {"role": "engineer", "label": "Implement"},
+    "gemini_qa": {"role": "qa", "label": "QA / Test"},
+    "codex_review": {"role": "pm", "label": "Final Review"},
+    "claude_fix": {"role": "engineer", "label": "Fix Bugs"},
 }
 
 FULL_SEQUENCE = ["codex_spec", "claude_implement", "gemini_qa", "codex_review"]
@@ -255,7 +256,7 @@ async def run_step(
         return {
             "status": "needs_confirmation",
             "warning": (
-                "Claude usage health is RED. Routing recommends Codex planning + Gemini QA + local tests "
+                "Claude usage health is RED. Routing recommends Codex planning + Antigravity QA + local tests "
                 "instead. Run Claude anyway?"
             ),
             **preview,

@@ -11,10 +11,10 @@ from typing import Any, Optional
 from . import paths
 
 DEFAULT_ROUTING = {
-    "orchestrator": "gemini",
+    "orchestrator": "antigravity",
     "pm": "codex",
     "engineer": "claude",
-    "qa": "gemini",
+    "qa": "antigravity",
 }
 
 # {prompt} is replaced with the generated prompt as a single argv element
@@ -22,9 +22,13 @@ DEFAULT_ROUTING = {
 DEFAULT_COMMAND_TEMPLATES = {
     "codex": "codex exec {prompt}",
     "claude": "claude -p {prompt}",
-    "gemini": "gemini -p {prompt}",
-    "antigravity": "antigravity {prompt}",
+    "antigravity": "antigravity -p {prompt}",
 }
+
+
+def _migrate_gemini(routing: dict) -> dict:
+    """Gemini CLI is sunset; Antigravity CLI replaced it. Map old configs forward."""
+    return {role: ("antigravity" if provider == "gemini" else provider) for role, provider in routing.items()}
 
 
 def read_json(path: Path, default: Any = None) -> Any:
@@ -56,8 +60,10 @@ def load_global_config() -> dict:
     cfg = read_json(paths.global_config_file(), {}) or {}
     cfg.setdefault("currentWorkspace", None)
     cfg.setdefault("routing", dict(DEFAULT_ROUTING))
+    cfg["routing"] = _migrate_gemini(cfg["routing"])
     templates = dict(DEFAULT_COMMAND_TEMPLATES)
     templates.update(cfg.get("commandTemplates") or {})
+    templates.pop("gemini", None)
     cfg["commandTemplates"] = templates
     return cfg
 
@@ -143,4 +149,4 @@ def get_workspace_routing(workspace: Path) -> dict:
     cfg = read_json(paths.workspace_config_file(workspace), {}) or {}
     routing = dict(DEFAULT_ROUTING)
     routing.update(cfg.get("routing") or {})
-    return routing
+    return _migrate_gemini(routing)
