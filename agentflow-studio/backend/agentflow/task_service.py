@@ -25,7 +25,34 @@ STEP_DEFS: dict[str, dict] = {
     "claude_fix": {"role": "engineer", "label": "Fix Bugs"},
 }
 
+# What each step reads and writes — the handoff contract between agents.
+# "@diff" = current git diff, "@code" = production code, "@folder" = whole task folder.
+STEP_IO: dict[str, dict] = {
+    "codex_spec": {
+        "reads": ["00_USER_GOAL.md"],
+        "writes": ["01_CODEX_SPEC.md", "02_CODEX_IMPLEMENTATION_PLAN.md"],
+    },
+    "claude_implement": {
+        "reads": ["01_CODEX_SPEC.md", "02_CODEX_IMPLEMENTATION_PLAN.md"],
+        "writes": ["@code", "04_CLAUDE_IMPLEMENTATION_SUMMARY.md"],
+    },
+    "gemini_qa": {
+        "reads": ["@diff", "04_CLAUDE_IMPLEMENTATION_SUMMARY.md"],
+        "writes": ["05_QA_RESULTS.md", "06_BUGS_FOR_CLAUDE.md"],
+    },
+    "codex_review": {
+        "reads": ["@diff", "@folder"],
+        "writes": ["07_CODEX_FINAL_REVIEW.md"],
+    },
+    "claude_fix": {
+        "reads": ["06_BUGS_FOR_CLAUDE.md"],
+        "writes": ["@code", "04_CLAUDE_IMPLEMENTATION_SUMMARY.md"],
+    },
+}
+
 FULL_SEQUENCE = ["codex_spec", "claude_implement", "gemini_qa", "codex_review"]
+
+MAX_EVENTS = 300
 
 _full_sequences_running: set[str] = set()
 
@@ -59,6 +86,39 @@ def step_provider(workspace: Path, step: str) -> str:
     return routing.get(STEP_DEFS[step]["role"], "claude")
 
 
+def _add_event(workspace: Path, task_id: str, type_: str, detail: str, *, step=None, provider=None, extra=None) -> None:
+    """Append to the task's structured handoff log (shown as the orchestration timeline)."""
+    meta = _load_meta(workspace, task_id)
+    events = meta.setdefault("events", [])
+    event = {"time": now_iso(), "type": type_, "step": step, "provider": provider, "detail": detail}
+    if extra:
+        event.update(extra)
+    events.append(event)
+    if len(events) > MAX_EVENTS:
+        del events[: len(events) - MAX_EVENTS]
+    _save_meta(workspace, meta)
+
+
+def _snapshot_task_files(workspace: Path, task_id: str) -> dict[str, tuple[int, int]]:
+    folder = paths.task_dir(workspace, task_id)
+    snap = {}
+    for name in prompt_templates.TASK_FILES:
+        p = folder / name
+        if p.exists():
+            st = p.stat()
+            snap[name] = (st.st_mtime_ns, st.st_size)
+    return snap
+
+
+async def _changed_code_paths(workspace: Path) -> set[str]:
+    """Working-tree paths with changes (tracked + untracked), excluding .agentflow."""
+    status = await git_service.status_files(workspace)
+    if not status.get("isRepo"):
+        return set()
+    paths_ = {f["path"] for f in status.get("staged", [])} | {f["path"] for f in status.get("changes", [])}
+    return {p for p in paths_ if not p.startswith(".agentflow/")}
+
+
 # ----------------------------------------------------------------- create/list
 
 
@@ -84,10 +144,15 @@ def create_task(workspace: Path, title: str, goal: str) -> dict:
         "status": "new",
         "steps": {step: {"status": "idle", "provider": step_provider(workspace, step)} for step in STEP_DEFS},
         "fullSequence": {"status": "idle", "currentStep": None},
+        "events": [],
     }
     _save_meta(workspace, meta)
+    _add_event(
+        workspace, task_id, "task_created",
+        f"task created — handoff files written to {_task_rel_dir(task_id)}/ ({len(prompt_templates.TASK_FILES)} files)",
+    )
     add_log_entry("task", f"created task {task_id}: {title}", task_id=task_id)
-    return meta
+    return _load_meta(workspace, task_id)
 
 
 def list_tasks(workspace: Path) -> list[dict]:
@@ -191,6 +256,8 @@ def build_step_preview(workspace: Path, task_id: str, step: str, usage: Optional
         "providerInstalled": installed,
         "commandPreview": redact(shlex.join(argv)),
         "promptChars": len(prompt),
+        "reads": STEP_IO[step]["reads"],
+        "writes": STEP_IO[step]["writes"],
     }
 
 
@@ -240,6 +307,11 @@ async def run_step(
             encoding="utf-8",
         )
         _set_step_state(workspace, task_id, step, status="provider_missing", provider=provider)
+        _add_event(
+            workspace, task_id, "provider_missing",
+            f"`{provider}` is not installed — prompt ({len(prompt):,} chars) saved to logs/{saved.name}",
+            step=step, provider=provider,
+        )
         routing_service.append_decision(
             workspace, task_id,
             f"Step `{step}` skipped: provider `{provider}` is not installed. "
@@ -270,7 +342,24 @@ async def run_step(
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     log_file = paths.task_logs_dir(workspace, task_id) / f"{stamp}-{step}.log"
 
+    # Audit trail: the exact (redacted) prompt this agent received.
+    prompt_file = paths.task_logs_dir(workspace, task_id) / f"{stamp}-{step}.prompt.txt"
+    prompt_file.parent.mkdir(exist_ok=True)
+    prompt_file.write_text(redact(prompt), encoding="utf-8")
+
+    # Snapshots for artifact/handoff detection on completion.
+    pre_files = _snapshot_task_files(workspace, task_id)
+    pre_code = await _changed_code_paths(workspace)
+
     async def on_complete(record: RunRecord) -> None:
+        post_files = _snapshot_task_files(workspace, task_id)
+        artifacts = sorted(
+            name
+            for name, sig in post_files.items()
+            if name != "ROUTING_DECISIONS.md" and pre_files.get(name) != sig
+        )
+        code_changed = sorted((await _changed_code_paths(workspace)) - pre_code)
+
         usage_service.record_call(
             workspace, provider,
             prompt_chars=len(prompt),
@@ -281,11 +370,25 @@ async def run_step(
         _set_step_state(
             workspace, task_id, step,
             status=record.status, exitCode=record.exit_code, runId=record.id, provider=provider,
+            artifactsWritten=artifacts, codeChanged=code_changed,
+            promptFile=prompt_file.name, logFile=log_file.name,
+        )
+        wrote = (", wrote " + ", ".join(artifacts)) if artifacts else ""
+        touched = (f", changed {len(code_changed)} production file(s): " + ", ".join(code_changed[:5])) if code_changed else ""
+        _add_event(
+            workspace, task_id, "step_finished",
+            f"{provider} finished {STEP_DEFS[step]['label']}: {record.status} "
+            f"(exit {record.exit_code}, {(record.duration_ms or 0) / 1000:.1f}s, "
+            f"{len(record.stdout):,} chars out){wrote}{touched}",
+            step=step, provider=provider,
+            extra={"artifacts": artifacts, "codeChanged": code_changed, "status": record.status},
         )
         routing_service.append_decision(
             workspace, task_id,
             f"Step `{step}` finished via `{provider}`: {record.status} "
-            f"(exit {record.exit_code}, {(record.duration_ms or 0) / 1000:.1f}s). Log: logs/{log_file.name}",
+            f"(exit {record.exit_code}, {(record.duration_ms or 0) / 1000:.1f}s). Log: logs/{log_file.name}"
+            + (f" Wrote: {', '.join(artifacts)}." if artifacts else "")
+            + (f" Production files changed: {', '.join(code_changed)}." if code_changed else ""),
         )
         add_log_entry(
             "task-step",
@@ -305,6 +408,13 @@ async def run_step(
         return {"status": "error", "message": record.stderr[:500], **preview}
 
     _set_step_state(workspace, task_id, step, status="running", runId=record.id, provider=provider)
+    reads = ", ".join(r.replace("@diff", "git diff").replace("@folder", "task folder") for r in STEP_IO[step]["reads"])
+    _add_event(
+        workspace, task_id, "step_started",
+        f"orchestrator routed {STEP_DEFS[step]['label']} → {provider} "
+        f"(sent {len(prompt):,} chars; reads: {reads})",
+        step=step, provider=provider,
+    )
     add_log_entry("task-step", f"started {step} via {provider}", provider=provider, task_id=task_id, step=step)
     return {"status": "started", "runId": record.id, "consumeTaskName": consume_task.get_name(), **preview}
 
@@ -358,6 +468,12 @@ async def run_full_sequence(workspace: Path, task_id: str, confirm: bool = False
                 encoding="utf-8",
             )
             add_log_entry("git", f"local pre-check for {task_id} (branch {git.get('branch', '-')})", task_id=task_id)
+            _add_event(
+                workspace, task_id, "local_check",
+                f"local git pre-check (free): branch {git.get('branch', '-')}, "
+                f"{git.get('changedFileCount', 0)} changed file(s) — no AI call",
+                provider="git",
+            )
 
             for step in FULL_SEQUENCE:
                 fresh_usage = usage_service.ensure_usage(workspace)
@@ -369,6 +485,11 @@ async def run_full_sequence(workspace: Path, task_id: str, confirm: bool = False
                 ):
                     usage_service.increment_avoided(workspace)
                     _set_step_state(workspace, task_id, step, status="skipped_budget")
+                    _add_event(
+                        workspace, task_id, "skipped",
+                        "Budget Saver skipped the Codex spec for this small task — expensive call avoided",
+                        step=step, provider=step_provider(workspace, step),
+                    )
                     routing_service.append_decision(
                         workspace, task_id,
                         "Budget Saver: skipped Codex spec for this small task — Claude gets the compact "
@@ -378,6 +499,11 @@ async def run_full_sequence(workspace: Path, task_id: str, confirm: bool = False
 
                 if step == "claude_implement" and usage_service.provider_health(fresh_usage, "claude") == "red" and not confirm:
                     _set_sequence(workspace, task_id, "blocked_claude_red", step)
+                    _add_event(
+                        workspace, task_id, "blocked",
+                        "sequence paused before Implement — Claude health is RED (explicit confirmation required)",
+                        step=step, provider="claude",
+                    )
                     routing_service.append_decision(
                         workspace, task_id,
                         "Full sequence stopped before `claude_implement`: Claude health is RED. "
@@ -403,6 +529,7 @@ async def run_full_sequence(workspace: Path, task_id: str, confirm: bool = False
                     return
 
             _set_sequence(workspace, task_id, "completed", None)
+            _add_event(workspace, task_id, "sequence", "full sequence completed")
             add_log_entry("task-step", f"full sequence completed for {task_id}", task_id=task_id)
         finally:
             _full_sequences_running.discard(task_id)

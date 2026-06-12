@@ -124,6 +124,21 @@ export interface StepState {
   runId?: string;
   exitCode?: number | null;
   updatedAt?: string;
+  artifactsWritten?: string[];
+  codeChanged?: string[];
+  promptFile?: string;
+  logFile?: string;
+}
+
+export interface TaskEvent {
+  time: string;
+  type: string;
+  step: string | null;
+  provider: string | null;
+  detail: string;
+  artifacts?: string[];
+  codeChanged?: string[];
+  status?: string;
 }
 
 export interface TaskMeta {
@@ -134,6 +149,7 @@ export interface TaskMeta {
   status: string;
   steps: Record<string, StepState>;
   fullSequence: { status: string; currentStep: string | null };
+  events?: TaskEvent[];
 }
 
 export interface StepPreview {
@@ -143,6 +159,8 @@ export interface StepPreview {
   providerInstalled: boolean;
   commandPreview: string;
   promptChars: number;
+  reads: string[];
+  writes: string[];
 }
 
 export interface RunInfo {

@@ -1,28 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
-import { ArrowRight, Inbox, Spinner, StopSquare } from "../components/icons";
+import { ArrowRight, ChevronDown, ChevronRight, Close, FileIcon, Inbox, Spinner, StopSquare } from "../components/icons";
 import RoutingRecommendationCard from "../components/RoutingRecommendationCard";
 import StatusBadge from "../components/StatusBadge";
-import type { RunInfo, StepPreview, StepState, TaskDetail, TaskMeta } from "../types";
+import UsageHealthBadge from "../components/UsageHealthBadge";
+import type { Health, RunInfo, StepPreview, StepState, TaskDetail, TaskEvent, TaskMeta } from "../types";
 
 const STEP_ORDER = ["codex_spec", "claude_implement", "gemini_qa", "codex_review", "claude_fix"];
-const PIPELINE = ["codex_spec", "claude_implement", "gemini_qa", "codex_review"];
-const SHORT_LABELS: Record<string, string> = {
-  codex_spec: "Spec",
-  claude_implement: "Implement",
-  gemini_qa: "QA",
-  codex_review: "Review",
-  claude_fix: "Fix Bugs",
+
+const SPECIAL_ARTIFACTS: Record<string, string> = {
+  "@code": "production code",
+  "@diff": "git diff",
+  "@folder": "task folder",
 };
 
-const NODE_STYLE: Record<string, string> = {
-  running: "border-blue-400 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/40",
-  succeeded: "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30",
-  failed: "border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/30",
-  error: "border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/30",
-  cancelled: "border-neutral-300 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900",
-  provider_missing: "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30",
-  skipped_budget: "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30",
+const EVENT_DOT: Record<string, string> = {
+  task_created: "bg-neutral-400",
+  step_started: "bg-blue-500",
+  step_finished: "bg-emerald-500",
+  provider_missing: "bg-amber-500",
+  skipped: "bg-amber-500",
+  blocked: "bg-rose-500",
+  local_check: "bg-neutral-400",
+  sequence: "bg-blue-500",
 };
 
 function fmtDuration(ms?: number | null): string {
@@ -32,162 +32,406 @@ function fmtDuration(ms?: number | null): string {
   return `${Math.round(ms / 60_000)}m${Math.round((ms % 60_000) / 1000)}s`;
 }
 
-/* ---------- pipeline strip: how the task flows between agents ---------- */
+/* ------------------------------------------------ artifact chips (handoffs) */
 
-function PipelineStrip({ detail }: { detail: TaskDetail }) {
+function ArtifactChip({
+  name,
+  written,
+  onOpen,
+}: {
+  name: string;
+  written?: boolean;
+  onOpen?: (name: string) => void;
+}) {
+  const special = SPECIAL_ARTIFACTS[name];
+  if (special) {
+    return (
+      <span className="rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 font-mono text-[10px] text-violet-700 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-300">
+        {special}
+      </span>
+    );
+  }
+  const base = written
+    ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+    : "border-neutral-200 text-neutral-500 dark:border-neutral-700 dark:text-neutral-400";
   return (
-    <div className="card flex flex-wrap items-center gap-1.5 p-3" aria-label="Orchestration pipeline">
-      {PIPELINE.map((step, i) => {
-        const state = detail.task.steps[step] ?? { status: "idle" };
-        const preview = detail.stepPreviews[step];
-        const lastRun = [...detail.runs].reverse().find((r) => r.step === step);
-        return (
-          <div key={step} className="flex items-center gap-1.5">
-            {i > 0 && <ArrowRight className="h-3.5 w-3.5 shrink-0 text-neutral-300 dark:text-neutral-600" />}
-            <div
-              className={`min-w-[108px] rounded-xl border px-2.5 py-1.5 ${
-                NODE_STYLE[state.status] ?? "border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-1">
-                <span className="font-mono text-[10px] uppercase tracking-wide text-neutral-500">
-                  {preview?.provider}
-                </span>
-                {state.status === "running" && <Spinner className="h-3 w-3 text-blue-500" />}
-              </div>
-              <div className="text-xs font-medium">{SHORT_LABELS[step]}</div>
-              <div className="mt-0.5 flex items-center gap-1 text-[10px] text-neutral-500">
-                {state.status === "idle" ? "idle" : state.status.replace(/_/g, " ")}
-                {lastRun?.durationMs != null && state.status !== "running" && (
-                  <span className="tabular-nums">· {fmtDuration(lastRun.durationMs)}</span>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })}
-      {detail.task.steps["claude_fix"] && detail.task.steps["claude_fix"].status !== "idle" && (
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-neutral-400">↩</span>
-          <div className={`min-w-[108px] rounded-xl border border-dashed px-2.5 py-1.5 ${NODE_STYLE[detail.task.steps["claude_fix"].status] ?? "border-neutral-300 dark:border-neutral-700"}`}>
-            <span className="font-mono text-[10px] uppercase text-neutral-500">{detail.stepPreviews["claude_fix"]?.provider}</span>
-            <div className="text-xs font-medium">Fix Bugs</div>
-            <div className="text-[10px] text-neutral-500">{detail.task.steps["claude_fix"].status.replace(/_/g, " ")}</div>
-          </div>
-        </div>
-      )}
-    </div>
+    <button
+      onClick={() => onOpen?.(name)}
+      disabled={!onOpen}
+      title={onOpen ? `Open ${name}` : name}
+      className={`focusable rounded border px-1.5 py-0.5 font-mono text-[10px] transition-colors ${base} ${
+        onOpen ? "cursor-pointer hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-300" : ""
+      }`}
+    >
+      {written && "✓ "}
+      {name.replace(".md", "")}
+    </button>
   );
 }
 
-/* ---------- live strip: what the active agent is doing right now ---------- */
+/* ------------------------------------------------------------- agent lanes */
 
-function NowRunning({ run, onStop }: { run: RunInfo; onStop: () => void }) {
-  const elapsed = Date.now() - Date.parse(run.startedAt);
-  const tail = (run.stdout + (run.stderr ? `\n${run.stderr}` : "")).slice(-1500);
-  return (
-    <div className="rounded-2xl border border-blue-300 bg-blue-50/70 p-3 dark:border-blue-800 dark:bg-blue-950/30" aria-live="polite">
-      <div className="mb-2 flex items-center gap-2 text-xs">
-        <Spinner className="h-3.5 w-3.5 text-blue-600" />
-        <span className="font-semibold text-blue-800 dark:text-blue-300">
-          {run.provider} is working on {SHORT_LABELS[run.step ?? ""] ?? run.step}
-        </span>
-        <span className="tabular-nums text-blue-700/70 dark:text-blue-300/70">{fmtDuration(elapsed)} elapsed</span>
-        <span className="flex-1" />
-        <button className="btn-danger px-2 py-1" onClick={onStop} title="Stop this process" aria-label="Stop this process">
-          <StopSquare className="h-3.5 w-3.5" /> Stop
-        </button>
-      </div>
-      <pre className="mono-block max-h-44 whitespace-pre-wrap text-[11px]">
-        {tail || "waiting for output…"}
-      </pre>
-    </div>
-  );
+function laneList(previews: Record<string, StepPreview>): string[] {
+  const lanes: string[] = [];
+  for (const step of STEP_ORDER) {
+    const p = previews[step]?.provider;
+    if (p && !lanes.includes(p)) lanes.push(p);
+  }
+  return lanes;
 }
 
-/* ---------- per-step detail row ---------- */
-
-function StepRow({
+function StepCard({
   preview,
   state,
   run,
+  taskId,
   onRun,
+  onOpenFile,
 }: {
   preview: StepPreview;
   state: StepState;
   run: RunInfo | undefined;
+  taskId: string;
   onRun: () => void;
+  onOpenFile: (name: string) => void;
 }) {
-  const [showPreview, setShowPreview] = useState(false);
   const [showOutput, setShowOutput] = useState(false);
+  const [prompt, setPrompt] = useState<string | null>(null);
+  const [showPrompt, setShowPrompt] = useState(false);
   const running = state.status === "running";
 
+  const border =
+    state.status === "running"
+      ? "border-blue-400 dark:border-blue-600"
+      : state.status === "succeeded"
+        ? "border-emerald-300 dark:border-emerald-800"
+        : ["failed", "error"].includes(state.status)
+          ? "border-rose-300 dark:border-rose-800"
+          : ["provider_missing", "skipped_budget"].includes(state.status)
+            ? "border-amber-300 dark:border-amber-800"
+            : "border-neutral-200 dark:border-neutral-800";
+
+  const togglePrompt = async () => {
+    if (!showPrompt && prompt === null) {
+      const file = (run?.logFile ?? state.logFile)?.split("/").pop()?.replace(/\.log$/, ".prompt.txt") ?? state.promptFile;
+      try {
+        const res = file
+          ? await api.taskFile(taskId, `logs/${file}`)
+          : { content: preview.commandPreview };
+        setPrompt(res.content);
+      } catch {
+        setPrompt(preview.commandPreview);
+      }
+    }
+    setShowPrompt(!showPrompt);
+  };
+
   return (
-    <div className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">{preview.label}</span>
-        <span className="chip">{preview.provider}</span>
-        {!preview.providerInstalled && <StatusBadge state="missing" label="CLI missing" />}
+    <div className={`rounded-xl border bg-white p-2.5 shadow-sm dark:bg-neutral-900 ${border}`}>
+      <div className="flex items-center gap-1.5">
+        <span className="min-w-0 flex-1 truncate text-xs font-semibold">{preview.label}</span>
+        {running && <Spinner className="h-3 w-3 text-blue-500" />}
         <StatusBadge state={state.status} />
-        <button className="btn-secondary" onClick={() => setShowPreview(!showPreview)} aria-expanded={showPreview}>
-          Preview
-        </button>
-        <button className="btn-primary" onClick={onRun} disabled={running}>
-          {running && <Spinner className="h-3.5 w-3.5" />}
-          {running ? "Running…" : "Run"}
-        </button>
       </div>
 
-      {run && (
-        <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] tabular-nums text-neutral-500">
-          {run.durationMs != null && <span>duration {fmtDuration(run.durationMs)}</span>}
-          {run.exitCode !== null && <span>exit {run.exitCode}</span>}
-          {run.logFile && <span className="font-mono">{run.logFile.split("/").pop()}</span>}
-          <span>~{preview.promptChars.toLocaleString()} prompt chars</span>
-        </div>
-      )}
-
-      {showPreview && (
-        <div className="mt-2">
-          <div className="label">Command preview</div>
-          <pre className="mono-block max-h-48 whitespace-pre-wrap">{preview.commandPreview}</pre>
-        </div>
-      )}
-      {run && (run.stdout || run.stderr) && (
-        <div className="mt-2">
-          <button
-            className="focusable cursor-pointer rounded text-xs text-blue-600 hover:underline dark:text-blue-400"
-            onClick={() => setShowOutput(!showOutput)}
-            aria-expanded={showOutput}
+      <div className="mt-1.5 flex flex-wrap items-center gap-1">
+        <span className="text-[9px] uppercase tracking-wide text-neutral-400">reads</span>
+        {preview.reads.map((r) => (
+          <ArtifactChip key={r} name={r} onOpen={SPECIAL_ARTIFACTS[r] ? undefined : onOpenFile} />
+        ))}
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-1">
+        <span className="text-[9px] uppercase tracking-wide text-neutral-400">writes</span>
+        {preview.writes.map((w) => (
+          <ArtifactChip
+            key={w}
+            name={w}
+            written={state.artifactsWritten?.includes(w)}
+            onOpen={SPECIAL_ARTIFACTS[w] ? undefined : onOpenFile}
+          />
+        ))}
+        {(state.codeChanged?.length ?? 0) > 0 && (
+          <span
+            className="rounded border border-violet-300 bg-violet-50 px-1.5 py-0.5 font-mono text-[10px] text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300"
+            title={state.codeChanged?.join("\n")}
           >
-            {showOutput ? "Hide output" : `Show output (${run.status})`}
+            ✓ code: {state.codeChanged?.length} file(s)
+          </span>
+        )}
+      </div>
+
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] tabular-nums text-neutral-500">
+        {run?.durationMs != null && <span>{fmtDuration(run.durationMs)}</span>}
+        {run?.exitCode !== null && run?.exitCode !== undefined && <span>exit {run.exitCode}</span>}
+        <span>~{(preview.promptChars / 1000).toFixed(1)}k chars</span>
+        {!preview.providerInstalled && <span className="text-rose-500">CLI missing</span>}
+      </div>
+
+      <div className="mt-2 flex items-center gap-1.5">
+        <button className="btn-primary px-2 py-0.5 text-[11px]" onClick={onRun} disabled={running}>
+          {running ? "Running…" : "Run"}
+        </button>
+        <button className="btn-secondary px-2 py-0.5 text-[11px]" onClick={togglePrompt} aria-expanded={showPrompt}>
+          Prompt
+        </button>
+        {run && (run.stdout || run.stderr) && (
+          <button className="btn-secondary px-2 py-0.5 text-[11px]" onClick={() => setShowOutput(!showOutput)} aria-expanded={showOutput}>
+            Output
           </button>
-          {showOutput && (
-            <pre className="mono-block mt-1 max-h-72 whitespace-pre-wrap">
-              {run.stdout}
-              {run.stderr && `\n--- stderr ---\n${run.stderr}`}
-            </pre>
-          )}
-        </div>
+        )}
+      </div>
+
+      {showPrompt && prompt !== null && (
+        <pre className="mono-block mt-2 max-h-44 whitespace-pre-wrap text-[10px]">{prompt}</pre>
+      )}
+      {showOutput && run && (
+        <pre className="mono-block mt-2 max-h-56 whitespace-pre-wrap text-[10px]">
+          {run.stdout}
+          {run.stderr && `\n--- stderr ---\n${run.stderr}`}
+        </pre>
       )}
     </div>
   );
 }
 
-/* ---------- main page ---------- */
+function FlowBoard({
+  detail,
+  onRun,
+  onOpenFile,
+  onReview,
+}: {
+  detail: TaskDetail;
+  onRun: (step: string) => void;
+  onOpenFile: (name: string) => void;
+  onReview: (provider: string) => void;
+}) {
+  const lanes = laneList(detail.stepPreviews);
+  const cols = { gridTemplateColumns: `repeat(${lanes.length}, minmax(0, 1fr))` };
+  const runFor = (step: string): RunInfo | undefined => {
+    const runs = detail.runs.filter((r) => r.step === step);
+    return runs[runs.length - 1];
+  };
+
+  return (
+    <div className="card p-3">
+      {/* lane headers — one per agent; each agent is reviewable */}
+      <div className="grid gap-3" style={cols}>
+        {lanes.map((provider) => {
+          const roles = STEP_ORDER.filter((s) => detail.stepPreviews[s]?.provider === provider).map(
+            (s) => detail.stepPreviews[s].label,
+          );
+          return (
+            <div
+              key={provider}
+              className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-2.5 py-2 dark:border-neutral-800 dark:bg-neutral-950"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-mono text-xs font-bold">{provider}</div>
+                <div className="truncate text-[10px] text-neutral-400" title={roles.join(", ")}>
+                  {roles.join(" · ")}
+                </div>
+              </div>
+              <UsageHealthBadge value={(detail.recommendation.health[provider] as Health) ?? null} name={provider} />
+              <button className="btn-secondary px-2 py-0.5 text-[11px]" onClick={() => onReview(provider)}>
+                Review
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* step rows + handoff connectors */}
+      {STEP_ORDER.map((step, i) => {
+        const preview = detail.stepPreviews[step];
+        if (!preview) return null;
+        const lane = lanes.indexOf(preview.provider);
+        const prev = i > 0 ? detail.stepPreviews[STEP_ORDER[i - 1]] : null;
+        return (
+          <div key={step}>
+            {prev && (
+              <div className="flex items-center justify-center gap-1.5 py-1.5" aria-hidden="true">
+                <span className="font-mono text-[10px] text-neutral-400">{prev.provider}</span>
+                <ArrowRight className="h-3 w-3 text-neutral-300 dark:text-neutral-600" />
+                <span className="flex flex-wrap items-center gap-1">
+                  {preview.reads.map((r) => (
+                    <ArtifactChip key={r} name={r} onOpen={SPECIAL_ARTIFACTS[r] ? undefined : onOpenFile} />
+                  ))}
+                </span>
+                <ArrowRight className="h-3 w-3 text-neutral-300 dark:text-neutral-600" />
+                <span className="font-mono text-[10px] text-neutral-400">{preview.provider}</span>
+              </div>
+            )}
+            <div className="grid gap-3" style={cols}>
+              {lanes.map((_, idx) => (
+                <div key={idx}>
+                  {idx === lane && (
+                    <StepCard
+                      preview={preview}
+                      state={detail.task.steps[step] ?? { status: "idle" }}
+                      run={runFor(step)}
+                      taskId={detail.task.id}
+                      onRun={() => onRun(step)}
+                      onOpenFile={onOpenFile}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------- agent review */
+
+function AgentReview({
+  provider,
+  detail,
+  onClose,
+}: {
+  provider: string;
+  detail: TaskDetail;
+  onClose: () => void;
+}) {
+  const runs = detail.runs.filter((r) => r.provider === provider);
+  const [open, setOpen] = useState<Record<string, "prompt" | "output" | null>>({});
+  const [prompts, setPrompts] = useState<Record<string, string>>({});
+
+  const toggle = async (run: RunInfo, what: "prompt" | "output") => {
+    const cur = open[run.id];
+    if (cur === what) {
+      setOpen({ ...open, [run.id]: null });
+      return;
+    }
+    if (what === "prompt" && !prompts[run.id]) {
+      const file = run.logFile?.split("/").pop()?.replace(/\.log$/, ".prompt.txt");
+      try {
+        const res = file ? await api.taskFile(detail.task.id, `logs/${file}`) : { content: run.commandPreview };
+        setPrompts((p) => ({ ...p, [run.id]: res.content }));
+      } catch {
+        setPrompts((p) => ({ ...p, [run.id]: run.commandPreview }));
+      }
+    }
+    setOpen({ ...open, [run.id]: what });
+  };
+
+  return (
+    <section className="card border-blue-200 p-4 dark:border-blue-900">
+      <div className="mb-2 flex items-center gap-2">
+        <h3 className="text-sm font-semibold">
+          Agent review — <span className="font-mono">{provider}</span>
+        </h3>
+        <span className="text-xs text-neutral-400">{runs.length} run(s) in this task</span>
+        <span className="flex-1" />
+        <button
+          onClick={onClose}
+          aria-label="Close agent review"
+          className="focusable cursor-pointer rounded p-1 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
+        >
+          <Close className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {runs.length === 0 ? (
+        <p className="text-xs text-neutral-500">
+          This agent hasn't run yet in this task. Run one of its steps, then review the exact prompt it received
+          and the output it produced here.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {[...runs].reverse().map((run) => (
+            <div key={run.id} className="rounded-xl border border-neutral-200 p-2.5 dark:border-neutral-800">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="font-medium">{run.step}</span>
+                <StatusBadge state={run.status} />
+                <span className="tabular-nums text-neutral-400">
+                  {new Date(run.startedAt).toLocaleTimeString()} · {fmtDuration(run.durationMs)} · exit {run.exitCode ?? "—"}
+                </span>
+                <span className="flex-1" />
+                <button className="btn-secondary px-2 py-0.5 text-[11px]" onClick={() => void toggle(run, "prompt")}>
+                  {open[run.id] === "prompt" ? "Hide prompt" : "Prompt sent"}
+                </button>
+                <button className="btn-secondary px-2 py-0.5 text-[11px]" onClick={() => void toggle(run, "output")}>
+                  {open[run.id] === "output" ? "Hide output" : "Output received"}
+                </button>
+              </div>
+              {open[run.id] === "prompt" && (
+                <pre className="mono-block mt-2 max-h-64 whitespace-pre-wrap text-[10px]">
+                  {prompts[run.id] ?? "loading…"}
+                </pre>
+              )}
+              {open[run.id] === "output" && (
+                <pre className="mono-block mt-2 max-h-64 whitespace-pre-wrap text-[10px]">
+                  {run.stdout || "(no stdout)"}
+                  {run.stderr && `\n--- stderr ---\n${run.stderr}`}
+                </pre>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------ handoff log */
+
+function HandoffLog({ events, onOpenFile }: { events: TaskEvent[]; onOpenFile: (name: string) => void }) {
+  const endRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "nearest" });
+  }, [events.length]);
+
+  if (events.length === 0) {
+    return <p className="text-xs text-neutral-500">No orchestration events yet — run a step to see the handoff story.</p>;
+  }
+  return (
+    <div className="max-h-80 space-y-1.5 overflow-y-auto pr-1">
+      {events.map((e, i) => (
+        <div key={i} className="flex items-start gap-2">
+          <span
+            className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
+              e.type === "step_finished" && e.status && e.status !== "succeeded" ? "bg-rose-500" : EVENT_DOT[e.type] ?? "bg-neutral-400"
+            }`}
+            aria-hidden="true"
+          />
+          <span className="w-16 shrink-0 font-mono text-[10px] tabular-nums leading-5 text-neutral-400">
+            {new Date(e.time).toLocaleTimeString()}
+          </span>
+          <div className="min-w-0 flex-1 text-xs leading-5 text-neutral-700 dark:text-neutral-300">
+            {e.detail}
+            {(e.artifacts?.length ?? 0) > 0 && (
+              <span className="ml-1.5 inline-flex flex-wrap gap-1 align-middle">
+                {e.artifacts!.map((a) => (
+                  <ArtifactChip key={a} name={a} written onOpen={onOpenFile} />
+                ))}
+              </span>
+            )}
+          </div>
+        </div>
+      ))}
+      <div ref={endRef} />
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- the page */
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<TaskMeta[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<TaskDetail | null>(null);
-  const [decisions, setDecisions] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [goal, setGoal] = useState("");
   const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [taskFile, setTaskFile] = useState<{ name: string; content: string } | null>(null);
-  const [logs, setLogs] = useState<{ name: string; size: number; content: string }[] | null>(null);
+  const [reviewAgent, setReviewAgent] = useState<string | null>(null);
+  const [showRouting, setShowRouting] = useState(false);
+  const fileViewerRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<number | null>(null);
 
   const loadTasks = useCallback(async () => {
@@ -204,12 +448,7 @@ export default function TasksPage() {
 
   const loadDetail = useCallback(async (id: string) => {
     try {
-      const [d, dec] = await Promise.all([
-        api.task(id),
-        api.taskFile(id, "ROUTING_DECISIONS.md").catch(() => null),
-      ]);
-      setDetail(d);
-      setDecisions(dec?.content ?? null);
+      setDetail(await api.task(id));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -224,8 +463,7 @@ export default function TasksPage() {
   useEffect(() => {
     if (selectedId) {
       setTaskFile(null);
-      setLogs(null);
-      setDecisions(null);
+      setReviewAgent(null);
       void loadDetail(selectedId);
     }
   }, [selectedId, loadDetail]);
@@ -295,29 +533,22 @@ export default function TasksPage() {
     if (selectedId) await loadDetail(selectedId);
   };
 
-  const refreshLogs = async () => {
-    if (!selectedId) return;
-    setLogs((await api.taskLogs(selectedId)).files);
-  };
-
   const openFile = async (name: string) => {
     if (!selectedId) return;
-    setTaskFile(await api.taskFile(selectedId, name));
+    try {
+      setTaskFile(await api.taskFile(selectedId, name));
+      fileViewerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : String(e));
+    }
   };
-
-  const runFor = (step: string): RunInfo | undefined => {
-    const runs = detail?.runs.filter((r) => r.step === step) ?? [];
-    return runs.length > 0 ? runs[runs.length - 1] : undefined;
-  };
-
-  const liveRun = detail?.runs.find((r) => r.status === "running");
 
   return (
-    <div className="grid h-full grid-cols-[280px_1fr]">
+    <div className="grid h-full grid-cols-[270px_1fr]">
       {/* Left: create + list */}
-      <div className="overflow-y-auto border-r border-neutral-200 p-5 dark:border-neutral-800">
+      <div className="overflow-y-auto border-r border-neutral-200 p-4 dark:border-neutral-800">
         <h1 className="mb-3 text-xl font-semibold">Tasks</h1>
-        <div className="card space-y-2.5 p-4">
+        <div className="card space-y-2.5 p-3.5">
           <div>
             <label className="label">Title</label>
             <input className="input" value={title} placeholder="Fix playback overlay" onChange={(e) => setTitle(e.target.value)} />
@@ -325,7 +556,7 @@ export default function TasksPage() {
           <div>
             <label className="label">User goal</label>
             <textarea
-              className="input min-h-[88px] resize-y"
+              className="input min-h-[80px] resize-y"
               value={goal}
               placeholder="Describe what should change…"
               onChange={(e) => setGoal(e.target.value)}
@@ -342,7 +573,7 @@ export default function TasksPage() {
               key={t.id}
               onClick={() => setSelectedId(t.id)}
               aria-current={selectedId === t.id ? "true" : undefined}
-              className={`focusable w-full cursor-pointer rounded-xl border px-3 py-2.5 text-left transition-colors duration-150 ${
+              className={`focusable w-full cursor-pointer rounded-xl border px-3 py-2 text-left transition-colors duration-150 ${
                 selectedId === t.id
                   ? "border-accent bg-blue-50 dark:border-accent dark:bg-blue-950/40"
                   : "border-neutral-200 bg-white hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
@@ -364,8 +595,8 @@ export default function TasksPage() {
         </div>
       </div>
 
-      {/* Right: orchestration detail */}
-      <div className="space-y-4 overflow-y-auto p-6">
+      {/* Right: orchestration console */}
+      <div className="space-y-4 overflow-y-auto p-5">
         {error && <div className="card border-rose-200 p-4 text-sm text-rose-600 dark:border-rose-900">{error}</div>}
         {!detail && !error && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
@@ -382,78 +613,56 @@ export default function TasksPage() {
                 <p className="truncate font-mono text-[11px] text-neutral-400">{detail.taskDir}</p>
               </div>
               <button className="btn-primary" onClick={runFull}>Run Full Sequence</button>
-              <button className="btn-danger" onClick={stopAll}>Stop</button>
+              <button className="btn-danger" onClick={stopAll}>
+                <StopSquare className="h-3.5 w-3.5" /> Stop
+              </button>
               <button className="btn-secondary" onClick={() => void api.openTaskFolder(detail.task.id)}>
                 Open Folder
               </button>
-              <button className="btn-secondary" onClick={refreshLogs}>Logs</button>
             </header>
 
-            {detail.task.fullSequence && detail.task.fullSequence.status !== "idle" && (
-              <div className="flex items-center gap-2 text-xs text-neutral-500">
-                Full sequence: <StatusBadge state={detail.task.fullSequence.status} />
-                {detail.task.fullSequence.currentStep && <span>at {detail.task.fullSequence.currentStep}</span>}
-              </div>
-            )}
+            <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+              {detail.task.fullSequence && detail.task.fullSequence.status !== "idle" && (
+                <>
+                  Sequence: <StatusBadge state={detail.task.fullSequence.status} />
+                  {detail.task.fullSequence.currentStep && <span>at {detail.task.fullSequence.currentStep}</span>}
+                </>
+              )}
+              <span className="flex-1" />
+              <button
+                className="focusable flex cursor-pointer items-center gap-1 rounded text-xs text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                onClick={() => setShowRouting(!showRouting)}
+                aria-expanded={showRouting}
+              >
+                {showRouting ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                Routing recommendation
+                {detail.recommendation.cheaperRouteRecommended && (
+                  <span className="rounded-full bg-emerald-100 px-1.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                    cheaper route
+                  </span>
+                )}
+              </button>
+            </div>
+
             {notice && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
                 {notice}
               </div>
             )}
+            {showRouting && <RoutingRecommendationCard rec={detail.recommendation} />}
 
-            <PipelineStrip detail={detail} />
-            {liveRun && <NowRunning run={liveRun} onStop={() => void stopAll()} />}
+            <FlowBoard detail={detail} onRun={(s) => void runStep(s)} onOpenFile={openFile} onReview={setReviewAgent} />
 
-            <RoutingRecommendationCard rec={detail.recommendation} />
-
-            {decisions && (
-              <details className="card p-4" open={false}>
-                <summary className="focusable cursor-pointer rounded text-sm font-semibold">
-                  Routing decisions <span className="ml-1 font-normal text-neutral-400">(ROUTING_DECISIONS.md)</span>
-                </summary>
-                <pre className="mono-block mt-3 max-h-72 whitespace-pre-wrap">{decisions}</pre>
-              </details>
-            )}
-
-            <section className="space-y-2">
-              <h3 className="text-sm font-semibold">Steps</h3>
-              {STEP_ORDER.map((step) => {
-                const preview = detail.stepPreviews[step];
-                if (!preview) return null;
-                return (
-                  <StepRow
-                    key={step}
-                    preview={preview}
-                    state={detail.task.steps[step] ?? { status: "idle" }}
-                    run={runFor(step)}
-                    onRun={() => void runStep(step)}
-                  />
-                );
-              })}
-            </section>
-
-            {detail.runs.length > 0 && (
-              <section className="card p-4">
-                <h3 className="mb-2 text-sm font-semibold">Run timeline</h3>
-                <div className="space-y-1">
-                  {detail.runs.map((r) => (
-                    <div key={r.id} className="flex items-center gap-2 border-b border-neutral-100 py-1 text-xs last:border-0 dark:border-neutral-800">
-                      <span className="w-16 shrink-0 font-mono text-[11px] tabular-nums text-neutral-500">
-                        {new Date(r.startedAt).toLocaleTimeString()}
-                      </span>
-                      <span className="chip">{r.provider}</span>
-                      <span className="min-w-0 flex-1 truncate text-neutral-700 dark:text-neutral-300">
-                        {SHORT_LABELS[r.step ?? ""] ?? r.step ?? "process"}
-                      </span>
-                      <span className="tabular-nums text-neutral-400">{fmtDuration(r.durationMs)}</span>
-                      <StatusBadge state={r.status} />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
+            {reviewAgent && <AgentReview provider={reviewAgent} detail={detail} onClose={() => setReviewAgent(null)} />}
 
             <section className="card p-4">
+              <h3 className="mb-2 text-sm font-semibold">
+                Handoff log <span className="font-normal text-neutral-400">— how work moves between agents</span>
+              </h3>
+              <HandoffLog events={detail.task.events ?? []} onOpenFile={openFile} />
+            </section>
+
+            <section className="card p-4" ref={fileViewerRef}>
               <h3 className="mb-2 text-sm font-semibold">Task files</h3>
               <div className="flex flex-wrap gap-1.5">
                 {detail.files.map((f) => (
@@ -470,23 +679,24 @@ export default function TasksPage() {
                   </button>
                 ))}
               </div>
-              {taskFile && <pre className="mono-block mt-3 max-h-80 whitespace-pre-wrap">{taskFile.content}</pre>}
+              {taskFile && (
+                <div className="mt-3">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 font-mono text-[11px] text-neutral-500">
+                      <FileIcon className="h-3 w-3" /> {taskFile.name}
+                    </span>
+                    <button
+                      onClick={() => setTaskFile(null)}
+                      aria-label="Close file viewer"
+                      className="focusable cursor-pointer rounded p-0.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+                    >
+                      <Close className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <pre className="mono-block max-h-80 whitespace-pre-wrap">{taskFile.content}</pre>
+                </div>
+              )}
             </section>
-
-            {logs && (
-              <section className="card p-4">
-                <h3 className="mb-2 text-sm font-semibold">Saved logs</h3>
-                {logs.length === 0 && <p className="text-xs text-neutral-400">No log files yet.</p>}
-                {logs.map((l) => (
-                  <details key={l.name} className="mb-2">
-                    <summary className="focusable cursor-pointer rounded font-mono text-xs text-neutral-600 dark:text-neutral-400">
-                      {l.name} ({(l.size / 1024).toFixed(1)} KB)
-                    </summary>
-                    <pre className="mono-block mt-1 max-h-72 whitespace-pre-wrap">{l.content}</pre>
-                  </details>
-                ))}
-              </section>
-            )}
           </>
         )}
       </div>
