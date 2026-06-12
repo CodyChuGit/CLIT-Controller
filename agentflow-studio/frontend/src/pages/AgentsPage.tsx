@@ -61,8 +61,10 @@ export default function AgentsPage() {
         {providers.map((p) => (
           <ProviderCard key={p.id} provider={p} onCheck={checkOne} onLogin={login} />
         ))}
+        {providers.length === 0 &&
+          !error &&
+          [0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="skeleton h-56" aria-hidden="true" />)}
       </div>
-      {providers.length === 0 && !error && <p className="text-sm text-neutral-400">Loading providers…</p>}
     </div>
   );
 }

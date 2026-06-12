@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { Inbox, Spinner } from "../components/icons";
 import RoutingRecommendationCard from "../components/RoutingRecommendationCard";
 import StatusBadge from "../components/StatusBadge";
 import type { RunInfo, StepPreview, TaskDetail, TaskMeta } from "../types";
@@ -25,15 +26,14 @@ function StepRow({
     <div className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
       <div className="flex flex-wrap items-center gap-2">
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{preview.label}</span>
-        <span className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[11px] text-neutral-500 dark:bg-neutral-800">
-          {preview.provider}
-        </span>
+        <span className="chip">{preview.provider}</span>
         {!preview.providerInstalled && <StatusBadge state="missing" label="CLI missing" />}
         <StatusBadge state={state.status} />
-        <button className="btn-secondary" onClick={() => setShowPreview(!showPreview)}>
+        <button className="btn-secondary" onClick={() => setShowPreview(!showPreview)} aria-expanded={showPreview}>
           Preview
         </button>
         <button className="btn-primary" onClick={onRun} disabled={running}>
+          {running && <Spinner className="h-3.5 w-3.5" />}
           {running ? "Running…" : "Run"}
         </button>
       </div>
@@ -232,7 +232,10 @@ export default function TasksPage() {
             </button>
           ))}
           {tasks.length === 0 && !error && (
-            <p className="px-1 pt-2 text-xs text-neutral-400">No tasks yet — create one above.</p>
+            <div className="flex flex-col items-center gap-1.5 px-1 pt-6 text-center">
+              <Inbox className="h-5 w-5 text-neutral-300 dark:text-neutral-600" />
+              <p className="text-xs text-neutral-500">No tasks yet — create one above.</p>
+            </div>
           )}
         </div>
       </div>
@@ -240,7 +243,12 @@ export default function TasksPage() {
       {/* Right: detail */}
       <div className="space-y-4 overflow-y-auto p-6">
         {error && <div className="card border-rose-200 p-4 text-sm text-rose-600 dark:border-rose-900">{error}</div>}
-        {!detail && !error && <p className="text-sm text-neutral-400">Select or create a task.</p>}
+        {!detail && !error && (
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+            <Inbox className="h-7 w-7 text-neutral-300 dark:text-neutral-600" />
+            <p className="text-sm text-neutral-500">Select a task on the left, or create one to get started.</p>
+          </div>
+        )}
 
         {detail && (
           <>

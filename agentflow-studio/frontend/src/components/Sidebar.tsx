@@ -67,17 +67,21 @@ export default function Sidebar({ page, onNavigate, project, backendUp }: Props)
         </div>
       </div>
 
-      <nav className="flex-1 space-y-0.5 px-3">
+      <nav className="flex-1 space-y-0.5 px-3" aria-label="Main">
         {NAV.map((item) => (
           <button
             key={item.id}
             onClick={() => onNavigate(item.id)}
-            className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
+            aria-current={page === item.id ? "page" : undefined}
+            className={`focusable relative flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors duration-150 ${
               page === item.id
-                ? "bg-blue-600/10 font-medium text-blue-700 dark:bg-blue-500/15 dark:text-blue-300"
+                ? "bg-accent/10 font-medium text-blue-700 dark:bg-accent/20 dark:text-blue-300"
                 : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
             }`}
           >
+            {page === item.id && (
+              <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-accent" aria-hidden="true" />
+            )}
             <svg
               viewBox="0 0 24 24"
               className="h-4 w-4 shrink-0"

@@ -1,3 +1,5 @@
+import { FileIcon } from "./icons";
+
 interface Props {
   path: string | null;
   content: string | null;
@@ -27,9 +29,12 @@ export default function CodeReader({ path, content, size, truncated, error }: Pr
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
         {error ? (
-          <p className="p-4 text-sm text-rose-500">{error}</p>
+          <p className="p-4 text-sm text-rose-600 dark:text-rose-400" role="alert">{error}</p>
         ) : content === null ? (
-          <p className="p-4 text-sm text-neutral-400">Click a file in the tree to read it.</p>
+          <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
+            <FileIcon className="h-6 w-6 text-neutral-300 dark:text-neutral-600" />
+            <p className="text-sm text-neutral-500">Click a file in the tree to read it.</p>
+          </div>
         ) : (
           <pre className="p-4 font-mono text-xs leading-relaxed text-neutral-800 dark:text-neutral-200">
             {content}

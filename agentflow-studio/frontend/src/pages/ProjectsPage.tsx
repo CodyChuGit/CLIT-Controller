@@ -88,11 +88,15 @@ export default function ProjectsPage({ project, onProjectChange }: Props) {
             </button>
           )}
         </div>
-        <p className="mt-2 text-[11px] text-neutral-400">
+        <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
           Local folder path is resolved by the Python backend. Saving creates{" "}
           <code className="font-mono">.agentflow/</code> inside the workspace.
         </p>
-        {error && <p className="mt-2 text-xs text-rose-500">{error}</p>}
+        {error && (
+          <p className="mt-2 text-xs text-rose-600 dark:text-rose-400" role="alert">
+            {error}
+          </p>
+        )}
         {hasWorkspace && (
           <p className="mt-2 truncate text-xs text-neutral-500">
             Current: <code className="font-mono">{project?.workspacePath}</code>
@@ -111,7 +115,10 @@ export default function ProjectsPage({ project, onProjectChange }: Props) {
               </div>
             </div>
             {!git ? (
-              <p className="text-sm text-neutral-400">Loading…</p>
+              <div className="grid gap-4 md:grid-cols-2" aria-hidden="true">
+                <div className="skeleton h-24" />
+                <div className="skeleton h-24" />
+              </div>
             ) : !git.installed ? (
               <p className="text-sm text-rose-500">git is not installed.</p>
             ) : !git.isRepo ? (
@@ -138,7 +145,11 @@ export default function ProjectsPage({ project, onProjectChange }: Props) {
               {tree ? (
                 <FileTree nodes={tree.children} onOpenFile={openFile} selected={selected} truncated={tree.truncated} />
               ) : (
-                <p className="p-4 text-sm text-neutral-400">Loading…</p>
+                <div className="space-y-2 p-3" aria-hidden="true">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <div key={i} className="skeleton h-5" style={{ width: `${85 - i * 9}%` }} />
+                  ))}
+                </div>
               )}
             </div>
             <CodeReader

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { TreeNode } from "../types";
+import { ChevronDown, ChevronRight, FileIcon, Folder } from "./icons";
 
 interface NodeProps {
   node: TreeNode;
@@ -18,10 +19,15 @@ function Node({ node, depth, onOpenFile, selected }: NodeProps) {
         <button
           style={pad}
           onClick={() => setOpen(!open)}
-          className="flex w-full items-center gap-1.5 rounded py-1 pr-2 text-left text-[13px] text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+          aria-expanded={open}
+          className="focusable flex w-full cursor-pointer items-center gap-1.5 rounded py-1 pr-2 text-left text-[13px] text-neutral-700 transition-colors duration-150 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
         >
-          <span className="w-3 text-[10px] text-neutral-400">{open ? "▾" : "▸"}</span>
-          <span className="text-blue-500">▣</span>
+          {open ? (
+            <ChevronDown className="h-3 w-3 shrink-0 text-neutral-400" />
+          ) : (
+            <ChevronRight className="h-3 w-3 shrink-0 text-neutral-400" />
+          )}
+          <Folder className="h-3.5 w-3.5 shrink-0 text-accent-subtle" />
           <span className="truncate font-medium">{node.name}</span>
         </button>
         {open && node.children?.map((c) => (
@@ -37,17 +43,18 @@ function Node({ node, depth, onOpenFile, selected }: NodeProps) {
       style={pad}
       disabled={!previewable}
       onClick={() => onOpenFile(node.path)}
+      aria-current={selected === node.path ? "true" : undefined}
       title={previewable ? node.path : "Not previewable (binary / excluded)"}
-      className={`flex w-full items-center gap-1.5 rounded py-1 pr-2 text-left text-[13px] ${
+      className={`focusable flex w-full items-center gap-1.5 rounded py-1 pr-2 text-left text-[13px] transition-colors duration-150 ${
         selected === node.path
-          ? "bg-blue-600/10 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300"
+          ? "bg-accent/10 text-blue-700 dark:bg-accent/20 dark:text-blue-300"
           : previewable
-            ? "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+            ? "cursor-pointer text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
             : "cursor-default text-neutral-400 dark:text-neutral-600"
       }`}
     >
-      <span className="w-3" />
-      <span className="text-neutral-400">▢</span>
+      <span className="w-3 shrink-0" />
+      <FileIcon className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
       <span className="truncate">{node.name}</span>
     </button>
   );
@@ -62,15 +69,15 @@ interface Props {
 
 export default function FileTree({ nodes, onOpenFile, selected, truncated }: Props) {
   if (nodes.length === 0) {
-    return <p className="p-4 text-sm text-neutral-400">Empty folder.</p>;
+    return <p className="p-4 text-sm text-neutral-500 dark:text-neutral-400">Empty folder.</p>;
   }
   return (
-    <div className="py-1">
+    <div className="py-1" role="tree">
       {nodes.map((n) => (
         <Node key={n.path} node={n} depth={0} onOpenFile={onOpenFile} selected={selected} />
       ))}
       {truncated && (
-        <p className="px-3 py-2 text-[11px] text-neutral-400">Tree truncated (depth 8 / 2000 files max).</p>
+        <p className="px-3 py-2 text-[11px] text-neutral-500">Tree truncated (depth 8 / 2000 files max).</p>
       )}
     </div>
   );

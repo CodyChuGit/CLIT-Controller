@@ -4,6 +4,14 @@ export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      colors: {
+        // Semantic tokens — keep raw hex out of components.
+        surface: "#f5f5f7", // Apple Settings-style canvas (light)
+        accent: {
+          DEFAULT: "#2563eb", // blue-600
+          subtle: "#3b82f6",
+        },
+      },
       fontFamily: {
         sans: [
           "-apple-system",

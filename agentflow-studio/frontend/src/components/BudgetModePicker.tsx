@@ -14,21 +14,23 @@ interface Props {
 
 export default function BudgetModePicker({ value, onChange }: Props) {
   return (
-    <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" role="radiogroup" aria-label="Orchestration mode">
       {MODES.map((m) => (
         <button
           key={m.id}
+          role="radio"
+          aria-checked={value === m.id}
           onClick={() => onChange(m.id)}
-          className={`rounded-xl border p-3 text-left transition-colors ${
+          className={`focusable cursor-pointer rounded-xl border p-3 text-left transition-all duration-150 active:scale-[0.99] ${
             value === m.id
-              ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500 dark:border-blue-500 dark:bg-blue-950/40"
+              ? "border-accent bg-blue-50 ring-1 ring-accent dark:border-accent dark:bg-blue-950/40"
               : "border-neutral-200 bg-white hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
           }`}
         >
           <div className={`text-sm font-medium ${value === m.id ? "text-blue-700 dark:text-blue-300" : ""}`}>
             {m.label}
           </div>
-          <div className="mt-0.5 text-[11px] leading-snug text-neutral-500">{m.hint}</div>
+          <div className="mt-0.5 text-[11px] leading-snug text-neutral-500 dark:text-neutral-400">{m.hint}</div>
         </button>
       ))}
     </div>

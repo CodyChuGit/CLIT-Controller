@@ -9,8 +9,8 @@ import type { Health, OrchestrationMode, Recommendation, Usage } from "../types"
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div>
-      <div className="text-[11px] text-neutral-400">{label}</div>
-      <div className="font-mono text-sm text-neutral-700 dark:text-neutral-300">{value}</div>
+      <div className="text-[11px] text-neutral-500 dark:text-neutral-400">{label}</div>
+      <div className="font-mono text-sm tabular-nums text-neutral-700 dark:text-neutral-300">{value}</div>
     </div>
   );
 }
@@ -75,7 +75,7 @@ export default function UsagePage() {
               <div key={id} className="card p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <span className="text-sm font-semibold capitalize">{id}</span>
-                  <UsageHealthBadge value={p.health} onChange={(h) => void setHealth(id, h)} />
+                  <UsageHealthBadge value={p.health} onChange={(h) => void setHealth(id, h)} name={id} />
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <Stat label="Calls today" value={p.callsToday} />
@@ -84,7 +84,7 @@ export default function UsagePage() {
                   <Stat label="Output chars" value={p.estimatedOutputChars.toLocaleString()} />
                   <Stat label="Last duration" value={`${(p.lastCommandDuration / 1000).toFixed(1)}s`} />
                   <div>
-                    <div className="text-[11px] text-neutral-400">Last status</div>
+                    <div className="text-[11px] text-neutral-500 dark:text-neutral-400">Last status</div>
                     <StatusBadge state={p.lastStatus} />
                   </div>
                 </div>
