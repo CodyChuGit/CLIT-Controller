@@ -78,3 +78,17 @@ def test_extract_rate_limits_brace_matching():
     assert usage_service._window_label(300) == "5h"
     assert usage_service._window_label(10080) == "7d"
     assert usage_service._extract_rate_limits("no limits here") is None
+
+
+def test_parse_claude_usage_text():
+    text = (
+        "You are currently using your subscription to power your Claude Code usage\n\n"
+        "Current session: 35% used · resets Jun 13 at 3:49am (Asia/Taipei)\n"
+        "Current week (all models): 41% used · resets Jun 17 at 8:59am (Asia/Taipei)\n"
+        "Current week (Sonnet only): 0% used · resets Jun 17 at 9am (Asia/Taipei)\n"
+    )
+    windows = usage_service.parse_claude_usage_text(text)
+    assert [w["label"] for w in windows] == ["session", "week", "wk·sonnet"]
+    assert windows[0]["usedPercent"] == 35.0
+    assert "Jun 13" in windows[0]["resetsText"]
+    assert usage_service.parse_claude_usage_text("nothing") == []

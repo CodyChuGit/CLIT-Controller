@@ -297,18 +297,73 @@ def codex_live_usage():
     return None
 
 
+import re as _re
+
+_CLAUDE_USAGE_RE = _re.compile(
+    r"Current (session|week \(all models\)|week \(Sonnet only\)):\s*(\d+)% used(?:\s*[·\u00b7]\s*resets (.+))?"
+)
+
+
+def parse_claude_usage_text(text: str) -> list[dict]:
+    """Parse the output of `claude -p \"/usage\"` into usage windows."""
+    labels = {"session": "session", "week (all models)": "week", "week (Sonnet only)": "wk·sonnet"}
+    windows = []
+    for line in (text or "").splitlines():
+        m = _CLAUDE_USAGE_RE.search(line.strip())
+        if m:
+            windows.append(
+                {
+                    "label": labels[m.group(1)],
+                    "usedPercent": float(m.group(2)),
+                    "resetsAt": None,
+                    "resetsText": (m.group(3) or "").strip() or None,
+                }
+            )
+    return windows
+
+
+async def claude_live_usage():
+    """Fresh usage straight from the CLI: `claude -p \"/usage\"` is intercepted
+    headlessly (no model call) and prints session/week percentages."""
+    from datetime import datetime, timezone
+
+    from .process_runner import RUNNER
+    from .provider_probe import resolve_executable
+
+    exe = resolve_executable("claude")
+    if exe is None:
+        return None
+    record = await RUNNER.run_and_wait([exe, "-p", "/usage"], Path.home(), timeout=30, provider="claude")
+    if record.exit_code != 0:
+        return None
+    windows = parse_claude_usage_text(record.stdout)
+    if not windows:
+        return None
+    return {
+        "available": True,
+        "plan": None,
+        "windows": windows,
+        "sourcedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+
+
 _live_cache: dict = {"at": 0.0, "data": None}
 
 
-def live_usage(force: bool = False) -> dict:
+async def live_usage(force: bool = False) -> dict:
     now = _time.time()
-    if not force and _live_cache["data"] is not None and now - _live_cache["at"] < 60:
+    if not force and _live_cache["data"] is not None and now - _live_cache["at"] < 120:
         return _live_cache["data"]
+    claude = None
+    try:
+        claude = await claude_live_usage()
+    except Exception:  # noqa: BLE001 — live data is best-effort
+        claude = None
     data = {
         "codex": codex_live_usage()
         or {"available": False, "note": "no recent codex session data — run codex once"},
-        "claude": {"available": False, "note": "Claude Code exposes no headless usage API — manual limit"},
-        "antigravity": {"available": False, "note": "agy exposes no usage API — manual limit"},
+        "claude": claude or {"available": False, "note": "claude -p /usage returned nothing — manual limit"},
+        "antigravity": {"available": False, "note": "agy exposes no usage call — manual limit"},
     }
     _live_cache["at"] = now
     _live_cache["data"] = data
@@ -316,18 +371,27 @@ def live_usage(force: bool = False) -> dict:
 
 
 def live_summary_line() -> str:
-    """Compact live-quota line for the orchestrator's budget awareness."""
+    """Compact live-quota lines for the orchestrator (reads the cache only)."""
     from datetime import datetime, timezone
 
-    codex = live_usage().get("codex", {})
-    if not codex.get("available"):
-        return ""
+    data = _live_cache["data"] or {}
     parts = []
-    for w in codex.get("windows", []):
-        reset = ""
-        if w.get("resetsAt"):
-            dt = datetime.fromtimestamp(w["resetsAt"], tz=timezone.utc)
-            hours = max(0, (dt - datetime.now(timezone.utc)).total_seconds() / 3600)
-            reset = f", resets in {hours:.1f}h"
-        parts.append(f"{w['label']} window {w['usedPercent']:.0f}% used{reset}")
-    return f"Codex live quota ({codex.get('plan', '?')} plan): " + "; ".join(parts)
+    codex = data.get("codex", {})
+    if codex.get("available"):
+        bits = []
+        for w in codex.get("windows", []):
+            reset = ""
+            if w.get("resetsAt"):
+                dt = datetime.fromtimestamp(w["resetsAt"], tz=timezone.utc)
+                hours = max(0, (dt - datetime.now(timezone.utc)).total_seconds() / 3600)
+                reset = f", resets in {hours:.1f}h"
+            bits.append(f"{w['label']} {w['usedPercent']:.0f}% used{reset}")
+        parts.append(f"Codex live quota ({codex.get('plan', '?')}): " + "; ".join(bits))
+    claude = data.get("claude", {})
+    if claude.get("available"):
+        bits = [
+            f"{w['label']} {w['usedPercent']:.0f}% used" + (f" (resets {w['resetsText']})" if w.get("resetsText") else "")
+            for w in claude.get("windows", [])
+        ]
+        parts.append("Claude live quota: " + "; ".join(bits))
+    return "\n".join(parts)

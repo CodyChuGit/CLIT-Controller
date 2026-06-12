@@ -37,8 +37,8 @@ def set_limit(body: ProviderLimitRequest):
 
 
 @router.get("/live")
-def live(force: bool = False):
-    return usage_service.live_usage(force=force)
+async def live(force: bool = False):
+    return await usage_service.live_usage(force=force)
 
 
 @router.get("/recommendations")

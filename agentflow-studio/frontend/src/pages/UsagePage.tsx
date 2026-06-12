@@ -227,11 +227,11 @@ export default function UsagePage() {
                             {(live[id].windows ?? []).map((w) => (
                               <div key={w.label} className="flex items-center gap-1.5 text-[11px]">
                                 <span className="font-mono text-[10px] text-neutral-400">{w.label}</span>
-                                <span className="tabular-nums text-neutral-500">{epochResets(w.resetsAt)}</span>
+                                <span className="tabular-nums text-neutral-500">{w.resetsText ?? epochResets(w.resetsAt)}</span>
                               </div>
                             ))}
                             <span className="rounded bg-violet-100 px-1 text-[9px] font-semibold uppercase text-violet-700 dark:bg-violet-950 dark:text-violet-300">
-                              live · {live[id].plan ?? "cli"}
+                              live{live[id].plan ? ` · ${live[id].plan}` : ""}
                             </span>
                           </div>
                         ) : (

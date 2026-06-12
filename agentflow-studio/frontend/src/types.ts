@@ -233,6 +233,7 @@ export interface LiveWindow {
   label: string;
   usedPercent: number;
   resetsAt: number | null;
+  resetsText?: string | null;
 }
 
 export interface LiveProviderUsage {
