@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { Card, PageShell } from "../components/ui";
 import type { RoutingConfig, Settings } from "../types";
 
 const ROLE_LABELS: Record<keyof RoutingConfig, string> = {
@@ -45,13 +46,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-6">
-      <header>
-        <h1 className="text-xl font-semibold">Settings</h1>
-      </header>
-
-      <section className="card p-5">
-        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Routing defaults</h2>
+    <PageShell title="Settings">
+      <Card title="Routing defaults" pad>
         <div className="grid grid-cols-2 gap-4">
           {(Object.keys(ROLE_LABELS) as (keyof RoutingConfig)[]).map((role) => (
             <div key={role}>
@@ -68,10 +64,9 @@ export default function SettingsPage() {
             </div>
           ))}
         </div>
-      </section>
+      </Card>
 
-      <section className="card p-5">
-        <h2 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Command templates</h2>
+      <Card title="Command templates" pad>
         <p className="mb-3 text-xs text-neutral-500">
           <code className="font-mono">{"{prompt}"}</code> is replaced with the generated prompt (passed as a
           single argument, never through a shell string).
@@ -88,7 +83,7 @@ export default function SettingsPage() {
             </div>
           ))}
         </div>
-      </section>
+      </Card>
 
       <div className="flex items-center gap-3">
         <button className="btn-primary" onClick={save}>Save settings</button>
@@ -96,8 +91,7 @@ export default function SettingsPage() {
         {error && <span className="text-xs text-rose-500">{error}</span>}
       </div>
 
-      <section className="card p-5">
-        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Paths</h2>
+      <Card title="Paths" pad>
         <dl className="space-y-2 text-xs">
           {[
             ["Workspace", settings.workspacePath ?? "not set"],
@@ -113,11 +107,11 @@ export default function SettingsPage() {
             </div>
           ))}
         </dl>
-      </section>
+      </Card>
 
       <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
         AgentFlow uses official CLI auth and does not store provider secrets.
       </p>
-    </div>
+    </PageShell>
   );
 }

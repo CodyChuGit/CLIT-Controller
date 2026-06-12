@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import type { ChatMessage, ChatState, QueueState, RunInfo } from "../types";
 import DragHandle from "./DragHandle";
+import { EmptyState } from "./ui";
 import { loadState, saveState } from "../persist";
 import {
   AntigravityMark,
@@ -506,7 +507,7 @@ function EngineSelect({
             >
               <ProviderMark id={p.id} className="h-3.5 w-3.5" />
               <span className="flex-1">{p.id}</span>
-              {!p.installed && <span className="text-[9px] text-neutral-400">not installed</span>}
+              {!p.installed && <span className="text-[10px] text-neutral-400">not installed</span>}
               {p.id === value && <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />}
             </button>
           ))}
@@ -785,30 +786,30 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
       {/* messages */}
       <div ref={scrollRef} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-3">
         {!hasWorkspace ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-            <ChatBubble className="h-6 w-6 text-neutral-300 dark:text-neutral-600" />
-            <p className="text-xs text-neutral-500">Open a workspace to start.</p>
-          </div>
+          <EmptyState className="h-full" icon={<ChatBubble />} message="Open a workspace to start." />
         ) : data && messages.length === 0 && !pending ? (
           isOrch ? (
-            <div className="flex h-full flex-col items-center justify-center gap-3 px-2 text-center">
-              <TopHat className="h-6 w-6 text-neutral-300 dark:text-neutral-600" />
-              <p className="text-xs text-neutral-500">
-                Ask the orchestrator for work — it creates tasks and cues the agents.
-              </p>
+            <EmptyState
+              className="h-full px-2"
+              icon={<TopHat />}
+              message="Ask the orchestrator for work — it creates tasks and cues the agents."
+            >
               <div className="flex flex-wrap justify-center gap-1">
                 {Object.keys(STEP_META).map((s) => (
                   <StepChip key={s} name={s} />
                 ))}
               </div>
-            </div>
+            </EmptyState>
           ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-2 px-2 text-center">
-              <ProviderMark id={channel} className="h-6 w-6" />
-              <p className="text-xs text-neutral-500">
-                Direct chat with <span className="font-mono">{channel}</span> — no tasks, no queue.
-              </p>
-            </div>
+            <EmptyState
+              className="h-full px-2"
+              icon={<ProviderMark id={channel} className="h-6 w-6" />}
+              message={
+                <>
+                  Direct chat with <span className="font-mono">{channel}</span> — no tasks, no queue.
+                </>
+              }
+            />
           )
         ) : (
           messages.map((m, i) => <Bubble key={`${m.time}-${i}`} msg={m} />)

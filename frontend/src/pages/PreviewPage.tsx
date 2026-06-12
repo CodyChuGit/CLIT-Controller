@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import { ChevronDown, ChevronRight, Refresh, StopSquare } from "../components/icons";
+import { EmptyState } from "../components/ui";
 import type { PreviewState } from "../types";
 
 /** Embedded browser for the workspace's frontend; AgentFlow can run the dev server. */
@@ -122,17 +123,21 @@ export default function PreviewPage() {
             sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
           />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 bg-surface text-center dark:bg-neutral-950">
-            <p className="text-sm text-neutral-500">
-              Nothing responding at <span className="font-mono text-xs">{state?.url ?? "…"}</span>
-            </p>
+          <EmptyState
+            className="h-full bg-surface dark:bg-neutral-950"
+            message={
+              <>
+                Nothing responding at <span className="font-mono">{state?.url ?? "…"}</span>
+              </>
+            }
+          >
             {!state?.running && (
               <button className="btn-primary" onClick={() => void start()}>
                 Start dev server
               </button>
             )}
             {state?.running && <p className="text-xs text-neutral-400">Server starting…</p>}
-          </div>
+          </EmptyState>
         )}
       </div>
 
@@ -141,7 +146,7 @@ export default function PreviewPage() {
         <button
           onClick={() => setShowOutput(!showOutput)}
           aria-expanded={showOutput}
-          className="focusable flex w-full cursor-pointer items-center gap-1 px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500 transition-colors hover:text-neutral-800 dark:hover:text-neutral-200"
+          className="focusable flex w-full cursor-pointer items-center gap-1 px-3 py-1.5 text-left section-title transition-colors hover:text-neutral-800 dark:hover:text-neutral-200"
         >
           {showOutput ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
           Server output

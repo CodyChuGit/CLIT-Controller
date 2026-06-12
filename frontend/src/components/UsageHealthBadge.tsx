@@ -17,7 +17,7 @@ interface Props {
 export default function UsageHealthBadge({ value, onChange, name }: Props) {
   return (
     <div
-      className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-neutral-50 px-1.5 py-1 dark:border-neutral-700 dark:bg-neutral-800"
+      className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-1 dark:border-neutral-700 dark:bg-neutral-800"
       role={onChange ? "radiogroup" : "img"}
       aria-label={`${name ? name + " " : ""}usage health${value ? `: ${value}` : ""}`}
     >

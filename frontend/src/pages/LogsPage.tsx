@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import LogConsole from "../components/LogConsole";
+import { Card, PageShell } from "../components/ui";
 import type { LogsResponse } from "../types";
 
 export default function LogsPage() {
@@ -34,11 +35,16 @@ export default function LogsPage() {
   }, [data, filter]);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-6">
-      <header className="flex items-end justify-between">
-        <h1 className="text-xl font-semibold">Logs</h1>
-        <div className="flex items-center gap-2">
-          <select className="input w-40" value={filter} onChange={(e) => setFilter(e.target.value)}>
+    <PageShell
+      title="Logs"
+      actions={
+        <>
+          <select
+            className="select w-40"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            aria-label="Filter by provider"
+          >
             <option value="all">All providers</option>
             {providers.map((p) => (
               <option key={p} value={p}>{p}</option>
@@ -54,17 +60,14 @@ export default function LogsPage() {
           >
             Clear view
           </button>
-        </div>
-      </header>
-
-      <div className="card overflow-hidden">
-        <div className="flex items-center border-b border-neutral-200 px-3 py-1.5 dark:border-neutral-800">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Activity</span>
-        </div>
+        </>
+      }
+    >
+      <Card title="Activity">
         <div className="px-4 py-1">
           <LogConsole entries={entries} running={data?.running ?? []} />
         </div>
-      </div>
-    </div>
+      </Card>
+    </PageShell>
   );
 }

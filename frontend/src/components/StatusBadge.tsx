@@ -24,7 +24,7 @@ const COLORS: Record<string, string> = {
 export default function StatusBadge({ state, label }: { state: string; label?: string }) {
   const dot = COLORS[state] ?? "bg-neutral-300 dark:bg-neutral-600";
   return (
-    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs font-medium text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-[11px] font-medium text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
       <span className={`h-2 w-2 rounded-full ${dot}`} aria-hidden="true" />
       {label ?? state.replace(/_/g, " ")}
     </span>

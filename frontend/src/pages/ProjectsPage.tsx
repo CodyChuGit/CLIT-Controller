@@ -6,6 +6,7 @@ import FileTree from "../components/FileTree";
 import FileTypeIcon from "../components/FileTypeIcon";
 import LogConsole from "../components/LogConsole";
 import SourceControlPanel from "../components/SourceControlPanel";
+import { EmptyState } from "../components/ui";
 import { loadState, saveState } from "../persist";
 import { ChevronDown, ChevronRight, Close, FileIcon, Refresh } from "../components/icons";
 import type { CurrentProject, EditorFile, LogsResponse, Tree } from "../types";
@@ -134,7 +135,7 @@ export default function ProjectsPage({
         {hasWorkspace && (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-center justify-between px-3 py-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+              <span className="section-title">
                 Files{tree ? ` (${tree.fileCount})` : ""}
               </span>
               <IconButton label="Refresh file tree" onClick={() => void refreshTree()}>
@@ -222,10 +223,11 @@ export default function ProjectsPage({
           {hasWorkspace ? (
             <CodeReader file={activeFile} />
           ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-2 bg-white text-center dark:bg-neutral-900">
-              <FileIcon className="h-7 w-7 text-neutral-300 dark:text-neutral-600" />
-              <p className="text-sm text-neutral-500">Open a workspace folder to browse and read its files.</p>
-            </div>
+            <EmptyState
+              className="h-full bg-white dark:bg-neutral-900"
+              icon={<FileIcon />}
+              message="Open a workspace folder to browse and read its files."
+            />
           )}
         </div>
 
@@ -283,7 +285,7 @@ function PanelSection({
         <button
           onClick={() => setOpen(!open)}
           aria-expanded={open}
-          className="focusable flex flex-1 cursor-pointer items-center gap-1 px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500 transition-colors hover:text-neutral-800 dark:hover:text-neutral-200"
+          className="focusable flex flex-1 cursor-pointer items-center gap-1 px-2 py-1.5 text-left section-title transition-colors hover:text-neutral-800 dark:hover:text-neutral-200"
         >
           {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
           {title}
@@ -341,13 +343,13 @@ function OutputPanel() {
         <button
           onClick={() => setOpen(!open)}
           aria-expanded={open}
-          className="focusable flex cursor-pointer items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 transition-colors hover:text-neutral-800 dark:hover:text-neutral-200"
+          className="focusable flex cursor-pointer items-center gap-1 section-title transition-colors hover:text-neutral-800 dark:hover:text-neutral-200"
         >
           {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
           Output · Logs
         </button>
         {data && data.running.length > 0 && (
-          <span className="rounded-full bg-blue-100 px-1.5 text-[10px] font-medium tabular-nums text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+          <span className="rounded-md bg-blue-100 px-1.5 text-[10px] font-medium tabular-nums text-blue-700 dark:bg-blue-950 dark:text-blue-300">
             {data.running.length} running
           </span>
         )}

@@ -136,7 +136,7 @@ export default function SourceControlPanel({ workspacePath, onOpenDiff }: Props)
         <button
           onClick={() => setOpen(!open)}
           aria-expanded={open}
-          className="focusable flex flex-1 cursor-pointer items-center gap-1 px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500 transition-colors hover:text-neutral-800 dark:hover:text-neutral-200"
+          className="focusable flex flex-1 cursor-pointer items-center gap-1 px-2 py-1.5 text-left section-title transition-colors hover:text-neutral-800 dark:hover:text-neutral-200"
         >
           {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
           Source Control

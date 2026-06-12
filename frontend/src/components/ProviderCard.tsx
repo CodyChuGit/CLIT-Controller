@@ -95,7 +95,7 @@ export default function ProviderCard({ provider: p, onCheck, onLogin, onInstall,
             disabled={busy}
             title={p.installCommand ? `Install now: ${p.installCommand}` : p.installHint}
             aria-label={`Install ${p.displayName}`}
-            className="focusable cursor-pointer rounded-full transition-transform duration-150 hover:scale-105 active:scale-95"
+            className="focusable cursor-pointer rounded-md transition-transform duration-150 hover:scale-105 active:scale-95"
           >
             <StatusBadge state="missing" label="not installed · install" />
           </button>

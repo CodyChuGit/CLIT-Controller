@@ -3,6 +3,7 @@ import { api } from "../api";
 import BudgetModePicker from "../components/BudgetModePicker";
 import { Refresh } from "../components/icons";
 import RoutingRecommendationCard from "../components/RoutingRecommendationCard";
+import { PageShell } from "../components/ui";
 import UsageHealthBadge from "../components/UsageHealthBadge";
 import type { Health, LiveProviderUsage, OrchestrationMode, Recommendation, Usage } from "../types";
 
@@ -107,23 +108,21 @@ export default function UsagePage() {
 
   if (error) {
     return (
-      <div className="p-6">
-        <h1 className="mb-2 text-xl font-semibold">Usage</h1>
+      <PageShell title="Usage">
         <p className="text-sm text-amber-600 dark:text-amber-400">{error}</p>
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-5xl space-y-4 p-6">
-        <header className="flex items-center">
-          <h1 className="text-xl font-semibold">Usage</h1>
-          <span className="flex-1" />
-          <button onClick={() => void load()} title="Refresh" aria-label="Refresh usage" className="icon-btn">
-            <Refresh className="h-3.5 w-3.5" />
-          </button>
-        </header>
+    <PageShell
+      title="Usage"
+      actions={
+        <button onClick={() => void load()} title="Refresh" aria-label="Refresh usage" className="icon-btn">
+          <Refresh className="h-3.5 w-3.5" />
+        </button>
+      }
+    >
 
         {usage && (
           <>
@@ -180,8 +179,7 @@ export default function UsagePage() {
           </>
         )}
 
-        {rec && <RoutingRecommendationCard rec={rec} />}
-      </div>
-    </div>
+      {rec && <RoutingRecommendationCard rec={rec} />}
+    </PageShell>
   );
 }

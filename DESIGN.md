@@ -67,6 +67,18 @@ Edge-to-edge layouts (Explorer, Tasks console) own their scroll areas; centered 
   overlay, FileTypeIcon badges) — the one tab-strip pattern shared with the chat dock;
   breadcrumb row, sticky line-number gutter on sunken bg.
 
+## Composition primitives (frontend/src/components/ui.tsx)
+
+Every page and panel composes these — do not hand-roll their patterns:
+
+- **PageShell** — scrollable canvas, centered `max-w-5xl p-6` column, `h1` + right-aligned
+  actions row. All centered pages use it (Tasks keeps its custom sticky header).
+- **Card** — bordered panel; a string `title` renders the canonical header strip
+  (`.section-title` left, actions right, `px-3 py-1.5 border-b`); `pad` adds the p-4 body.
+- **EmptyState** — muted icon + one `text-xs` line, optional extra content below.
+- **`.section-title`** — the only section-heading style (11px semibold uppercase neutral-500).
+- **`.select`** — compact native select that sits flush with `.btn` rows.
+
 ## Components
 
 - **Buttons:** `.btn-primary` (accent) / `.btn-secondary` (bordered) / `.btn-danger`; add `.btn-xs`

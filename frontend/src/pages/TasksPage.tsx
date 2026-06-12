@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { Close, FileIcon, Folder, Inbox, Spinner, StopSquare } from "../components/icons";
 import StatusBadge from "../components/StatusBadge";
+import { Card, EmptyState } from "../components/ui";
 import { loadState, saveState } from "../persist";
 import type { Exchange, QueueState, StepState, TaskDetail, TaskEvent, TaskMeta } from "../types";
 
@@ -161,7 +162,7 @@ function FlowChart({
                 {SHORT_LABELS[step]}
               </span>
               <span
-                className={`max-w-full truncate font-mono text-[9px] leading-none ${
+                className={`max-w-full truncate font-mono text-[10px] leading-none ${
                   involved ? "text-neutral-400" : "text-neutral-300 dark:text-neutral-700"
                 }`}
               >
@@ -245,20 +246,23 @@ function StepChat({
   }, [exchanges.length, liveRun?.stdout]);
 
   return (
-    <section
+    <Card
       id={`step-${step}`}
-      className={`card flex flex-col overflow-hidden border-t-2 ${color.border} ${involved ? "" : "opacity-50"}`}
-    >
-      <header className="flex shrink-0 items-center gap-2 border-b border-neutral-200 px-3 py-1.5 dark:border-neutral-800">
-        <span className={`h-2 w-2 rounded-full ${color.dot}`} aria-hidden="true" />
-        <span className="text-xs font-semibold">{SHORT_LABELS[step]}</span>
-        <span className="font-mono text-[10px] text-neutral-400">{preview?.provider}</span>
-        {state.status !== "idle" && <StatusBadge state={state.status} />}
-        <span className="flex-1" />
+      className={`border-t-2 ${color.border} ${involved ? "" : "opacity-50"}`}
+      title={
+        <span className="flex min-w-0 items-center gap-2">
+          <span className={`h-2 w-2 rounded-full ${color.dot}`} aria-hidden="true" />
+          <span className="text-xs font-semibold">{SHORT_LABELS[step]}</span>
+          <span className="font-mono text-[10px] text-neutral-400">{preview?.provider}</span>
+          {state.status !== "idle" && <StatusBadge state={state.status} />}
+        </span>
+      }
+      actions={
         <button className="btn-secondary btn-xs" onClick={onRun} disabled={state.status === "running"}>
           {state.status === "running" ? "Running…" : "Run"}
         </button>
-      </header>
+      }
+    >
 
       {((state.artifactsWritten?.length ?? 0) > 0 || (state.codeChanged?.length ?? 0) > 0) && (
         <div className="flex flex-wrap items-center gap-1 border-b border-neutral-100 px-3 py-1.5 dark:border-neutral-800/60">
@@ -286,7 +290,7 @@ function StepChat({
             <Fragment key={ex.stamp}>
               <div className="flex justify-end">
                 <div className="max-w-[94%] rounded-lg rounded-br-sm border border-blue-200 bg-blue-50/60 px-2.5 py-1.5 dark:border-blue-900 dark:bg-blue-950/30">
-                  <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-blue-600/80 dark:text-blue-300/80">
+                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-blue-600/80 dark:text-blue-300/80">
                     prompt · {fmtStamp(ex.stamp)}
                   </div>
                   <LongText text={ex.prompt} />
@@ -294,7 +298,7 @@ function StepChat({
               </div>
               <div className="flex justify-start">
                 <div className="max-w-[94%] rounded-lg rounded-bl-sm border border-neutral-200 bg-white px-2.5 py-1.5 dark:border-neutral-700 dark:bg-neutral-900">
-                  <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-neutral-400">
+                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
                     {preview?.provider} · reply
                   </div>
                   <LongText text={ex.output || "(no output)"} />
@@ -306,7 +310,7 @@ function StepChat({
         {liveRun && (
           <div className="flex justify-start">
             <div className="max-w-[94%] rounded-lg rounded-bl-sm border border-blue-200 bg-white px-2.5 py-1.5 dark:border-blue-900 dark:bg-neutral-900">
-              <div className="mb-1 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-wide text-blue-500">
+              <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-blue-500">
                 <Spinner className="h-3 w-3" /> {liveRun.provider} · working…
               </div>
               {liveRun.stdout && (
@@ -318,7 +322,7 @@ function StepChat({
           </div>
         )}
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -575,7 +579,7 @@ export default function TasksPage() {
             <h1 className="text-xl font-semibold">Tasks</h1>
             {tasks.length > 0 && (
               <select
-                className="input w-auto min-w-0 max-w-md flex-1 font-mono text-xs"
+                className="select min-w-0 max-w-md flex-1 font-mono"
                 value={selectedId ?? ""}
                 onChange={(e) => setSelectedId(e.target.value)}
                 aria-label="Select task"
@@ -623,10 +627,7 @@ export default function TasksPage() {
         )}
 
         {tasks.length === 0 && !error && (
-          <div className="flex flex-col items-center gap-2 py-24 text-center">
-            <Inbox className="h-7 w-7 text-neutral-300 dark:text-neutral-600" />
-            <p className="text-sm text-neutral-500">No tasks yet — ask the orchestrator.</p>
-          </div>
+          <EmptyState icon={<Inbox />} message="No tasks yet — ask the orchestrator." />
         )}
 
         {detail && (
@@ -656,29 +657,28 @@ export default function TasksPage() {
               ))}
             </div>
 
-            <section className="card p-4">
-              <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-                Orchestrator log
-              </h2>
+            <Card title="Orchestrator log" pad>
               <HandoffLog events={detail.task.events ?? []} onOpenFile={openFile} />
-            </section>
+            </Card>
 
             {taskFile && (
-              <section className="card p-4" ref={fileViewerRef}>
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 font-mono text-[11px] text-neutral-500">
-                    <FileIcon className="h-3 w-3" /> {taskFile.name}
-                  </span>
-                  <button
-                    onClick={() => setTaskFile(null)}
-                    aria-label="Close file viewer"
-                    className="focusable cursor-pointer rounded p-0.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-                  >
-                    <Close className="h-3 w-3" />
-                  </button>
-                </div>
-                <pre className="mono-block max-h-80 whitespace-pre-wrap">{taskFile.content}</pre>
-              </section>
+              <div ref={fileViewerRef}>
+                <Card
+                  title={
+                    <span className="flex min-w-0 items-center gap-1.5 font-mono text-[11px] text-neutral-500">
+                      <FileIcon className="h-3 w-3 shrink-0" /> <span className="truncate">{taskFile.name}</span>
+                    </span>
+                  }
+                  actions={
+                    <button onClick={() => setTaskFile(null)} aria-label="Close file viewer" className="icon-btn">
+                      <Close className="h-3 w-3" />
+                    </button>
+                  }
+                  pad
+                >
+                  <pre className="mono-block max-h-80 whitespace-pre-wrap">{taskFile.content}</pre>
+                </Card>
+              </div>
             )}
           </>
         )}
