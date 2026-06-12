@@ -63,7 +63,8 @@ Edge-to-edge layouts (Explorer, Tasks console) own their scroll areas; centered 
   micro-label + optional mono badge + right-aligned icon actions — then content, then
   `border-b`. No outer margin; sections stack flush.
 - **Output/terminal panel:** bottom-docked, `border-t`, collapsible, 32px header.
-- **Editor:** tab strip (`h-9`, sunken bg, active tab = panel bg + 2px accent top border),
+- **Editor:** tab strip (`h-8`, sunken `bg-surface`, active tab = panel bg + accent top-line
+  overlay, FileTypeIcon badges) — the one tab-strip pattern shared with the chat dock;
   breadcrumb row, sticky line-number gutter on sunken bg.
 
 ## Components
