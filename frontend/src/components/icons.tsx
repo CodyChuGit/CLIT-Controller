@@ -116,6 +116,15 @@ export const ChatBubble = (p: SVGProps<SVGSVGElement>) => (
   </Icon>
 );
 
+/** The AgentFlow mark: the orchestrator's top hat. */
+export const TopHat = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M7 16V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v10" />
+    <path d="M3.5 16.5c2.7.7 5.5 1 8.5 1s5.8-.3 8.5-1" />
+    <path d="M7 12.5h10" />
+  </Icon>
+);
+
 export const Send = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}>
     <path d="M4 12 20 4l-4 16-4.5-6.5L4 12z" />

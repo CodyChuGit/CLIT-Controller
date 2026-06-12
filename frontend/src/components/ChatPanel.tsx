@@ -3,7 +3,7 @@ import { api } from "../api";
 import type { ChatMessage, ChatState, QueueState, RunInfo } from "../types";
 import DragHandle from "./DragHandle";
 import { loadState, saveState } from "../persist";
-import { ChatBubble, ChevronRight, Close, Send, Spinner, StopSquare } from "./icons";
+import { ChatBubble, ChevronRight, Close, Send, Spinner, StopSquare, TopHat } from "./icons";
 
 const OPEN_KEY = "agentflow.chatOpen";
 const COLLAPSE_CHARS = 700; // longer messages start collapsed ("Show more")
@@ -488,10 +488,11 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
     (queue?.items ?? []).some((i) => i.status === "running") ||
     running.some((r) => r.step === "orchestrate");
 
+  // Poll while collapsed too (slowly) — the rail shows unread + activity dots.
   useEffect(() => {
-    if (!open || !hasWorkspace) return;
+    if (!hasWorkspace) return;
     void load();
-    const id = window.setInterval(load, busy ? 2000 : 6000);
+    const id = window.setInterval(load, !open ? 10000 : busy ? 2000 : 6000);
     return () => window.clearInterval(id);
   }, [open, hasWorkspace, load, busy]);
 
@@ -540,16 +541,50 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
   };
 
   if (!open) {
+    // One icon per channel — opens the dock straight onto that conversation.
+    const agents = data?.providers?.map((p) => p.id) ?? FALLBACK_AGENTS;
     return (
-      <div className="flex w-10 shrink-0 flex-col items-center border-l border-neutral-200 bg-white py-2 dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="flex w-10 shrink-0 flex-col items-center gap-1 border-l border-neutral-200 bg-white py-2 dark:border-neutral-800 dark:bg-neutral-900">
         <button
-          onClick={() => toggle(true)}
-          title="Open chat"
-          aria-label="Open chat"
-          className="focusable cursor-pointer rounded-lg p-2 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+          onClick={() => {
+            switchTab(ORCH);
+            toggle(true);
+          }}
+          title="Orchestrator"
+          aria-label="Open orchestrator chat"
+          className="focusable relative cursor-pointer rounded-lg p-2 text-neutral-500 transition-colors duration-150 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
         >
-          <ChatBubble className="h-5 w-5" />
+          <TopHat className="h-5 w-5" />
+          {(hasUnread(ORCH) || data?.pending) && (
+            <span
+              className={`absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-accent ${data?.pending ? "animate-pulse" : ""}`}
+              aria-hidden="true"
+            />
+          )}
         </button>
+        {agents.map((id) => {
+          const chPending = data?.channelPending?.[id];
+          return (
+            <button
+              key={id}
+              onClick={() => {
+                switchTab(id);
+                toggle(true);
+              }}
+              title={`Chat with ${id}`}
+              aria-label={`Open ${id} chat`}
+              className="focusable relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors duration-150 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+            >
+              <span
+                className={`h-2.5 w-2.5 rounded-full ${PROVIDER_DOT[id] ?? "bg-neutral-400"} ${chPending ? "animate-pulse" : ""}`}
+                aria-hidden="true"
+              />
+              {hasUnread(id) && (
+                <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
+              )}
+            </button>
+          );
+        })}
       </div>
     );
   }
@@ -606,7 +641,7 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
               >
                 {active && <span className="absolute inset-x-0 top-0 h-0.5 bg-accent" aria-hidden="true" />}
                 {id === ORCH ? (
-                  <ChatBubble className="h-3 w-3 text-accent-subtle" />
+                  <TopHat className="h-3.5 w-3.5 text-accent-subtle" />
                 ) : (
                   <span
                     className={`h-2 w-2 rounded-full ${PROVIDER_DOT[id] ?? "bg-neutral-400"} ${
@@ -658,7 +693,7 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
         ) : data && messages.length === 0 && !pending ? (
           isOrch ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 px-2 text-center">
-              <ChatBubble className="h-6 w-6 text-neutral-300 dark:text-neutral-600" />
+              <TopHat className="h-6 w-6 text-neutral-300 dark:text-neutral-600" />
               <p className="text-xs text-neutral-500">
                 Ask the orchestrator for work — it creates tasks and cues the agents.
               </p>

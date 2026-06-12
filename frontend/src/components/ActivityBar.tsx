@@ -1,3 +1,5 @@
+import { TopHat } from "./icons";
+
 export type PageId = "projects" | "agents" | "tasks" | "preview" | "usage" | "logs" | "settings";
 
 interface NavItem {
@@ -98,10 +100,10 @@ export default function ActivityBar({ page, onNavigate }: Props) {
       aria-label="Main navigation"
     >
       <div
-        className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-sm font-bold text-white shadow-sm"
+        className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm"
         title="AgentFlow Studio (beta)"
       >
-        A
+        <TopHat className="h-5 w-5" />
       </div>
       {MAIN_NAV.map((item) => (
         <RailButton key={item.id} item={item} active={page === item.id} onClick={() => onNavigate(item.id)} />

@@ -21,25 +21,34 @@ function pctColor(used: number): string {
   return "bg-emerald-500";
 }
 
-/** One row per CLI-reported window: label · bar · % left · reset. */
+/** One aligned row per CLI-reported window: label · bar (fill = remaining) · % left · reset. */
 function QuotaCell({ liveData }: { liveData?: LiveProviderUsage }) {
   const windows = liveData?.available ? liveData.windows ?? [] : [];
-  if (windows.length === 0) return <span className="text-neutral-400">NA</span>;
+  if (windows.length === 0) {
+    return (
+      <div className="flex items-center gap-2.5 text-[11px]">
+        <span className="w-16 shrink-0" aria-hidden="true" />
+        <span className="font-mono text-neutral-400">NA</span>
+      </div>
+    );
+  }
   return (
-    <div className="space-y-1" title="Live from the CLI">
+    <div className="space-y-1.5" title="Live from the CLI">
       {windows.map((w) => {
         const left = Math.max(0, 100 - w.usedPercent);
         return (
-          <div key={w.label} className="flex items-center justify-end gap-2 text-[11px]">
-            <span className="font-mono text-[10px] text-neutral-400">{w.label}</span>
-            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+          <div key={w.label} className="flex items-center gap-2.5 text-[11px]">
+            <span className="w-16 shrink-0 truncate text-right font-mono text-[10px] text-neutral-400">
+              {w.label}
+            </span>
+            <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
               <div
                 className={`h-full rounded-full ${pctColor(w.usedPercent)}`}
-                style={{ width: `${Math.min(100, w.usedPercent)}%` }}
+                style={{ width: `${Math.min(100, left)}%` }}
               />
             </div>
             <span
-              className={`w-14 text-right font-semibold tabular-nums ${
+              className={`w-16 shrink-0 text-right font-semibold tabular-nums ${
                 w.usedPercent >= 90
                   ? "text-rose-600 dark:text-rose-400"
                   : w.usedPercent >= 65
@@ -50,7 +59,7 @@ function QuotaCell({ liveData }: { liveData?: LiveProviderUsage }) {
               {left.toFixed(0)}% left
             </span>
             <span
-              className="w-24 truncate text-left tabular-nums text-neutral-400"
+              className="w-28 shrink-0 truncate text-right tabular-nums text-neutral-400"
               title={w.resetsText ?? undefined}
             >
               {(w.resetsText ?? epochResets(w.resetsAt)).replace(/\s*\(.*$/, "")}
@@ -124,28 +133,39 @@ export default function UsagePage() {
             </div>
 
             <section className="card overflow-hidden">
-              <table className="w-full text-xs">
+              <table className="w-full table-fixed text-xs">
+                <colgroup>
+                  <col className="w-44" />
+                  <col className="w-28" />
+                  <col />
+                </colgroup>
                 <thead>
                   <tr className="border-b border-neutral-200 text-left text-[10px] uppercase tracking-wide text-neutral-400 dark:border-neutral-800">
                     <th className="px-3 py-1.5 font-semibold">Provider</th>
                     <th className="px-2 py-1.5 font-semibold">Health</th>
-                    <th className="px-3 py-1.5 text-right font-semibold">Session quota</th>
+                    <th className="px-3 py-1.5 font-semibold">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-16 shrink-0" aria-hidden="true" />
+                        <span className="min-w-0 flex-1">Session quota</span>
+                        <span className="shrink-0">Resets</span>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {Object.entries(usage.providers).map(([id, p]) => (
                     <tr key={id} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800/60">
-                      <td className="px-3 py-2">
-                        <div className="font-mono font-semibold">{id}</div>
-                        <div className="text-[10px] text-neutral-400">
+                      <td className="px-3 py-2.5">
+                        <div className="truncate font-mono font-semibold">{id}</div>
+                        <div className="truncate text-[10px] text-neutral-400">
                           {p.preferredUse}
                           {live?.[id]?.plan ? ` · ${live[id].plan}` : ""}
                         </div>
                       </td>
-                      <td className="px-2 py-2">
+                      <td className="px-2 py-2.5">
                         <UsageHealthBadge value={p.health} onChange={(h) => void setHealth(id, h)} name={id} />
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2.5">
                         <QuotaCell liveData={live?.[id]} />
                       </td>
                     </tr>
