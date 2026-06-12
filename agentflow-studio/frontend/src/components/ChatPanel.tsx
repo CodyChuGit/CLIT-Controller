@@ -1,15 +1,165 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
-import type { ChatMessage, ChatState } from "../types";
+import type { ChatMessage, ChatState, QueueState, RunInfo } from "../types";
 import { ChatBubble, ChevronRight, Close, Send, Spinner, StopSquare } from "./icons";
 
 const OPEN_KEY = "agentflow.chatOpen";
+const COLLAPSE_CHARS = 600; // longer messages start collapsed ("Show more")
+
+/* ------------------------------------------------- message rendering helpers */
+
+type Segment = { kind: "text"; text: string } | { kind: "code"; lang: string; code: string };
+
+function parseSegments(content: string): Segment[] {
+  const segments: Segment[] = [];
+  const re = /```([\w-]*)\s*\n([\s\S]*?)```/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) {
+    if (m.index > last) segments.push({ kind: "text", text: content.slice(last, m.index) });
+    segments.push({ kind: "code", lang: m[1] ?? "", code: m[2] ?? "" });
+    last = re.lastIndex;
+  }
+  if (last < content.length) segments.push({ kind: "text", text: content.slice(last) });
+  return segments;
+}
+
+/** Minimal inline markdown: **bold** and `code`. */
+function renderInline(text: string): React.ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith("`") && part.endsWith("`") && part.length > 2) {
+      return (
+        <code key={i} className="rounded bg-neutral-100 px-1 font-mono text-[10px] dark:bg-neutral-700/60">
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+    return <Fragment key={i}>{part}</Fragment>;
+  });
+}
+
+function TextBlock({ text }: { text: string }) {
+  const lines = text.split("\n");
+  return (
+    <div className="space-y-0.5">
+      {lines.map((line, i) => {
+        const trimmed = line.trim();
+        if (!trimmed) return <div key={i} className="h-1.5" />;
+        if (/^#{1,4}\s/.test(trimmed)) {
+          return (
+            <div key={i} className="pt-1 text-xs font-semibold">
+              {renderInline(trimmed.replace(/^#{1,4}\s/, ""))}
+            </div>
+          );
+        }
+        if (/^[-*]\s+/.test(trimmed)) {
+          return (
+            <div key={i} className="flex gap-1.5 pl-1">
+              <span className="text-neutral-400">•</span>
+              <span className="min-w-0 flex-1">{renderInline(trimmed.replace(/^[-*]\s+/, ""))}</span>
+            </div>
+          );
+        }
+        return <div key={i}>{renderInline(line)}</div>;
+      })}
+    </div>
+  );
+}
+
+const DIRECTIVE_META: Record<string, { label: string; field: string }> = {
+  "agentflow-task": { label: "Created task", field: "title" },
+  "agentflow-queue": { label: "Queued steps", field: "steps" },
+  "agentflow-done": { label: "Task complete", field: "reason" },
+  "agentflow-needs-user": { label: "Needs your decision", field: "reason" },
+};
+
+/** AgentFlow directive blocks render as action cards instead of raw code. */
+function DirectiveCard({ lang, code }: { lang: string; code: string }) {
+  const meta = DIRECTIVE_META[lang];
+  const fields: Record<string, string> = {};
+  for (const line of code.split("\n")) {
+    const idx = line.indexOf(":");
+    if (idx > 0) fields[line.slice(0, idx).trim().toLowerCase()] = line.slice(idx + 1).trim();
+  }
+  const steps = (fields.steps ?? (fields.queue === "full" ? "spec → implement → qa → review" : fields.queue) ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return (
+    <div className="my-1 rounded-md border border-violet-200 bg-violet-50/70 px-2.5 py-1.5 dark:border-violet-900 dark:bg-violet-950/40">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-violet-600 dark:text-violet-300">
+        {meta?.label ?? lang}
+      </div>
+      {fields.title && <div className="mt-0.5 text-xs font-medium">{fields.title}</div>}
+      {fields.reason && <div className="mt-0.5 text-xs">{fields.reason}</div>}
+      {fields.goal && <div className="mt-0.5 text-[11px] text-neutral-600 dark:text-neutral-400">{fields.goal}</div>}
+      {steps.length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-1">
+          {steps.map((s) => (
+            <span
+              key={s}
+              className="rounded border border-violet-300 px-1.5 py-0.5 font-mono text-[10px] text-violet-700 dark:border-violet-800 dark:text-violet-300"
+            >
+              {s}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A message body: directive cards + code blocks + light markdown, collapsible when long. */
+function MessageBody({ content }: { content: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const long = content.length > COLLAPSE_CHARS;
+  const segments = parseSegments(content);
+  return (
+    <div>
+      <div className={long && !expanded ? "relative max-h-36 overflow-hidden" : ""}>
+        {segments.map((seg, i) =>
+          seg.kind === "code" ? (
+            seg.lang.startsWith("agentflow-") ? (
+              <DirectiveCard key={i} lang={seg.lang} code={seg.code} />
+            ) : (
+              <pre key={i} className="mono-block my-1 max-h-48 whitespace-pre-wrap text-[10px]">
+                {seg.code.trim()}
+              </pre>
+            )
+          ) : (
+            <TextBlock key={i} text={seg.text.trim()} />
+          ),
+        )}
+        {long && !expanded && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent dark:from-neutral-800" />
+        )}
+      </div>
+      {long && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="focusable mt-1 cursor-pointer rounded text-[10px] font-medium text-blue-600 hover:underline dark:text-blue-400"
+        >
+          {expanded ? "Show less" : "Show more"}
+        </button>
+      )}
+    </div>
+  );
+}
 
 function Bubble({ msg }: { msg: ChatMessage }) {
   if (msg.role === "system") {
     return (
-      <div className="px-2 py-1 text-center text-[11px] italic text-neutral-500" title={msg.time}>
-        {msg.content}
+      <div
+        className="flex items-start gap-1.5 rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 dark:border-neutral-800 dark:bg-neutral-950/60"
+        title={msg.time}
+      >
+        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-500" aria-hidden="true" />
+        <span className="min-w-0 flex-1 text-[11px] leading-snug text-neutral-600 dark:text-neutral-400">
+          {msg.content}
+        </span>
       </div>
     );
   }
@@ -24,23 +174,80 @@ function Bubble({ msg }: { msg: ChatMessage }) {
       )}
       <div
         title={msg.time}
-        className={`max-w-[85%] whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-xs leading-relaxed ${
+        className={`max-w-[92%] break-words rounded-lg px-3 py-2 text-xs leading-relaxed ${
           mine
             ? "rounded-br-sm bg-accent text-white"
             : "rounded-bl-sm border border-neutral-200 bg-white text-neutral-800 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
         }`}
       >
-        {msg.content}
+        {mine ? <span className="whitespace-pre-wrap">{msg.content}</span> : <MessageBody content={msg.content} />}
       </div>
     </div>
   );
 }
+
+/* ----------------------------------------------------- live agent activity */
+
+function elapsed(startedAt?: string): string {
+  if (!startedAt) return "";
+  const s = Math.max(0, Math.round((Date.now() - Date.parse(startedAt)) / 1000));
+  return s < 90 ? `${s}s` : `${Math.round(s / 60)}m`;
+}
+
+const ACTIVE = ["queued", "awaiting_approval", "blocked", "running"];
+
+function AgentActivity({ queue, running }: { queue: QueueState | null; running: RunInfo[] }) {
+  const items = (queue?.items ?? []).filter((i) => ACTIVE.includes(i.status));
+  const orchestrating = running.find((r) => r.step === "orchestrate");
+  if (items.length === 0 && !orchestrating) return null;
+  return (
+    <div className="rounded-md border border-blue-200 bg-blue-50/60 px-2.5 py-2 dark:border-blue-900 dark:bg-blue-950/30">
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+        Agents at work
+      </div>
+      <div className="space-y-1">
+        {orchestrating && (
+          <div className="flex items-center gap-1.5 text-[11px] text-neutral-700 dark:text-neutral-300">
+            <Spinner className="h-3 w-3 text-violet-500" />
+            <span className="font-mono">{orchestrating.provider}</span>
+            <span>is deciding the next step… {elapsed(orchestrating.startedAt)}</span>
+          </div>
+        )}
+        {items.map((i) => (
+          <div key={i.id} className="flex items-center gap-1.5 text-[11px] text-neutral-700 dark:text-neutral-300">
+            {i.status === "running" ? (
+              <Spinner className="h-3 w-3 text-blue-500" />
+            ) : (
+              <span
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                  i.status === "queued" ? "bg-neutral-400" : "bg-amber-500"
+                }`}
+                aria-hidden="true"
+              />
+            )}
+            <span className="font-mono">{i.provider}</span>
+            <span className="min-w-0 flex-1 truncate">
+              {i.status === "running" && `is working on ${i.label}… ${elapsed(i.startedAt)}`}
+              {i.status === "queued" && `waiting to run ${i.label}`}
+              {(i.status === "blocked" || i.status === "awaiting_approval") &&
+                `${i.label} needs approval (Tasks tab)`}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------- panel */
 
 /** Persistent orchestrator chat dock — always available on the right. */
 export default function ChatPanel({ workspacePath }: { workspacePath: string | null }) {
   const hasWorkspace = Boolean(workspacePath);
   const [open, setOpen] = useState(() => localStorage.getItem(OPEN_KEY) !== "0");
   const [data, setData] = useState<ChatState | null>(null);
+  const [queue, setQueue] = useState<QueueState | null>(null);
+  const [running, setRunning] = useState<RunInfo[]>([]);
   const [input, setInput] = useState("");
   const [provider, setProvider] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -57,6 +264,8 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
   useEffect(() => {
     wsRef.current = workspacePath;
     setData(null);
+    setQueue(null);
+    setRunning([]);
     setNotice(null);
     setProvider(null);
   }, [workspacePath]);
@@ -65,26 +274,34 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
     const ws = workspacePath;
     if (!ws) return;
     try {
-      const state = await api.chat();
-      if (wsRef.current === ws) setData(state); // ignore stale responses
+      const [chat, q, logs] = await Promise.all([api.chat(), api.queue(), api.logs()]);
+      if (wsRef.current !== ws) return; // ignore stale responses
+      setData(chat);
+      setQueue(q);
+      setRunning(logs.running);
     } catch {
       /* backend banner covers outages */
     }
   }, [workspacePath]);
 
-  // Poll fast while a reply is streaming in, slowly otherwise.
+  const busy =
+    data?.pending != null ||
+    (queue?.items ?? []).some((i) => i.status === "running") ||
+    running.some((r) => r.step === "orchestrate");
+
+  // Poll fast while agents are active, slowly otherwise.
   useEffect(() => {
     if (!open || !hasWorkspace) return;
     void load();
-    const id = window.setInterval(load, data?.pending ? 1500 : 6000);
+    const id = window.setInterval(load, busy ? 2000 : 6000);
     return () => window.clearInterval(id);
-  }, [open, hasWorkspace, load, data?.pending !== null]);
+  }, [open, hasWorkspace, load, busy]);
 
   // Stick to the bottom as messages arrive.
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [data?.messages.length, data?.pending?.outputTail]);
+  }, [data?.messages.length, data?.pending?.outputTail, busy]);
 
   const send = async () => {
     const message = input.trim();
@@ -195,6 +412,8 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
         ) : (
           data?.messages.map((m, i) => <Bubble key={`${m.time}-${i}`} msg={m} />)
         )}
+
+        <AgentActivity queue={queue} running={running} />
 
         {data?.pending && (
           <div className="flex flex-col items-start">
