@@ -224,11 +224,16 @@ def list_task_logs(workspace: Path, task_id: str) -> list[dict]:
 # ------------------------------------------------------------------ run a step
 
 
-def _build_argv(template: str, prompt: str) -> list[str]:
+def _build_argv(template: str, prompt: str, model: Optional[str] = None) -> list[str]:
     tokens = shlex.split(template)
-    argv, replaced = [], False
+    argv: list[str] = []
+    replaced = False
     for token in tokens:
-        if "{prompt}" in token:
+        if token == "{model}":
+            # Expands to `--model <name>` when a model is configured, vanishes otherwise.
+            if model:
+                argv.extend(["--model", model])
+        elif "{prompt}" in token:
             argv.append(token.replace("{prompt}", prompt))
             replaced = True
         else:
@@ -247,7 +252,7 @@ def build_step_preview(workspace: Path, task_id: str, step: str, usage: Optional
     provider = step_provider(workspace, step)
     prompt = prompt_templates.STEP_PROMPTS[step](usage, _task_rel_dir(task_id))
     template = config.get_command_templates().get(provider, f"{provider} {{prompt}}")
-    argv = _build_argv(template, prompt)
+    argv = _build_argv(template, prompt, config.get_models().get(provider))
     installed = shutil.which(argv[0]) is not None
     return {
         "step": step,
@@ -338,7 +343,11 @@ async def run_step(
             **preview,
         }
 
-    argv = _build_argv(config.get_command_templates().get(provider, f"{provider} {{prompt}}"), prompt)
+    argv = _build_argv(
+        config.get_command_templates().get(provider, f"{provider} {{prompt}}"),
+        prompt,
+        config.get_models().get(provider),
+    )
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     log_file = paths.task_logs_dir(workspace, task_id) / f"{stamp}-{step}.log"
 

@@ -5,20 +5,23 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from .. import config, provider_probe, usage_service
-from ..models import AgentActionRequest
+from ..models import AgentActionRequest, AgentModelRequest
 
 router = APIRouter()
 
 
 def _enrich_with_usage(providers: list[dict]) -> list[dict]:
-    """Merge per-workspace usage health into provider cards when a workspace is set."""
+    """Merge per-workspace usage health + configured model into provider cards."""
     ws = config.get_current_workspace()
     usage = usage_service.ensure_usage(ws) if ws else {"providers": {}}
+    models = config.get_models()
     for p in providers:
         u = usage.get("providers", {}).get(p["id"], {})
         p["usageHealth"] = u.get("health")
         p["callsToday"] = u.get("callsToday", 0)
         p["manualBudgetLevel"] = u.get("manualBudgetLevel")
+        p["model"] = models.get(p["id"], "")
+        p["modelEditable"] = p["id"] in provider_probe.AGENT_PROVIDER_IDS
     return providers
 
 
@@ -52,3 +55,12 @@ async def install(body: AgentActionRequest):
     if body.id not in provider_probe.PROVIDER_IDS:
         raise HTTPException(status_code=404, detail=f"Unknown provider: {body.id}")
     return await provider_probe.install_provider(body.id)
+
+
+@router.post("/model")
+def set_model(body: AgentModelRequest):
+    if body.id not in provider_probe.AGENT_PROVIDER_IDS:
+        raise HTTPException(status_code=404, detail=f"Not a model-configurable agent: {body.id}")
+    config.update_settings(models={body.id: body.model})
+    model = config.get_models().get(body.id, "")
+    return {"ok": True, "id": body.id, "model": model or None}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Provider } from "../types";
 import { Spinner } from "./icons";
 import StatusBadge from "./StatusBadge";
@@ -9,16 +9,37 @@ interface Props {
   onCheck: (id: string) => Promise<void>;
   onLogin: (id: string) => Promise<string>;
   onInstall: (id: string) => Promise<string>;
+  onSetModel: (id: string, model: string) => Promise<string>;
 }
+
+const MODEL_SUGGESTIONS: Record<string, string[]> = {
+  claude: ["sonnet", "opus", "haiku"],
+  codex: [],
+  antigravity: [],
+};
 
 function copyText(text: string) {
   if (navigator.clipboard?.writeText) void navigator.clipboard.writeText(text);
 }
 
-export default function ProviderCard({ provider: p, onCheck, onLogin, onInstall }: Props) {
+export default function ProviderCard({ provider: p, onCheck, onLogin, onInstall, onSetModel }: Props) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [showLog, setShowLog] = useState(false);
+  const [model, setModel] = useState(p.model ?? "");
+
+  // Stay in sync when the providers list refreshes externally.
+  useEffect(() => setModel(p.model ?? ""), [p.model]);
+
+  const saveModel = async () => {
+    const next = model.trim();
+    if (next === (p.model ?? "")) return;
+    try {
+      setNote(await onSetModel(p.id, next));
+    } catch (e) {
+      setNote(String(e));
+    }
+  };
 
   const check = async () => {
     setBusy(true);
@@ -104,6 +125,32 @@ export default function ProviderCard({ provider: p, onCheck, onLogin, onInstall 
             {p.callsToday > 0 && <span className="tabular-nums text-neutral-500">{p.callsToday} calls</span>}
           </dd>
         </div>
+        {p.modelEditable && (
+          <div className="flex items-center justify-between gap-2">
+            <dt className="text-neutral-500 dark:text-neutral-400">
+              <label htmlFor={`model-${p.id}`}>Model</label>
+            </dt>
+            <dd className="min-w-0 flex-1 text-right">
+              <input
+                id={`model-${p.id}`}
+                list={MODEL_SUGGESTIONS[p.id]?.length ? `models-${p.id}` : undefined}
+                className="input ml-auto max-w-[170px] px-2 py-0.5 text-right font-mono text-[11px]"
+                placeholder="CLI default"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                onBlur={() => void saveModel()}
+                onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+              />
+              {MODEL_SUGGESTIONS[p.id]?.length > 0 && (
+                <datalist id={`models-${p.id}`}>
+                  {MODEL_SUGGESTIONS[p.id].map((m) => (
+                    <option key={m} value={m} />
+                  ))}
+                </datalist>
+              )}
+            </dd>
+          </div>
+        )}
         <div className="flex justify-between gap-2">
           <dt className="text-neutral-500 dark:text-neutral-400">Last checked</dt>
           <dd>

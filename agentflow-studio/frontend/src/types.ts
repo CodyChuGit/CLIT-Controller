@@ -42,6 +42,8 @@ export interface Provider {
   loginCommand: string | null;
   versionCommand: string;
   statusCommand: string | null;
+  model: string;
+  modelEditable: boolean;
 }
 
 export interface InstallResult {
@@ -249,6 +251,7 @@ export interface LogsResponse {
 export interface Settings {
   routing: RoutingConfig;
   commandTemplates: Record<string, string>;
+  models: Record<string, string>;
   workspacePath: string | null;
   globalConfigPath: string;
   workspaceConfigPath: string | null;

@@ -125,6 +125,7 @@ def get_settings():
     return {
         "routing": cfg["routing"],
         "commandTemplates": cfg["commandTemplates"],
+        "models": cfg["models"],
         "workspacePath": str(ws) if ws else None,
         "globalConfigPath": str(paths.global_config_file()),
         "workspaceConfigPath": str(paths.workspace_config_file(ws)) if ws else None,
@@ -137,6 +138,7 @@ def save_settings(body: SettingsUpdateRequest):
     config.update_settings(
         routing=body.routing.model_dump() if body.routing else None,
         command_templates=body.commandTemplates,
+        models=body.models,
     )
-    add_log_entry("system", "settings updated (routing/command templates)")
+    add_log_entry("system", "settings updated (routing/command templates/models)")
     return get_settings()

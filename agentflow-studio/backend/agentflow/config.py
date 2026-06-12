@@ -19,15 +19,20 @@ DEFAULT_ROUTING = {
 
 # {prompt} is replaced with the generated prompt as a single argv element
 # (parsed with shlex, never interpolated into a shell string).
+# {model} expands to `--model <configured model>` or disappears when unset.
+# Note: for agy, {model} must come before -p because -p takes the prompt as its value.
 DEFAULT_COMMAND_TEMPLATES = {
-    "codex": "codex exec {prompt}",
-    "claude": "claude -p {prompt}",
-    "antigravity": "agy -p {prompt}",
+    "codex": "codex exec {model} {prompt}",
+    "claude": "claude -p {model} {prompt}",
+    "antigravity": "agy {model} -p {prompt}",
 }
 
-# Old defaults we replace automatically when seen in stored config
-# (the real Antigravity CLI binary is `agy`, not `antigravity`).
-_STALE_ANTIGRAVITY_TEMPLATES = {"antigravity {prompt}", "antigravity -p {prompt}"}
+# Previous defaults we upgrade automatically when seen in stored config.
+_STALE_TEMPLATES = {
+    "codex": {"codex exec {prompt}"},
+    "claude": {"claude -p {prompt}"},
+    "antigravity": {"antigravity {prompt}", "antigravity -p {prompt}", "agy -p {prompt}"},
+}
 
 
 def _migrate_gemini(routing: dict) -> dict:
@@ -68,9 +73,11 @@ def load_global_config() -> dict:
     templates = dict(DEFAULT_COMMAND_TEMPLATES)
     templates.update(cfg.get("commandTemplates") or {})
     templates.pop("gemini", None)
-    if templates.get("antigravity") in _STALE_ANTIGRAVITY_TEMPLATES:
-        templates["antigravity"] = DEFAULT_COMMAND_TEMPLATES["antigravity"]
+    for pid, stale in _STALE_TEMPLATES.items():
+        if templates.get(pid) in stale:
+            templates[pid] = DEFAULT_COMMAND_TEMPLATES[pid]
     cfg["commandTemplates"] = templates
+    cfg.setdefault("models", {})  # provider id -> model name ("" = CLI default)
     return cfg
 
 
@@ -90,7 +97,15 @@ def get_command_templates() -> dict[str, str]:
     return load_global_config()["commandTemplates"]
 
 
-def update_settings(routing: Optional[dict] = None, command_templates: Optional[dict] = None) -> dict:
+def get_models() -> dict[str, str]:
+    return load_global_config()["models"]
+
+
+def update_settings(
+    routing: Optional[dict] = None,
+    command_templates: Optional[dict] = None,
+    models: Optional[dict] = None,
+) -> dict:
     cfg = load_global_config()
     if routing:
         cfg["routing"] = {**cfg["routing"], **routing}
@@ -102,6 +117,9 @@ def update_settings(routing: Optional[dict] = None, command_templates: Optional[
             write_json(paths.workspace_config_file(ws), ws_cfg)
     if command_templates:
         cfg["commandTemplates"] = {**cfg["commandTemplates"], **command_templates}
+    if models is not None:
+        merged = {**cfg["models"], **models}
+        cfg["models"] = {pid: m.strip() for pid, m in merged.items() if m and m.strip()}
     save_global_config(cfg)
     return cfg
 

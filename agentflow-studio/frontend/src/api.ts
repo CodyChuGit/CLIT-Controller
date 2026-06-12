@@ -80,6 +80,8 @@ export const api = {
   checkAllAgents: () => post<Provider[]>("/agents/check-all"),
   loginAgent: (id: string) => post<LoginResult>("/agents/login", { id }),
   installAgent: (id: string) => post<InstallResult>("/agents/install", { id }),
+  setAgentModel: (id: string, model: string) =>
+    post<{ ok: boolean; id: string; model: string | null }>("/agents/model", { id, model }),
 
   // tasks
   tasks: () => get<TaskMeta[]>("/tasks"),

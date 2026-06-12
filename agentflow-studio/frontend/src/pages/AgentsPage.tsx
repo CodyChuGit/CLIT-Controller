@@ -58,6 +58,12 @@ export default function AgentsPage() {
     return res.message ?? res.status;
   };
 
+  const setModel = async (id: string, model: string) => {
+    const res = await api.setAgentModel(id, model);
+    await load();
+    return res.model ? `Model set: ${res.model}` : "Model cleared — using the CLI default.";
+  };
+
   return (
     <div className="space-y-5 p-8">
       <header className="flex items-end justify-between">
@@ -76,7 +82,14 @@ export default function AgentsPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
         {providers.map((p) => (
-          <ProviderCard key={p.id} provider={p} onCheck={checkOne} onLogin={login} onInstall={install} />
+          <ProviderCard
+            key={p.id}
+            provider={p}
+            onCheck={checkOne}
+            onLogin={login}
+            onInstall={install}
+            onSetModel={setModel}
+          />
         ))}
         {providers.length === 0 &&
           !error &&

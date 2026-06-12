@@ -154,7 +154,7 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
     transcript = _transcript(workspace)
     summary = await _workspace_summary(workspace)
     prompt = prompt_templates.orchestrator_chat_prompt(usage, summary, transcript, message)
-    argv = task_service._build_argv(template, prompt)
+    argv = task_service._build_argv(template, prompt, config.get_models().get(provider))
 
     ws_key = str(workspace)
 

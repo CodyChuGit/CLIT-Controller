@@ -65,6 +65,12 @@ class RoutingConfig(BaseModel):
 class SettingsUpdateRequest(BaseModel):
     routing: Optional[RoutingConfig] = None
     commandTemplates: Optional[dict[str, str]] = None
+    models: Optional[dict[str, str]] = None
+
+
+class AgentModelRequest(BaseModel):
+    id: str
+    model: str = ""  # empty string clears back to the CLI default
 
 
 class GitPathRequest(BaseModel):
