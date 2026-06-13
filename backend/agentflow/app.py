@@ -10,7 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import __version__, paths, queue_service
+from . import __version__, config, paths, queue_service, state_store
+from .process_runner import add_log_entry
 from .api import (
     routes_agents,
     routes_chat,
@@ -18,6 +19,7 @@ from .api import (
     routes_preview,
     routes_projects,
     routes_queue,
+    routes_state,
     routes_tasks,
     routes_usage,
 )
@@ -25,6 +27,22 @@ from .api import (
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
+    # Recover durable state before the dispatcher starts: a restart must not leave any
+    # run / queue item / task step stuck `running`.
+    try:
+        ws = config.get_current_workspace()
+        if ws is not None:
+            summary = state_store.recover_workspace(ws)
+            if any(summary.values()):
+                add_log_entry(
+                    "system",
+                    f"startup recovery: {summary['runs']} run(s), {summary['items']} queue item(s), "
+                    f"{summary['steps']} step(s) settled after restart",
+                    status="warn",
+                )
+    except Exception as exc:  # noqa: BLE001 — recovery must never block startup
+        add_log_entry("system", f"startup recovery failed: {exc}", status="error")
+
     # The dispatcher cues queued steps to agents for as long as the app runs.
     dispatcher = asyncio.create_task(queue_service.dispatcher_loop())
     yield
@@ -53,6 +71,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_logs.router, prefix="/api/logs", tags=["logs"])
     app.include_router(routes_chat.router, prefix="/api/chat", tags=["chat"])
     app.include_router(routes_queue.router, prefix="/api/queue", tags=["queue"])
+    app.include_router(routes_state.router, prefix="/api", tags=["state"])
     app.include_router(routes_preview.router, prefix="/api/preview", tags=["preview"])
 
     @app.get("/api/health")

@@ -11,7 +11,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from . import config, git_service, paths, prompt_templates, provider_probe, routing_service, usage_service
+from . import (
+    config,
+    git_service,
+    paths,
+    prompt_templates,
+    provider_probe,
+    routing_service,
+    state_store,
+    transitions,
+    usage_service,
+)
 from .process_runner import RUNNER, RunRecord, add_log_entry, now_iso
 from .redaction import redact
 
@@ -179,6 +189,10 @@ def create_task(workspace: Path, title: str, goal: str, orchestrated: bool = Fal
         workspace, task_id, "task_created",
         f"task created — handoff files written to {_task_rel_dir(task_id)}/ ({len(prompt_templates.TASK_FILES)} files)",
     )
+    state_store.append_event(
+        workspace, "task.created", f"task created: {title}",
+        task_id=task_id, data={"title": title, "orchestrated": orchestrated},
+    )
     add_log_entry("task", f"created task {task_id}: {title}", task_id=task_id)
     return _load_meta(workspace, task_id)
 
@@ -195,6 +209,35 @@ def list_tasks(workspace: Path) -> list[dict]:
             except (FileNotFoundError, ValueError):
                 continue
     return out
+
+
+def task_runs(workspace: Path, task_id: str) -> list[dict]:
+    """Runs for a task, RunInfo-shaped. In-memory (live) records win; the durable run
+    ledger fills in anything lost to a restart so completed runs stay visible."""
+    by_id: dict[str, dict] = {}
+    for rec in state_store.runs_for_task(workspace, task_id):
+        by_id[rec["id"]] = {
+            "id": rec["id"],
+            "taskId": rec.get("taskId"),
+            "step": rec.get("step"),
+            "provider": rec.get("provider"),
+            "status": rec.get("status"),
+            "exitCode": rec.get("exitCode"),
+            "startedAt": rec.get("startedAt"),
+            "endedAt": rec.get("endedAt"),
+            "durationMs": rec.get("durationMs"),
+            "commandPreview": rec.get("commandPreview", ""),
+            "cwd": rec.get("cwd", str(workspace)),
+            "stdout": rec.get("stdoutTail", ""),
+            "stderr": rec.get("stderrTail", ""),
+            "logFile": rec.get("logFile"),
+            "failureKind": rec.get("failureKind"),
+        }
+    for r in RUNNER.runs_for_task(task_id):  # live records override the ledger snapshot
+        d = r.to_dict()
+        d["failureKind"] = r.failure_kind
+        by_id[r.id] = d
+    return sorted(by_id.values(), key=lambda d: d.get("startedAt") or "")
 
 
 def get_task_detail(workspace: Path, task_id: str) -> dict:
@@ -220,7 +263,7 @@ def get_task_detail(workspace: Path, task_id: str) -> dict:
         "task": meta,
         "taskDir": str(folder),
         "files": files,
-        "runs": [r.to_dict() for r in RUNNER.runs_for_task(task_id)],
+        "runs": task_runs(workspace, task_id),
         "stepPreviews": previews,
         "recommendation": routing_service.recommend(usage),
     }
@@ -306,9 +349,11 @@ def _build_argv(template: str, prompt: str, model: Optional[str] = None) -> list
     return argv
 
 
-def build_step_preview(workspace: Path, task_id: str, step: str, usage: Optional[dict] = None) -> dict:
+def build_step_preview(
+    workspace: Path, task_id: str, step: str, usage: Optional[dict] = None, provider_override: Optional[str] = None
+) -> dict:
     usage = usage or usage_service.ensure_usage(workspace)
-    provider = step_provider(workspace, step)
+    provider = provider_override or step_provider(workspace, step)
     prompt = prompt_templates.STEP_PROMPTS[step](usage, _task_rel_dir(task_id))
     template = config.get_command_templates().get(provider, f"{provider} {{prompt}}")
     argv = _build_argv(template, prompt, config.get_models().get(provider))
@@ -326,12 +371,53 @@ def build_step_preview(workspace: Path, task_id: str, step: str, usage: Optional
 
 
 def _set_step_state(workspace: Path, task_id: str, step: str, **fields) -> None:
+    """Single chokepoint for step status. Validates the transition (logs, never crashes)
+    and writes a durable event whenever a step or the task's rolled-up status changes."""
     meta = _load_meta(workspace, task_id)
+    prev_step = meta["steps"].get(step, {}).get("status", "idle")
+    prev_task = meta.get("status")
     meta["steps"].setdefault(step, {})
+
+    new_step = fields.get("status", prev_step)
+    if new_step != prev_step and not transitions.is_valid("step", prev_step, new_step):
+        add_log_entry(
+            "system", f"invalid step transition {prev_step}→{new_step} for {task_id}/{step}",
+            task_id=task_id, step=step, status="error",
+        )
+
     meta["steps"][step].update(fields, updatedAt=now_iso())
     statuses = [s.get("status") for s in meta["steps"].values()]
     meta["status"] = "running" if "running" in statuses else ("idle" if set(statuses) == {"idle"} else "in_progress")
     _save_meta(workspace, meta)
+
+    if new_step != prev_step:
+        state_store.append_event(
+            workspace, "task.status_changed", f"step {step}: {prev_step} → {new_step}",
+            task_id=task_id, step=step, provider=meta["steps"][step].get("provider"),
+            data={"scope": "step", "from": prev_step, "to": new_step},
+        )
+    if meta["status"] != prev_task:
+        state_store.append_event(
+            workspace, "task.status_changed", f"task {prev_task} → {meta['status']}",
+            task_id=task_id, data={"scope": "task", "from": prev_task, "to": meta["status"]},
+        )
+
+
+_AUTH_MARKERS = ("not logged in", "please log in", "unauthorized", "authentication", "401", "api key", "login required")
+
+
+def _classify_run_failure(record: RunRecord) -> Optional[str]:
+    """Map a finished agent run to a durable failure kind (None on success)."""
+    if record.status == "succeeded":
+        return None
+    if record.status == "cancelled":
+        return "cancelled"
+    if record.status == "error":
+        return "start_error"
+    blob = (record.stderr + "\n" + record.stdout).lower()
+    if any(m in blob for m in _AUTH_MARKERS):
+        return "auth_required"
+    return "exit_nonzero"
 
 
 async def run_step(
@@ -340,18 +426,35 @@ async def run_step(
     step: str,
     confirm: bool = False,
     source: str = "manual",
+    provider_override: Optional[str] = None,
 ) -> dict:
-    """Run one orchestration step as a real subprocess (or explain why not)."""
+    """Run one orchestration step as a real subprocess (or explain why not).
+
+    ``provider_override`` lets a rerouted queue item run on a different provider than the
+    workspace routing default for the step's role.
+    """
     if step not in STEP_DEFS:
         raise ValueError(f"unknown step: {step}")
     _load_meta(workspace, task_id)  # 404 if missing
 
     usage = usage_service.ensure_usage(workspace)
     mode = usage.get("orchestrationMode", "balanced")
-    provider = step_provider(workspace, step)
+    provider = provider_override or step_provider(workspace, step)
     prompt = prompt_templates.STEP_PROMPTS[step](usage, _task_rel_dir(task_id))
-    preview = build_step_preview(workspace, task_id, step, usage)
+    preview = build_step_preview(workspace, task_id, step, usage, provider_override=provider_override)
     folder = paths.task_dir(workspace, task_id)
+
+    busy = RUNNER.running_for_provider(provider)
+    if busy is not None:
+        return {
+            "status": "provider_busy",
+            "message": (
+                f"`{provider}` is already running `{busy.step or 'request'}`. "
+                f"Wait for it to finish or stop it before starting another `{provider}` request."
+            ),
+            "runId": busy.id,
+            **preview,
+        }
 
     # Keep 03_CLAUDE_PROMPT.md current whenever a Claude implementation runs.
     if step == "claude_implement":
@@ -375,6 +478,11 @@ async def run_step(
             workspace, task_id, "provider_missing",
             f"`{provider}` is not installed — prompt ({len(prompt):,} chars) saved to logs/{saved.name}",
             step=step, provider=provider,
+        )
+        state_store.append_event(
+            workspace, "run.finished", f"`{provider}` not installed — step skipped",
+            task_id=task_id, step=step, provider=provider,
+            data={"status": "provider_missing", "failureKind": "provider_missing"},
         )
         routing_service.append_decision(
             workspace, task_id,
@@ -420,6 +528,8 @@ async def run_step(
     pre_code = await _changed_code_paths(workspace)
 
     async def on_complete(record: RunRecord) -> None:
+        record.prompt_file = prompt_file.name
+        record.failure_kind = _classify_run_failure(record)
         post_files = _snapshot_task_files(workspace, task_id)
         artifacts = sorted(
             name
@@ -465,17 +575,51 @@ async def run_step(
             status="info" if record.status == "succeeded" else "warn",
             output=(record.stdout + "\n" + record.stderr)[-3000:],
         )
+        # Durable run ledger + finish event survive restart; in-memory records do not.
+        state_store.persist_run(workspace, record.to_ledger(workspace))
+        state_store.append_event(
+            workspace, "run.finished",
+            f"{provider} {record.status} (exit {record.exit_code}, {(record.duration_ms or 0) / 1000:.1f}s)",
+            task_id=task_id, step=step, provider=provider,
+            data={"runId": record.id, "status": record.status, "failureKind": record.failure_kind},
+        )
+
+    busy = RUNNER.running_for_provider(provider)
+    if busy is not None:
+        return {
+            "status": "provider_busy",
+            "message": (
+                f"`{provider}` is already running `{busy.step or 'request'}`. "
+                f"Wait for it to finish or stop it before starting another `{provider}` request."
+            ),
+            "runId": busy.id,
+            **preview,
+        }
 
     record, consume_task = await RUNNER.start(
         argv, workspace,
         task_id=task_id, step=step, provider=provider,
         log_file=str(log_file), on_complete=on_complete,
     )
+    record.prompt_file = prompt_file.name
     if record.status == "error":
+        record.failure_kind = "start_error"
         _set_step_state(workspace, task_id, step, status="error", provider=provider)
+        state_store.persist_run(workspace, record.to_ledger(workspace))
+        state_store.append_event(
+            workspace, "run.finished", f"failed to start `{provider}`",
+            task_id=task_id, step=step, provider=provider,
+            data={"runId": record.id, "status": "error", "failureKind": "start_error"},
+        )
         return {"status": "error", "message": record.stderr[:500], **preview}
 
     _set_step_state(workspace, task_id, step, status="running", runId=record.id, provider=provider)
+    # Persist the running run immediately so a restart before completion can recover it.
+    state_store.persist_run(workspace, record.to_ledger(workspace))
+    state_store.append_event(
+        workspace, "run.started", f"{provider} started {STEP_DEFS[step]['label']}",
+        task_id=task_id, step=step, provider=provider, data={"runId": record.id, "pid": record.pid},
+    )
     reads = ", ".join(r.replace("@diff", "git diff").replace("@folder", "task folder") for r in STEP_IO[step]["reads"])
     _add_event(
         workspace, task_id, "step_started",

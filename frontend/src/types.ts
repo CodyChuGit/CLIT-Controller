@@ -183,6 +183,7 @@ export interface RunInfo {
   stdout: string;
   stderr: string;
   logFile: string | null;
+  failureKind?: string | null;
 }
 
 export interface Recommendation {
@@ -336,6 +337,60 @@ export interface QueueItem {
   finishedAt?: string;
   note: string | null;
   runId: string | null;
+  attempt?: number;
+  providerOverride?: string | null;
+}
+
+export interface AgentflowEvent {
+  id: number;
+  time: string;
+  type: string;
+  taskId: string | null;
+  step: string | null;
+  provider: string | null;
+  detail: string;
+  data: Record<string, unknown>;
+}
+
+export interface EventsResponse {
+  events: AgentflowEvent[];
+  cursor: number;
+}
+
+export interface RunRecord {
+  id: string;
+  workspacePath: string;
+  commandPreview: string;
+  cwd: string;
+  provider: string | null;
+  taskId: string | null;
+  step: string | null;
+  status: string;
+  pid: number | null;
+  startedAt: string;
+  endedAt: string | null;
+  durationMs: number | null;
+  exitCode: number | null;
+  promptFile: string | null;
+  logFile: string | null;
+  stdoutTail: string;
+  stderrTail: string;
+  outputTruncated: boolean;
+  failureKind: string | null;
+}
+
+export interface Approval {
+  id: string;
+  action: string;
+  kind: string;
+  source: string;
+  provider: string | null;
+  taskId: string | null;
+  reason: string;
+  status: string; // pending | approved | rejected
+  createdAt: string;
+  resolvedAt: string | null;
+  resolver: string | null;
 }
 
 export interface PreviewState {

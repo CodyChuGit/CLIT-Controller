@@ -40,7 +40,35 @@ class RunRecord:
     stderr_parts: list[str] = field(default_factory=list)
     truncated: bool = False
     log_file: Optional[str] = None
+    pid: Optional[int] = None           # OS pid, for restart liveness checks
+    prompt_file: Optional[str] = None   # durable prompt artifact, for the run ledger
+    failure_kind: Optional[str] = None  # set on terminal non-success (see state_store)
     _start_monotonic: float = field(default_factory=time.monotonic)
+
+    def to_ledger(self, workspace: "Path", tail: int = 4000) -> dict:
+        """Durable, recovery-oriented projection (see docs 02 §Run). Output is tailed
+        and redacted; full output stays in the per-run log file."""
+        return {
+            "id": self.id,
+            "workspacePath": str(workspace),
+            "commandPreview": self.command_preview(),
+            "cwd": self.cwd,
+            "provider": self.provider,
+            "taskId": self.task_id,
+            "step": self.step,
+            "status": self.status,
+            "pid": self.pid,
+            "startedAt": self.started_at,
+            "endedAt": self.ended_at,
+            "durationMs": self.duration_ms,
+            "exitCode": self.exit_code,
+            "promptFile": self.prompt_file,
+            "logFile": self.log_file,
+            "stdoutTail": redact(self.stdout)[-tail:],
+            "stderrTail": redact(self.stderr)[-tail:],
+            "outputTruncated": self.truncated,
+            "failureKind": self.failure_kind,
+        }
 
     @property
     def stdout(self) -> str:
@@ -157,11 +185,16 @@ class ProcessRunner:
                 parts.append("\n[output truncated by AgentFlow]\n")
                 record.truncated = True
 
+    # Generic terminal-status -> failure-kind map. The orchestration layer may refine
+    # this (e.g. provider_missing, policy_denied) before persisting to the run ledger.
+    _FAILURE_KIND = {"failed": "exit_nonzero", "cancelled": "cancelled", "error": "start_error"}
+
     def _finalize(self, record: RunRecord, status: str, exit_code: Optional[int]) -> None:
         record.status = status
         record.exit_code = exit_code
         record.ended_at = now_iso()
         record.duration_ms = int((time.monotonic() - record._start_monotonic) * 1000)
+        record.failure_kind = self._FAILURE_KIND.get(status)
         self.procs.pop(record.id, None)
         if record.log_file:
             self._write_log_file(record)
@@ -246,6 +279,7 @@ class ProcessRunner:
             return record, asyncio.create_task(_noop())
 
         self.procs[record.id] = proc
+        record.pid = proc.pid
 
         async def _consume() -> None:
             assert proc.stdout is not None and proc.stderr is not None
@@ -277,6 +311,7 @@ class ProcessRunner:
         if record is None or proc is None or proc.returncode is not None:
             return False
         record.status = "cancelled"
+        record.failure_kind = "cancelled"
         record.ended_at = now_iso()
         record.duration_ms = int((time.monotonic() - record._start_monotonic) * 1000)
         try:
@@ -306,6 +341,12 @@ class ProcessRunner:
 
     def running_runs(self) -> list[RunRecord]:
         return [r for r in self.runs.values() if r.status == "running"]
+
+    def running_for_provider(self, provider: str) -> Optional[RunRecord]:
+        for record in self.running_runs():
+            if record.provider == provider:
+                return record
+        return None
 
     def runs_for_task(self, task_id: str) -> list[RunRecord]:
         runs = [r for r in self.runs.values() if r.task_id == task_id]

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from .. import config, git_service, paths, workspace as workspace_service
+from .. import config, git_service, paths, state_store, workspace as workspace_service
 from ..models import GitCommitRequest, GitPathRequest, SettingsUpdateRequest, WorkspaceRequest
 from ..process_runner import add_log_entry
 
@@ -42,6 +42,11 @@ def set_workspace(body: WorkspaceRequest):
     except FileNotFoundError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     add_log_entry("system", f"workspace set to {cfg['workspacePath']}")
+    # Heal any state left running by a previous session for this workspace.
+    try:
+        state_store.recover_workspace(Path(cfg["workspacePath"]))
+    except Exception as exc:  # noqa: BLE001 — recovery must not block workspace selection
+        add_log_entry("system", f"recovery on workspace select failed: {exc}", status="error")
     return {"ok": True, "workspacePath": cfg["workspacePath"], "routing": cfg["routing"]}
 
 

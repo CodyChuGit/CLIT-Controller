@@ -373,10 +373,14 @@ function QueueStrip({
   queue,
   onApprove,
   onRemove,
+  onRetry,
+  onSkip,
 }: {
   queue: QueueState;
   onApprove: (id: string) => void;
   onRemove: (id: string) => void;
+  onRetry: (id: string) => void;
+  onSkip: (id: string) => void;
 }) {
   const items = queue.items.filter((i) => QUEUE_ACTIVE.includes(i.status) || i.status === "failed");
   if (items.length === 0) return null;
@@ -401,9 +405,14 @@ function QueueStrip({
               Approve
             </button>
           )}
-          {item.status === "failed" && (
-            <button className="btn-secondary btn-xs" onClick={() => onApprove(item.id)}>
+          {(item.status === "failed" || item.status === "blocked" || item.status === "cancelled") && (
+            <button className="btn-secondary btn-xs" onClick={() => onRetry(item.id)}>
               Retry
+            </button>
+          )}
+          {item.status !== "running" && item.status !== "skipped" && item.status !== "done" && (
+            <button className="btn-secondary btn-xs" onClick={() => onSkip(item.id)}>
+              Skip
             </button>
           )}
           {item.status !== "running" && (
@@ -560,6 +569,18 @@ export default function TasksPage() {
 
   const removeItem = async (id: string) => setQueue(await api.queueRemove(id));
 
+  const retryItem = async (id: string) => {
+    const res = await api.queueRetry(id);
+    if (res.status !== "ok") setNotice(res.message ?? res.status);
+    setQueue(res);
+  };
+
+  const skipItem = async (id: string) => {
+    const res = await api.queueSkip(id);
+    if (res.status !== "ok") setNotice(res.message ?? res.status);
+    setQueue(res);
+  };
+
   const openFile = async (name: string) => {
     if (!selectedId) return;
     try {
@@ -640,7 +661,15 @@ export default function TasksPage() {
               }
             />
 
-            {queue && <QueueStrip queue={queue} onApprove={(id) => void approveItem(id)} onRemove={(id) => void removeItem(id)} />}
+            {queue && (
+              <QueueStrip
+                queue={queue}
+                onApprove={(id) => void approveItem(id)}
+                onRemove={(id) => void removeItem(id)}
+                onRetry={(id) => void retryItem(id)}
+                onSkip={(id) => void skipItem(id)}
+              />
+            )}
 
             {/* One conversation per pipeline step: what was sent, what came back. */}
             <div className="grid gap-3 md:grid-cols-2">

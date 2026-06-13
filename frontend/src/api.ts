@@ -1,7 +1,9 @@
 import type {
+  Approval,
   ChatSendResult,
   ChatState,
   CurrentProject,
+  EventsResponse,
   Exchange,
   FileContent,
   FileDiff,
@@ -13,6 +15,7 @@ import type {
   LogsResponse,
   PreviewState,
   QueueState,
+  RunRecord,
   OrchestrationMode,
   Provider,
   Recommendation,
@@ -127,6 +130,20 @@ export const api = {
     post<{ status: string; message?: string; queue: QueueState }>("/queue/approve", { itemId }),
   queueRemove: (itemId: string) => post<QueueState>("/queue/remove", { itemId }),
   queueClear: () => post<QueueState>("/queue/clear"),
+  queueRetry: (itemId: string) =>
+    post<{ status: string; message?: string } & QueueState>("/queue/retry", { itemId }),
+  queueSkip: (itemId: string) =>
+    post<{ status: string; message?: string } & QueueState>("/queue/skip", { itemId }),
+  queueReroute: (itemId: string, provider: string) =>
+    post<{ status: string; message?: string } & QueueState>("/queue/reroute", { itemId, provider }),
+
+  // durable state (events ledger, run ledger, approvals)
+  events: (cursor = 0) => get<EventsResponse>(`/events?cursor=${cursor}`),
+  run: (id: string) => get<RunRecord>(`/runs/${id}`),
+  approvals: (pendingOnly = false) =>
+    get<{ approvals: Approval[] }>(`/approvals?pendingOnly=${pendingOnly}`),
+  approvalApprove: (id: string) => post<{ status: string; approval: Approval }>(`/approvals/${id}/approve`),
+  approvalReject: (id: string) => post<{ status: string; approval: Approval }>(`/approvals/${id}/reject`),
 
   // preview
   preview: () => get<PreviewState>("/preview"),

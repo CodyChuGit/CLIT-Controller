@@ -371,16 +371,24 @@ function SystemNotice({ msg }: { msg: ChatMessage }) {
   );
 }
 
-function Bubble({ msg }: { msg: ChatMessage }) {
-  if (msg.role === "system") return <SystemNotice msg={msg} />;
+function Bubble({ msg, direct = false }: { msg: ChatMessage; direct?: boolean }) {
+  // In a direct chat every turn is the provider's own line, so even a failed run
+  // belongs in its bubble — attributed, same shape as a reply — not the
+  // orchestrator's system-notice strip (which is what the ORCH channel uses).
+  if (msg.role === "system" && !direct) return <SystemNotice msg={msg} />;
   const mine = msg.role === "user";
+  const failed = msg.role === "system";
   return (
     <div className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
       {!mine && msg.provider && (
         <span className="mb-0.5 flex items-center gap-1.5 px-1 text-[10px] text-neutral-400">
           <ProviderMark id={msg.provider} className="h-3 w-3" />
           <span className="font-mono">{msg.provider}</span>
-          {msg.durationMs !== undefined && <span className="tabular-nums">{(msg.durationMs / 1000).toFixed(1)}s</span>}
+          {failed ? (
+            <span className="text-rose-500">failed</span>
+          ) : (
+            msg.durationMs !== undefined && <span className="tabular-nums">{(msg.durationMs / 1000).toFixed(1)}s</span>
+          )}
         </span>
       )}
       <div
@@ -812,7 +820,7 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
             />
           )
         ) : (
-          messages.map((m, i) => <Bubble key={`${m.time}-${i}`} msg={m} />)
+          messages.map((m, i) => <Bubble key={`${m.time}-${i}`} msg={m} direct={!isOrch} />)
         )}
 
         {isOrch && <AgentActivity queue={queue} running={running} />}

@@ -20,6 +20,11 @@ class QueueItemRequest(BaseModel):
     itemId: str
 
 
+class QueueRerouteRequest(BaseModel):
+    itemId: str
+    provider: str
+
+
 @router.get("")
 def get_queue():
     return queue_service.queue_state(require_workspace())
@@ -50,3 +55,18 @@ def remove(body: QueueItemRequest):
 @router.post("/clear")
 def clear():
     return queue_service.clear_queue(require_workspace())
+
+
+@router.post("/retry")
+def retry(body: QueueItemRequest):
+    return queue_service.retry_item(require_workspace(), body.itemId)
+
+
+@router.post("/skip")
+def skip(body: QueueItemRequest):
+    return queue_service.skip_item(require_workspace(), body.itemId)
+
+
+@router.post("/reroute")
+def reroute(body: QueueRerouteRequest):
+    return queue_service.reroute_item(require_workspace(), body.itemId, body.provider)

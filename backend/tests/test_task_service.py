@@ -1,7 +1,9 @@
+import asyncio
 from pathlib import Path
 
 from agentflow import config, task_service
 from agentflow.prompt_templates import TASK_FILES
+from agentflow.process_runner import RunRecord
 
 
 def make_workspace(tmp_path: Path) -> Path:
@@ -54,6 +56,18 @@ def test_task_listing_and_detail(tmp_path):
     assert detail["task"]["id"] == meta["id"]
     assert len(detail["files"]) == len(TASK_FILES)
     assert set(detail["stepPreviews"]) == set(task_service.STEP_DEFS)
+
+
+def test_run_step_rejects_busy_provider(tmp_path, monkeypatch):
+    ws = make_workspace(tmp_path)
+    meta = task_service.create_task(ws, "A task", "Do the thing.")
+    record = RunRecord(id="busy-codex", argv=["codex"], cwd=str(ws), provider="codex", step="chat")
+    monkeypatch.setattr(task_service.RUNNER, "runs", {record.id: record})
+
+    result = asyncio.run(task_service.run_step(ws, meta["id"], "codex_spec"))
+
+    assert result["status"] == "provider_busy"
+    assert result["runId"] == "busy-codex"
 
 
 def test_step_exchanges_rebuilt_from_log_files(tmp_path):

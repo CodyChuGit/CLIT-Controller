@@ -11,7 +11,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from . import config, paths, task_service, usage_service
+from . import config, paths, provider_probe, state_store, task_service, transitions, usage_service
 from .config import read_json, write_json
 from .process_runner import RUNNER, add_log_entry, now_iso
 
@@ -92,6 +92,8 @@ def add_steps(workspace: Path, task_id: str, steps: list[str], source: str = "or
             "enqueuedAt": now_iso(),
             "note": None,
             "runId": None,
+            "attempt": 1,
+            "providerOverride": None,
         }
         data["items"].append(item)
         added.append(item)
@@ -103,6 +105,12 @@ def add_steps(workspace: Path, task_id: str, steps: list[str], source: str = "or
             workspace, task_id, "queued",
             f"{source} queued {len(added)} step(s): {labels} — the system will cue each agent in order",
         )
+        for i in added:
+            state_store.append_event(
+                workspace, "queue.enqueued", f"queued {i['label']} → {i['provider']}",
+                task_id=task_id, step=i["step"], provider=i["provider"],
+                data={"itemId": i["id"], "source": source},
+            )
         add_log_entry("queue", f"queued {len(added)} step(s) for {task_id}: {labels}", task_id=task_id)
     return queue_state(workspace)
 
@@ -126,10 +134,48 @@ def _set_item(workspace: Path, item_id: str, **fields) -> Optional[dict]:
     data = load_queue(workspace)
     for item in data["items"]:
         if item["id"] == item_id:
+            _apply_status(workspace, item, fields)
             item.update(fields)
             _save(workspace, data)
             return item
     return None
+
+
+_QUEUE_EVENT_TYPE = {
+    "running": "queue.dispatched",
+    "awaiting_approval": "queue.approval_required",
+    "blocked": "queue.blocked",
+    "done": "queue.done",
+    "failed": "queue.failed",
+    "skipped": "queue.skipped",
+    "cancelled": "queue.cancelled",
+    "queued": "queue.enqueued",
+}
+
+
+def _apply_status(workspace: Path, item: dict, fields: dict) -> None:
+    """Validate + record a queue item's status change (mutates nothing but emits).
+
+    Call right before applying ``fields`` to ``item``. A no-op or a non-status update is
+    ignored; an illegal known→known transition is logged but still allowed (so we never
+    wedge the queue), and every real change appends a durable ``queue.*`` event.
+    """
+    to = fields.get("status")
+    frm = item.get("status")
+    if to is None or to == frm:
+        return
+    if not transitions.is_valid("queue", frm, to):
+        add_log_entry(
+            "queue", f"invalid queue transition {frm}→{to} for {item.get('id')}",
+            task_id=item.get("taskId"), step=item.get("step"), status="error",
+        )
+    state_store.append_event(
+        workspace, _QUEUE_EVENT_TYPE.get(to, "queue.status_changed"),
+        f"{item.get('label', item.get('step'))} → {to}"
+        + (f": {fields.get('note')}" if fields.get("note") else ""),
+        task_id=item.get("taskId"), step=item.get("step"), provider=item.get("provider"),
+        data={"itemId": item.get("id"), "from": frm, "to": to},
+    )
 
 
 # ------------------------------------------------------------- the dispatcher
@@ -164,16 +210,20 @@ def _finalize_running(workspace: Path) -> None:
             continue
         record = RUNNER.runs.get(item.get("runId") or "")
         if record is None:
-            item.update(status="failed", note="run record lost (backend restarted)", finishedAt=now_iso())
+            fields = {"status": "failed", "note": "run record lost (backend restarted)", "finishedAt": now_iso()}
+            _apply_status(workspace, item, fields)
+            item.update(fields)
             failed_tasks.add(item["taskId"])
             changed = True
         elif record.status != "running":
             ok = record.status == "succeeded"
-            item.update(
-                status="done" if ok else ("cancelled" if record.status == "cancelled" else "failed"),
-                note=None if ok else f"{record.status} (exit {record.exit_code})",
-                finishedAt=now_iso(),
-            )
+            fields = {
+                "status": "done" if ok else ("cancelled" if record.status == "cancelled" else "failed"),
+                "note": None if ok else f"{record.status} (exit {record.exit_code})",
+                "finishedAt": now_iso(),
+            }
+            _apply_status(workspace, item, fields)
+            item.update(fields)
             if not ok:
                 failed_tasks.add(item["taskId"])
             changed = True
@@ -188,7 +238,9 @@ def _finalize_running(workspace: Path) -> None:
     if failed_tasks:
         for item in data["items"]:
             if item["status"] == "queued" and item["taskId"] in failed_tasks:
-                item.update(status="blocked", note="an earlier step in this task did not succeed")
+                fields = {"status": "blocked", "note": "an earlier step in this task did not succeed"}
+                _apply_status(workspace, item, fields)
+                item.update(fields)
                 changed = True
         for tid in failed_tasks:
             try:
@@ -235,16 +287,18 @@ def _pick_candidate(workspace: Path, manual_mode: bool) -> Optional[str]:
         try:
             meta = task_service._load_meta(workspace, item["taskId"])
         except FileNotFoundError:
-            item["status"] = "failed"
-            item["note"] = "task no longer exists"
+            fields = {"status": "failed", "note": "task no longer exists"}
+            _apply_status(workspace, item, fields)
+            item.update(fields)
             _save(workspace, data)
             return None
         if meta.get("fullSequence", {}).get("status") == "running":
             waiting_tasks.add(item["taskId"])
             continue
         if manual_mode:
-            item["status"] = "awaiting_approval"
-            item["note"] = "Manual Approval mode — approve to run"
+            fields = {"status": "awaiting_approval", "note": "Manual Approval mode — approve to run"}
+            _apply_status(workspace, item, fields)
+            item.update(fields)
             _save(workspace, data)
             return None
         return item["id"]
@@ -260,7 +314,10 @@ async def dispatch_item(workspace: Path, item_id: str, confirm: bool = False, so
     if item["status"] == "running":
         return {"status": "already_running"}
 
-    result = await task_service.run_step(workspace, item["taskId"], item["step"], confirm=confirm, source=source)
+    result = await task_service.run_step(
+        workspace, item["taskId"], item["step"], confirm=confirm, source=source,
+        provider_override=item.get("providerOverride"),
+    )
 
     if result["status"] == "started":
         _set_item(workspace, item_id, status="running", runId=result["runId"], note=None, startedAt=now_iso())
@@ -285,6 +342,87 @@ async def approve_item(workspace: Path, item_id: str) -> dict:
     if provider in {r.provider for r in RUNNER.running_runs() if r.provider}:
         return {"status": "provider_busy", "message": f"`{provider}` is already running — try again when it finishes."}
     return await dispatch_item(workspace, item_id, confirm=True, source="manual")
+
+
+def _unblock_task(workspace: Path, data: dict, task_id: str, *, exclude: Optional[str] = None) -> None:
+    """Flip a task's blocked items back to queued so the pipeline can resume in order.
+    Intra-task order is still enforced by the dispatcher, so this is safe."""
+    for item in data["items"]:
+        if item["taskId"] == task_id and item["status"] == "blocked" and item["id"] != exclude:
+            fields = {"status": "queued", "note": None}
+            _apply_status(workspace, item, fields)
+            item.update(fields)
+
+
+def _find_item(data: dict, item_id: str) -> Optional[dict]:
+    return next((i for i in data["items"] if i["id"] == item_id), None)
+
+
+def retry_item(workspace: Path, item_id: str) -> dict:
+    """Re-enqueue a failed/blocked/skipped/cancelled item (incrementing its attempt)."""
+    data = load_queue(workspace)
+    item = _find_item(data, item_id)
+    if item is None:
+        return {"status": "not_found", **queue_state(workspace)}
+    if item["status"] not in ("failed", "blocked", "skipped", "cancelled"):
+        return {"status": "not_retryable", "message": f"cannot retry a {item['status']} item", **queue_state(workspace)}
+    fields = {
+        "status": "queued",
+        "note": "retry requested",
+        "attempt": int(item.get("attempt", 1)) + 1,
+        "runId": None,
+        "finishedAt": None,
+    }
+    _apply_status(workspace, item, fields)
+    item.update(fields)
+    _unblock_task(workspace, data, item["taskId"], exclude=item_id)
+    _save(workspace, data)
+    add_log_entry("queue", f"retry {item['label']} ({item['provider']})", task_id=item["taskId"], step=item["step"])
+    return {"status": "ok", **queue_state(workspace)}
+
+
+def skip_item(workspace: Path, item_id: str) -> dict:
+    """Intentionally skip an item and let the task's later steps proceed."""
+    data = load_queue(workspace)
+    item = _find_item(data, item_id)
+    if item is None:
+        return {"status": "not_found", **queue_state(workspace)}
+    if item["status"] == "running":
+        return {"status": "running", "message": "cannot skip a running item", **queue_state(workspace)}
+    fields = {"status": "skipped", "note": "skipped by user", "finishedAt": now_iso()}
+    _apply_status(workspace, item, fields)
+    item.update(fields)
+    _unblock_task(workspace, data, item["taskId"], exclude=item_id)
+    _save(workspace, data)
+    add_log_entry("queue", f"skipped {item['label']} ({item['provider']})", task_id=item["taskId"], step=item["step"])
+    return {"status": "ok", **queue_state(workspace)}
+
+
+def reroute_item(workspace: Path, item_id: str, provider: str) -> dict:
+    """Re-enqueue an item to run on a different provider than the routing default."""
+    if provider not in provider_probe.AGENT_PROVIDER_IDS:
+        return {"status": "bad_provider", "message": f"unknown provider `{provider}`", **queue_state(workspace)}
+    data = load_queue(workspace)
+    item = _find_item(data, item_id)
+    if item is None:
+        return {"status": "not_found", **queue_state(workspace)}
+    if item["status"] == "running":
+        return {"status": "running", "message": "cannot reroute a running item", **queue_state(workspace)}
+    fields = {
+        "status": "queued",
+        "provider": provider,
+        "providerOverride": provider,
+        "note": f"rerouted to {provider}",
+        "attempt": int(item.get("attempt", 1)) + 1,
+        "runId": None,
+        "finishedAt": None,
+    }
+    _apply_status(workspace, item, fields)
+    item.update(fields)
+    _unblock_task(workspace, data, item["taskId"], exclude=item_id)
+    _save(workspace, data)
+    add_log_entry("queue", f"rerouted {item['label']} → {provider}", task_id=item["taskId"], step=item["step"])
+    return {"status": "ok", **queue_state(workspace)}
 
 
 async def _process_consults(workspace: Path, manual: bool) -> None:

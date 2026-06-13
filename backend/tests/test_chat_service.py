@@ -4,6 +4,7 @@ from pathlib import Path
 
 from agentflow import chat_service, config
 from agentflow.prompt_templates import orchestrator_chat_prompt
+from agentflow.process_runner import RunRecord
 from agentflow.usage_service import DEFAULT_USAGE
 
 
@@ -76,6 +77,30 @@ def test_direct_send_rejects_unknown_provider(tmp_path):
     ws = make_workspace(tmp_path)
     result = asyncio.run(chat_service.send_direct(ws, "shell", "rm everything"))
     assert result["status"] == "error"
+
+
+def test_orchestrator_send_rejects_busy_provider(tmp_path, monkeypatch):
+    ws = make_workspace(tmp_path)
+    record = RunRecord(id="busy-codex", argv=["codex"], cwd=str(ws), provider="codex", step="chat")
+    monkeypatch.setattr(chat_service.RUNNER, "runs", {record.id: record})
+
+    result = asyncio.run(chat_service.send(ws, "plan this", provider="codex"))
+
+    assert result["status"] == "provider_busy"
+    assert result["runId"] == "busy-codex"
+    assert chat_service.load_chat(ws)["messages"] == []
+
+
+def test_direct_send_rejects_busy_provider(tmp_path, monkeypatch):
+    ws = make_workspace(tmp_path)
+    record = RunRecord(id="busy-codex", argv=["codex"], cwd=str(ws), provider="codex", step="orchestrate")
+    monkeypatch.setattr(chat_service.RUNNER, "runs", {record.id: record})
+
+    result = asyncio.run(chat_service.send_direct(ws, "codex", "hello"))
+
+    assert result["status"] == "provider_busy"
+    assert result["runId"] == "busy-codex"
+    assert chat_service.chat_state(ws)["channels"]["codex"] == []
 
 
 def test_direct_chat_prompt_has_no_directives():

@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import re
 import shlex
-import shutil
 from pathlib import Path
 from typing import Optional
 
-from . import config, git_service, paths, prompt_templates, queue_service, task_service, usage_service
+from . import config, git_service, paths, policy_service, prompt_templates, queue_service, state_store, task_service, usage_service
 from .process_runner import RUNNER, RunRecord, add_log_entry, now_iso
 from .provider_probe import AGENT_PROVIDER_IDS, resolve_executable
 from .redaction import redact
@@ -50,46 +49,61 @@ def parse_run_directives(text: str) -> list[str]:
 
 
 def command_denied(command: str, workspace: Optional[Path] = None) -> Optional[str]:
-    """Direct execution is exec-only, workspace-confined, and refuses the dangerous."""
-    try:
-        tokens = shlex.split(command)
-    except ValueError:
-        return "unparseable quoting"
-    if not tokens:
-        return "empty command"
-    if tokens[0] in ("sudo", "su", "sh", "bash", "zsh", "shutdown", "reboot", "halt", "mkfs", "dd"):
-        return f"`{tokens[0]}` is not allowed for direct execution"
-    if tokens[0] == "rm" and any(t.startswith("-") and "r" in t and "f" in t for t in tokens) and any(
-        t == "/" or t.startswith("/ ") for t in tokens
-    ):
-        return "refusing recursive force-delete on /"
-    if any(ch in command for ch in ("|", ">", "<", ";", "&&", "`", "$(")):
-        return "shell operators are not supported — one plain command only"
-    # Agents stay inside the workspace: no traversal, no absolute paths outside it.
-    if workspace is not None:
-        ws = str(workspace.resolve())
-        for t in tokens[1:]:
-            arg = t.split("=", 1)[1] if t.startswith("-") and "=" in t else t
-            if ".." in arg.split("/"):
-                return "path traversal (`..`) is not allowed"
-            if arg.startswith(("/", "~")) and not str(Path(arg).expanduser().resolve()).startswith(ws):
-                return f"`{arg}` is outside the workspace"
-    return None
+    """Direct execution is exec-only, workspace-confined, and refuses the dangerous.
+
+    Thin wrapper over the policy service: returns a reason only for hard denials.
+    Commands that merely ``require_approval`` (git push, npm install, …) return None —
+    they are gated by the approval flow in ``execute_run_directive``, not denied here.
+    """
+    return policy_service.deny_reason(command, workspace)
 
 
 async def execute_run_directive(
-    workspace: Path, command: str, provider: str, task_id: Optional[str] = None
+    workspace: Path, command: str, provider: str, task_id: Optional[str] = None, approved: bool = False
 ) -> None:
-    """The orchestrator runs simple operational commands directly — no task, no roles."""
+    """The orchestrator runs simple operational commands directly — no task, no roles.
+
+    ``approved=True`` is the post-approval path: it bypasses the require-approval gate
+    (the user already authorized it) but hard denials still apply."""
     import asyncio
 
-    denied = command_denied(command, workspace)
-    if denied:
-        append_message(workspace, "system", f"Didn't run `{command}` — {denied}.", provider=provider)
+    usage = usage_service.ensure_usage(workspace)
+    mode = usage.get("orchestrationMode", "balanced")
+    policy = policy_service.classify_action(
+        command, workspace, source="orchestrator", provider=provider, task_id=task_id, mode=mode,
+    )
+
+    if policy.denied:
+        state_store.append_event(
+            workspace, "policy.denied", f"denied `{command}` — {policy.reason}",
+            task_id=task_id, provider=provider, data={"command": command, "reason": policy.reason},
+        )
+        append_message(workspace, "system", f"Didn't run `{command}` — {policy.reason}.", provider=provider)
         return
 
-    usage = usage_service.ensure_usage(workspace)
-    if usage.get("orchestrationMode") == "manual_approval":
+    # Risky-but-legitimate actions (installs, git push/pull, deploys) need an explicit,
+    # durable approval rather than running automatically.
+    if policy.decision == policy_service.REQUIRE_APPROVAL and not approved:
+        state_store.create_approval(
+            workspace, action=command, kind="command", source="orchestrator",
+            provider=provider, task_id=task_id, reason=policy.reason,
+        )
+        append_message(
+            workspace, "system",
+            f"Approval needed before `{command}` — {policy.reason}. Approve it to run.",
+            provider=provider,
+        )
+        if task_id:
+            try:
+                task_service._add_event(
+                    workspace, task_id, "approval_required",
+                    f"`{command}` needs approval — {policy.reason}", provider=provider,
+                )
+            except FileNotFoundError:
+                pass
+        return
+
+    if mode == "manual_approval":
         append_message(
             workspace, "system",
             f"Manual Approval mode — run it yourself: `{command}`", provider=provider,
@@ -296,6 +310,19 @@ def pending_state(workspace: Path, channel: str = ORCHESTRATOR_CHANNEL) -> Optio
     return {"runId": run_id, "status": record.status, "outputTail": redact(tail)}
 
 
+def _provider_busy(provider: str) -> Optional[dict]:
+    record = RUNNER.running_for_provider(provider)
+    if record is None:
+        return None
+    step = record.step or "request"
+    return {
+        "status": "provider_busy",
+        "provider": provider,
+        "runId": record.id,
+        "message": f"`{provider}` is already running `{step}`. Wait for it to finish or stop it before starting another `{provider}` request.",
+    }
+
+
 async def _workspace_summary(workspace: Path) -> str:
     git = await git_service.git_info(workspace)
     if git.get("isRepo"):
@@ -339,6 +366,10 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
     routing = config.get_workspace_routing(workspace)
     provider = provider or routing.get("orchestrator", "antigravity")
     usage = usage_service.ensure_usage(workspace)
+
+    busy = _provider_busy(provider)
+    if busy is not None:
+        return busy
 
     if provider == "claude" and usage_service.provider_health(usage, "claude") == "red":
         return {
@@ -444,6 +475,9 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
             if _pending.get(ws_key) == record.id:
                 _pending.pop(ws_key, None)
 
+    busy = _provider_busy(provider)
+    if busy is not None:
+        return busy
     record, _task = await RUNNER.start(argv, workspace, step="chat", provider=provider, on_complete=on_complete)
     if record.status == "error":
         _pending.pop(ws_key, None)
@@ -469,6 +503,9 @@ async def send_direct(workspace: Path, provider: str, message: str) -> dict:
         return {"status": "error", "message": f"`{provider}` is not a chat agent."}
     if pending_state(workspace, provider) is not None:
         return {"status": "busy", "message": f"`{provider}` is still replying. Stop it or wait."}
+    busy = _provider_busy(provider)
+    if busy is not None:
+        return busy
 
     # History snapshot first — the new message goes into the prompt separately.
     transcript = _transcript(workspace, channel=provider)
@@ -544,6 +581,9 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
     provider = routing.get("orchestrator", "antigravity")
     usage = usage_service.ensure_usage(workspace)
     template = config.get_command_templates().get(provider, f"{provider} {{prompt}}")
+    busy = _provider_busy(provider)
+    if busy is not None:
+        return busy
     if resolve_executable(shlex.split(template)[0]) is None:
         task_service._add_event(
             workspace, task_id, "needs_user",
