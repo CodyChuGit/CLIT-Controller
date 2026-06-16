@@ -39,10 +39,10 @@ Missing CLIs are handled gracefully: the step's prompt is saved into the task fo
 ## VS Code-style Agent Surfaces
 
 ![CLITC Files](docs/assets/dark_mode_files.png)
-*The CLITC Workspace view showing the file explorer, active tasks, and execution queue.*
+*The CLIT Controller Workspace view showing the file explorer, active tasks, and execution queue.*
 
 ![CLITC CLI View](docs/assets/dark_mode_CLI.png)
-*The CLITC Agents view for managing installed CLI agents and their configuration.*
+*The CLIT Controller Agents view for managing installed CLI agents and their configuration.*
 
 
 CLITC's preferred UI direction is native VS Code extension feature parity across
