@@ -70,7 +70,7 @@ Creates a Python 3.11+ virtualenv at `.venv`, installs backend deps (FastAPI, Uv
 
 ### Install via a Coding CLI
 
-You can copy and paste the following prompt into your coding CLI (e.g., Claude Code or Antigravity) to have it install and run the app for you:
+You can copy and paste the following prompt into your coding CLI (e.g., Claude Code, Codex or Antigravity) to have it install and run the app for you:
 
 > Clone the repository https://github.com/CodyChuGit/CLIT-Controller.git, navigate into it, run `./scripts/install.sh`, and then start the dev server with `./scripts/dev.sh`.
 
