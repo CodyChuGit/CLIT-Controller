@@ -38,6 +38,11 @@ Missing CLIs are handled gracefully: the step's prompt is saved into the task fo
 
 ## VS Code-style Agent Surfaces
 
+![Terminals View Loaded](docs/assets/terminals_view_loaded.png)
+![Click Terminals Icon](docs/assets/click_terminals_icon.webp)
+![After Clicking Terminals](docs/assets/after_clicking_terminals.png)
+
+
 CLITC's preferred UI direction is native VS Code extension feature parity across
 two surfaces without running VS Code plugins. The right-hand Agent Dock should
 feel like live provider panels for Codex, Claude Code, Antigravity, and the
