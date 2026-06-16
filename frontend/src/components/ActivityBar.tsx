@@ -1,4 +1,4 @@
-import { TopHat } from "./icons";
+import { BeanMark } from "./icons";
 
 export type PageId =
   | "projects"
@@ -119,9 +119,9 @@ export default function ActivityBar({ page, onNavigate }: Props) {
     >
       <div
         className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm"
-        title="AgentFlow Studio (beta)"
+        title="Command Line Interface Terminal Controller (CLIT Controller IDE)"
       >
-        <TopHat className="h-5 w-5" />
+        <BeanMark className="h-5 w-5" />
       </div>
       {MAIN_NAV.map((item) => (
         <RailButton key={item.id} item={item} active={page === item.id} onClick={() => onNavigate(item.id)} />

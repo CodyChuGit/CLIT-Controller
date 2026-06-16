@@ -81,11 +81,11 @@ export default function StatusBar({ backendUp, project, git, usage, queuedCount,
       <span className="flex-1" />
 
       {usage && (
-        <Item onClick={() => onNavigate("usage")} title="Orchestration mode (open Usage)">
+        <Item onClick={() => onNavigate("usage")} title="Traffic control mode (open Usage)">
           {MODE_LABELS[usage.orchestrationMode] ?? usage.orchestrationMode}
         </Item>
       )}
-      <Item>AgentFlow 0.1 beta</Item>
+      <Item>CLIT Controller IDE 0.1 beta</Item>
     </footer>
   );
 }

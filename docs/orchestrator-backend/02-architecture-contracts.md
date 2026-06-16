@@ -1,6 +1,6 @@
 # Architecture Contracts
 
-This document defines the backend shape needed to make orchestration predictable,
+This document defines the backend shape needed to make traffic control predictable,
 durable, and extensible while preserving the current app structure.
 
 ## Component Boundaries
@@ -10,10 +10,10 @@ durable, and extensible while preserving the current app structure.
 | API routes | Request validation, HTTP status mapping, response DTOs | Business rules |
 | Workspace service | Workspace selection, `.agentflow/` layout, safe path resolution | Agent routing |
 | Provider registry | Provider definitions, capabilities, command template rendering | Queue decisions |
-| Orchestrator service | Prompt construction, decision parsing, consult loop | Raw subprocess details |
+| Controller service | Prompt construction, decision parsing, consult loop | Raw subprocess details |
 | Task service | Task metadata, markdown artifacts, task state transitions | Provider installation |
 | Queue service | Queue ordering, dispatch eligibility, approval holds | Prompt generation details |
-| Execution service | Durable run records, process lifecycle, streaming output | Orchestrator policy |
+| Execution service | Durable run records, process lifecycle, streaming output | Controller policy |
 | Policy service | Command classification, approval requirements, denials | Process execution |
 | Usage service | Approximate and live provider usage | Routing implementation details |
 | Event service | Append-only events, subscriptions, projections | Domain-specific decisions |
@@ -43,7 +43,7 @@ Recommended layout:
 ```
 
 `state.db` should hold queue items, run records, events, approvals, provider snapshots,
-and orchestration decisions. `task.json` may remain as a readable task snapshot, but
+and traffic-control decisions. `task.json` may remain as a readable task snapshot, but
 the backend should treat the durable event/run store as authoritative for recovery.
 
 If SQLite is deferred, the same contracts still apply to JSON files:
@@ -236,7 +236,7 @@ Capabilities should include:
 This makes Codex, Claude, Antigravity, Ollama, and future local models pluggable
 without spreading provider conditionals through task and queue code.
 
-## Orchestrator Decision Contract
+## Controller Decision Contract
 
 The current fenced-block directives are workable for beta. Full functionality should
 parse them into a typed decision list before mutating state.
@@ -284,7 +284,7 @@ Inputs:
 - source: user, orchestrator, queue, route, install helper
 - provider
 - task id
-- orchestration mode
+- traffic control mode
 
 Default classifications:
 
@@ -338,7 +338,7 @@ On backend startup:
 1. Load current workspace.
 2. Load durable queue, runs, tasks, and events.
 3. For every run marked `running`, check whether the process still exists.
-4. If the process exists and belongs to AgentFlow, reattach where possible.
+4. If the process exists and belongs to CLITC, reattach where possible.
 5. If the process is gone, mark the run `failed` with `failureKind=backend_restart`
    or reconcile from its log file if a terminal marker exists.
 6. For every queue item marked `running`, map it to the recovered run status.
@@ -347,4 +347,3 @@ On backend startup:
 
 No queue item should remain `running` forever because an in-memory run record was
 lost.
-

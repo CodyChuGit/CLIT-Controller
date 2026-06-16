@@ -35,7 +35,7 @@ def test_handles_none_and_empty():
 
 
 def test_children_do_not_inherit_port(monkeypatch, tmp_path):
-    """Dev servers honor PORT; inheriting AgentFlow's would hijack localhost:8787."""
+    """Dev servers honor PORT; inheriting CLIT Controller IDE's would hijack localhost:8787."""
     import asyncio
 
     from agentflow.process_runner import ProcessRunner

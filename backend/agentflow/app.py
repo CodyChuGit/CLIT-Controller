@@ -53,7 +53,12 @@ async def _lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="AgentFlow Studio", version=__version__, lifespan=_lifespan)
+    app = FastAPI(
+        title="Command Line Interface Terminal Controller",
+        description="Vibe with CLIT Controller",
+        version=__version__,
+        lifespan=_lifespan,
+    )
 
     app.add_middleware(
         CORSMiddleware,
@@ -80,7 +85,13 @@ def create_app() -> FastAPI:
 
     @app.get("/api/health")
     def health() -> dict:
-        return {"ok": True, "app": "AgentFlow Studio", "version": __version__}
+        return {
+            "ok": True,
+            "app": "CLIT Controller IDE",
+            "fullName": "Command Line Interface Terminal Controller",
+            "tagline": "Vibe with CLIT Controller",
+            "version": __version__,
+        }
 
     # Serve the built frontend when it exists (single-port mode on :8787).
     dist = paths.frontend_dist()

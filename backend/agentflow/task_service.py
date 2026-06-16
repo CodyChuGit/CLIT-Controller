@@ -105,7 +105,7 @@ def set_orchestrated(workspace: Path, task_id: str) -> None:
 
 
 def task_state_summary(workspace: Path, task_id: str) -> str:
-    """Compact, truthful state for the orchestrator: what each agent actually did."""
+    """Compact, truthful state for the controller: what each agent actually did."""
     meta = _load_meta(workspace, task_id)
     lines = [f"Task {task_id}: {meta['title']} — goal: {meta.get('goal', '')[:200]}"]
     for step, s in meta.get("steps", {}).items():
@@ -123,7 +123,7 @@ def task_state_summary(workspace: Path, task_id: str) -> str:
 
 
 def _add_event(workspace: Path, task_id: str, type_: str, detail: str, *, step=None, provider=None, extra=None) -> None:
-    """Append to the task's structured handoff log (shown as the orchestration timeline)."""
+    """Append to the task's structured handoff log (shown as the traffic-control timeline)."""
     meta = _load_meta(workspace, task_id)
     events = meta.setdefault("events", [])
     event = {"time": now_iso(), "type": type_, "step": step, "provider": provider, "detail": detail}
@@ -428,7 +428,7 @@ async def run_step(
     source: str = "manual",
     provider_override: Optional[str] = None,
 ) -> dict:
-    """Run one orchestration step as a real subprocess (or explain why not).
+    """Run one traffic-control step as a real subprocess (or explain why not).
 
     ``provider_override`` lets a rerouted queue item run on a different provider than the
     workspace routing default for the step's role.
@@ -623,7 +623,7 @@ async def run_step(
     reads = ", ".join(r.replace("@diff", "git diff").replace("@folder", "task folder") for r in STEP_IO[step]["reads"])
     _add_event(
         workspace, task_id, "step_started",
-        f"orchestrator routed {STEP_DEFS[step]['label']} → {provider} "
+        f"controller routed {STEP_DEFS[step]['label']} → {provider} "
         f"(sent {len(prompt):,} chars; reads: {reads})",
         step=step, provider=provider,
     )

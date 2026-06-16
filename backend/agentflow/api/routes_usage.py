@@ -1,4 +1,4 @@
-"""Usage: orchestration mode, provider health, routing recommendations."""
+"""Usage: traffic control mode, provider health, routing recommendations."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def get_usage():
 @router.post("/mode")
 def set_mode(body: ModeUpdateRequest):
     data = usage_service.set_orchestration_mode(require_workspace(), body.mode)
-    add_log_entry("system", f"orchestration mode set to {body.mode}")
+    add_log_entry("system", f"traffic control mode set to {body.mode}")
     return data
 
 

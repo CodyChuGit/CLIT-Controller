@@ -2,13 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
+html,
+body,
+#root {
+  height: 100%;
+  overscroll-behavior: none;
+}
+
 html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 body {
+  overflow: hidden;
   touch-action: manipulation;
+}
+
+#root {
+  overflow: hidden;
+}
+
+/* The app owns its scroll panes; don't chain to the browser rubber-band edge. */
+.overflow-auto,
+.overflow-y-auto {
+  overscroll-behavior: none;
 }
 
 /* Subtle, mac-like scrollbars */

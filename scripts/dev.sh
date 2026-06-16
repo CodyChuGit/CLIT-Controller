@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AgentFlow Studio — run backend (:8787) and frontend dev server (:5173).
+# Command Line Interface Terminal Controller — run backend (:8787) and frontend dev server (:5173).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -9,7 +9,9 @@ if [ ! -x .venv/bin/python ]; then
 fi
 
 echo ""
-echo "  AgentFlow Studio (beta)"
+echo "  Command Line Interface Terminal Controller"
+echo "  CLIT Controller IDE"
+echo "  Vibe with CLIT Controller"
 echo "  Backend  → http://localhost:8787   (API + built frontend, if present)"
 echo "  Frontend → http://localhost:5173   (dev server, hot reload)"
 echo ""

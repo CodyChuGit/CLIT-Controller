@@ -18,7 +18,7 @@ export default function BudgetModePicker({ value, onChange }: Props) {
     <div
       className="inline-flex overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-800"
       role="radiogroup"
-      aria-label="Orchestration mode"
+      aria-label="Traffic control mode"
     >
       {MODES.map((m) => (
         <button

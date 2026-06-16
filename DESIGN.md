@@ -1,4 +1,4 @@
-# AgentFlow Studio — Design Language
+# CLIT Controller IDE — Design Language
 
 The reference surface is the **Explorer tab**: rigid, rectangular, edge-to-edge panels divided by
 hairline borders. It reads like a serious IDE (VS Code / Zed), not a marketing site. Every new
@@ -14,6 +14,16 @@ surface should look like it belongs next to the Explorer.
   always `font-mono`. Prose stays in the sans stack.
 - **Color is a signal, not decoration.** Neutral surfaces; color only for status, diffs, focus,
   and the single blue accent.
+
+## Naming
+
+- Tagline: **Vibe with CLIT Controller**.
+- Use the full name, **Command Line Interface Terminal Controller**, in first mentions,
+  formal docs, metadata, startup text, and explanatory tooltips.
+- Use **CLIT Controller IDE** in compact UI surfaces such as tab titles, status bars,
+  badges, and narrow panel labels.
+- Use **CLITC** or **CLIT Controller** in repeated body prose once the full product
+  name is already established.
 
 ## Tokens
 
@@ -66,6 +76,59 @@ Edge-to-edge layouts (Explorer, Tasks console) own their scroll areas; centered 
 - **Editor:** tab strip (`h-8`, sunken `bg-surface`, active tab = panel bg + accent top-line
   overlay, FileTypeIcon badges) — the one tab-strip pattern shared with the chat dock;
   breadcrumb row, sticky line-number gutter on sunken bg.
+
+## Agent Dock
+
+The right-hand dock should feel like VS Code agent plugin panels while staying
+native to CLITC. It must use the existing app shell, panel sections, tab strip,
+icon buttons, status badges, markdown renderer, terminal stack, and task views.
+
+- **Dock frame:** resizable right panel with a hairline left border, no outer margin,
+  no floating cards, and the same collapsed icon rail behavior as the current chat
+  dock.
+- **Provider tabs:** `controller`, `codex`, `claude`, and `antigravity` share the
+  editor/chat tab-strip pattern: `h-8`, active accent top-line, provider mark,
+  unread dot, and running pulse.
+- **Command row:** compact input plus icon buttons for send, stop, clear, command
+  palette, provider/model controls, and terminal drawer. Use icons with tooltips;
+  reserve text buttons for destructive or approval actions.
+- **Transcript:** user prompts, agent replies, system notices, command results,
+  failures, task directives, and queue updates render as styled rows. Raw prompts,
+  raw logs, and long outputs live behind expanders.
+- **Terminal drawer:** provider-scoped PTY terminals are docked inside the Agent
+  Dock as a drawer or split pane, using the same xterm.js theme as Terminals.
+- **Approval and diff cards:** use compact bordered panels for approval holds,
+  failed steps, changed files, and queue blockers. Show status, provider, task,
+  command/file path, and primary action without hiding the raw details.
+- **Status/footer:** a 24px dock footer mirrors the global status bar density:
+  workspace, branch, active provider, queue state, provider health, and run count.
+- **Text rules:** provider ids, commands, paths, task ids, model names, and branch
+  names are `font-mono`; prose and summaries stay sans. Do not display raw CLI
+  output as the default reading experience.
+- **Boundary:** never design controls that require real VS Code, `vscode://`
+  deep links, `.vsix` execution, or embedded vendor plugin UI.
+
+## Tasks Tab
+
+The Tasks tab is the durable VS Code-extension parity surface. It should expose
+the same provider capabilities as the Agent Dock, but optimized for review,
+audit, recovery, and continuing work after a run finishes.
+
+- **Task workspace:** split list/detail layout with a dense task queue on the
+  left and a task detail surface on the right. Preserve the existing sticky
+  header and flow-board affordances.
+- **Conversation replay:** prompt/output exchanges render as styled transcript
+  rows with provider marks, step chips, elapsed time, status, and expandable raw
+  prompt/output. Budget context and commands render as summarized cards first.
+- **Artifacts and files:** task markdown, changed files, diffs, logs, approvals,
+  and final reports appear as tabs or panel sections inside the task detail view;
+  raw markdown remains available but is never the default reading experience.
+- **Continuation actions:** retry, skip, reroute, approve, reject, run next step,
+  open log, open task file, copy command, and stop run must be local actions with
+  icon buttons or compact text buttons where approval semantics require clarity.
+- **Parity boundary:** the Tasks tab may mimic VS Code extension history, diff,
+  approval, and session views, but it must not depend on VS Code APIs or copied
+  extension UI.
 
 ## Composition primitives (frontend/src/components/ui.tsx)
 

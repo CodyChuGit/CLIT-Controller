@@ -1,4 +1,4 @@
-"""Filesystem locations used by AgentFlow Studio."""
+"""Filesystem locations used by Command Line Interface Terminal Controller."""
 
 from __future__ import annotations
 

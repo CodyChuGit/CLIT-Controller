@@ -4,7 +4,7 @@ import { Card, PageShell } from "../components/ui";
 import type { RoutingConfig, Settings } from "../types";
 
 const ROLE_LABELS: Record<keyof RoutingConfig, string> = {
-  orchestrator: "Orchestrator",
+  orchestrator: "Controller",
   pm: "PM / Spec / Review",
   engineer: "Engineer",
   qa: "QA",
@@ -110,7 +110,7 @@ export default function SettingsPage() {
       </Card>
 
       <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
-        AgentFlow uses official CLI auth and does not store provider secrets.
+        CLIT Controller uses official CLI auth and does not store provider secrets.
       </p>
     </PageShell>
   );

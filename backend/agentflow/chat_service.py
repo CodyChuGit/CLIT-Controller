@@ -1,4 +1,4 @@
-"""Persistent chat with the orchestration model, executed via the user's own CLI agents."""
+"""Persistent chat with the traffic-control model, executed via the user's own CLI agents."""
 
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ def command_denied(command: str, workspace: Optional[Path] = None) -> Optional[s
 async def execute_run_directive(
     workspace: Path, command: str, provider: str, task_id: Optional[str] = None, approved: bool = False
 ) -> None:
-    """The orchestrator runs simple operational commands directly — no task, no roles.
+    """The controller runs simple operational commands directly — no task, no roles.
 
     ``approved=True`` is the post-approval path: it bypasses the require-approval gate
     (the user already authorized it) but hard denials still apply."""
@@ -137,14 +137,14 @@ async def execute_run_directive(
         try:
             task_service._add_event(
                 workspace, task_id, "run",
-                f"orchestrator ran `{command}` → {record.status}"
+                f"controller ran `{command}` → {record.status}"
                 + (f" (exit {record.exit_code})" if record.exit_code is not None else ""),
                 provider=provider,
             )
         except FileNotFoundError:
             pass
     add_log_entry(
-        "run", f"orchestrator ran: $ {command} → {record.status}",
+        "run", f"controller ran: $ {command} → {record.status}",
         provider="shell", task_id=task_id,
         output=(record.stdout + "\n" + record.stderr)[-2000:],
     )
@@ -253,7 +253,7 @@ def load_chat(workspace: Path) -> dict:
 
 
 def _channel_messages(data: dict, channel: str) -> list:
-    """Orchestrator history lives in `messages`; direct agent chats under `channels`."""
+    """Controller history lives in `messages`; direct agent chats under `channels`."""
     if channel == ORCHESTRATOR_CHANNEL:
         return data["messages"]
     channels = data.setdefault("channels", {})
@@ -331,7 +331,7 @@ async def _workspace_summary(workspace: Path) -> str:
         git_line = "not a git repository"
     tasks = task_service.list_tasks(workspace)[:5]
     task_lines = "".join(f"\n- {t['id']}: {t['title']} ({t['status']})" for t in tasks) or " none yet"
-    # The orchestrator must see what each agent actually did, not just task names.
+    # The controller must see what each agent actually did, not just task names.
     detail = "\n\n".join(
         task_service.task_state_summary(workspace, t["id"]) for t in tasks[:2]
     )
@@ -340,7 +340,7 @@ async def _workspace_summary(workspace: Path) -> str:
         f"Workspace: {workspace} ({git_line})\n"
         f"{queue_service.summary_line(workspace)}\n"
         + (f"{live_line}\n" if live_line else "")
-        + f"Recent AgentFlow tasks:{task_lines}"
+        + f"Recent CLITC tasks:{task_lines}"
         + (f"\n\nCurrent task state (per agent):\n{detail}" if detail else "")
     )
 
@@ -412,22 +412,22 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
             if record.status == "succeeded" and out:
                 append_message(workspace, "assistant", out, provider=provider,
                                durationMs=record.duration_ms)
-                # The orchestrator can create tasks and queue steps via fenced blocks.
+                # The controller can create tasks and queue steps via fenced blocks.
                 directive = parse_task_directive(out)
                 if directive is not None:
                     title, goal, queue_steps = directive
                     try:
                         meta = task_service.create_task(workspace, title, goal, orchestrated=True)
-                        # Auto-start the task. If the orchestrator named no steps,
+                        # Auto-start the task. If the controller named no steps,
                         # default to the planning step so a task the user hands
                         # over always begins running on its own — the closed loop
-                        # then consults the orchestrator for what to do next.
+                        # then consults the controller for what to do next.
                         steps_to_queue = queue_steps or ["codex_spec"]
                         queue_service.add_steps(workspace, meta["id"], steps_to_queue, source="orchestrator")
                         note = f"Created \u201c{title}\u201d · queued {', '.join(steps_to_queue)}"
                         append_message(workspace, "system", note, provider=provider)
                         add_log_entry(
-                            "chat", f"orchestrator created task {meta['id']}: {title}",
+                            "chat", f"controller created task {meta['id']}: {title}",
                             provider=provider, task_id=meta["id"],
                         )
                     except Exception as exc:  # noqa: BLE001 — never break the chat loop
@@ -470,7 +470,7 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
                 )
             add_log_entry(
                 "chat",
-                f"orchestrator chat via {provider}: {record.status} in {(record.duration_ms or 0) / 1000:.1f}s",
+                f"controller chat via {provider}: {record.status} in {(record.duration_ms or 0) / 1000:.1f}s",
                 provider=provider, step="chat",
                 status="info" if record.status == "succeeded" else "warn",
             )
@@ -501,7 +501,7 @@ async def stop(workspace: Path, channel: str = ORCHESTRATOR_CHANNEL) -> dict:
 
 
 async def send_direct(workspace: Path, provider: str, message: str) -> dict:
-    """Direct chat with one agent CLI — no orchestration, no directives, no tasks."""
+    """Direct chat with one agent CLI — no traffic control, no directives, no tasks."""
     if provider not in AGENT_PROVIDER_IDS:
         return {"status": "error", "message": f"`{provider}` is not a chat agent."}
     if pending_state(workspace, provider) is not None:
@@ -569,14 +569,14 @@ async def send_direct(workspace: Path, provider: str, message: str) -> dict:
 
 
 async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, output_tail: str = "") -> dict:
-    """System-initiated orchestrator turn after a step finishes: it sees the results
+    """System-initiated controller turn after a step finishes: it sees the results
     and decides the next action (queue more steps, declare done, or escalate)."""
     meta = task_service._load_meta(workspace, task_id)
     consults = int(meta.get("consults", 0))
     if consults >= MAX_CONSULTS_PER_TASK:
         task_service._add_event(
             workspace, task_id, "needs_user",
-            f"orchestrator consult limit reached ({MAX_CONSULTS_PER_TASK}) — continue manually or via chat",
+            f"controller consult limit reached ({MAX_CONSULTS_PER_TASK}) — continue manually or via chat",
         )
         return {"status": "consult_limit"}
 
@@ -590,7 +590,7 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
     if resolve_executable(shlex.split(template)[0]) is None:
         task_service._add_event(
             workspace, task_id, "needs_user",
-            f"orchestrator consult skipped — `{provider}` is not installed",
+            f"controller consult skipped — `{provider}` is not installed",
         )
         return {"status": "provider_missing"}
 
@@ -611,7 +611,7 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
     task_service._save_meta(workspace, meta)
     task_service._add_event(
         workspace, task_id, "consult",
-        f"system consulted the orchestrator ({provider}): {trigger[:120]}",
+        f"system consulted the controller ({provider}): {trigger[:120]}",
         provider=provider,
     )
 
@@ -628,7 +628,7 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
             if record.status != "succeeded" or not out:
                 task_service._add_event(
                     workspace, task_id, "needs_user",
-                    f"orchestrator consult failed ({record.status}, exit {record.exit_code}) — decide the next step manually",
+                    f"controller consult failed ({record.status}, exit {record.exit_code}) — decide the next step manually",
                     provider=provider,
                 )
                 return
@@ -654,7 +654,7 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
                 queue_service.add_steps(workspace, task_id, steps, source="orchestrator")
                 task_service._add_event(
                     workspace, task_id, "consult",
-                    f"orchestrator decision: queue {', '.join(steps)}" + (f" — {reasoning}" if reasoning else ""),
+                    f"controller decision: queue {', '.join(steps)}" + (f" — {reasoning}" if reasoning else ""),
                     provider=provider,
                 )
                 append_message(
@@ -669,7 +669,7 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
                 task_service._save_meta(workspace, meta2)
                 task_service._add_event(
                     workspace, task_id, "done",
-                    f"orchestrator declared the task complete: {done_reason}",
+                    f"controller declared the task complete: {done_reason}",
                     provider=provider,
                 )
                 append_message(
@@ -680,7 +680,7 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
             elif user_reason is not None:
                 task_service._add_event(
                     workspace, task_id, "needs_user",
-                    f"orchestrator needs your decision: {user_reason}",
+                    f"controller needs your decision: {user_reason}",
                     provider=provider,
                 )
                 append_message(
@@ -691,7 +691,7 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
             elif not commands:
                 task_service._add_event(
                     workspace, task_id, "needs_user",
-                    "orchestrator replied without an actionable block — decide the next step manually"
+                    "controller replied without an actionable block — decide the next step manually"
                     + (f" (it said: {reasoning})" if reasoning else ""),
                     provider=provider,
                 )
@@ -711,7 +711,7 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
     if record.status == "error":
         task_service._add_event(
             workspace, task_id, "needs_user",
-            f"orchestrator consult could not start: {record.stderr.strip()[:200]}",
+            f"controller consult could not start: {record.stderr.strip()[:200]}",
             provider=provider,
         )
         return {"status": "error"}

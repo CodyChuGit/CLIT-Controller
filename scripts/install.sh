@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AgentFlow Studio — one-time setup: Python venv + backend deps + frontend deps.
+# Command Line Interface Terminal Controller — one-time setup: Python venv + backend deps + frontend deps.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

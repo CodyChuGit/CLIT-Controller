@@ -1,7 +1,8 @@
 {
-  "name": "agentflow-studio-frontend",
+  "name": "clit-controller-ide-frontend",
   "private": true,
   "version": "0.1.0",
+  "description": "Vibe with CLIT Controller",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight, Refresh, StopSquare } from "../components/ic
 import { EmptyState } from "../components/ui";
 import type { PreviewState } from "../types";
 
-/** Embedded browser for the workspace's frontend; AgentFlow can run the dev server. */
+/** Embedded browser for the workspace's frontend; CLITC can run the dev server. */
 export default function PreviewPage() {
   const [state, setState] = useState<PreviewState | null>(null);
   const [reachable, setReachable] = useState<boolean | null>(null);

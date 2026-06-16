@@ -41,7 +41,7 @@ DEFAULT_PROVIDER_USAGE = {
         "callsToday": 0,
         "manualBudgetLevel": "high",
         "health": "green",
-        "preferredUse": "orchestration_qa",
+        "preferredUse": "traffic_control_qa",
         "estimatedPromptChars": 0,
         "estimatedOutputChars": 0,
         "lastCommandDuration": 0,
@@ -371,7 +371,7 @@ async def live_usage(force: bool = False) -> dict:
 
 
 def live_summary_line() -> str:
-    """Compact live-quota lines for the orchestrator (reads the cache only)."""
+    """Compact live-quota lines for the controller (reads the cache only)."""
     from datetime import datetime, timezone
 
     data = _live_cache["data"] or {}

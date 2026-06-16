@@ -96,11 +96,12 @@ After fixing, append to 04_CLAUDE_IMPLEMENTATION_SUMMARY.md.
 
 
 def orchestrator_consult_prompt(usage: dict, task_state: str, trigger: str, output_tail: str) -> str:
-    """After a step finishes, the system asks the orchestrator what to do next."""
+    """After a step finishes, the system asks the controller what to do next."""
     tail = f"Output from that step (tail):\n{output_tail}\n\n" if output_tail else ""
     return (
         f"{budget_context_header(usage)}\n\n"
-        "You are the orchestration model for AgentFlow Studio, supervising a task whose step just "
+        "You are the controller model for Command Line Interface Terminal Controller "
+        "(CLIT Controller IDE), supervising a task whose step just "
         "finished. Decide the next action based on what the task ACTUALLY needs — you are not bound "
         "to a fixed pipeline. Skip steps that add no value; pick the agent that fits the work: "
         "codex (specs/plans/reviews), claude (implementation/bug fixing), antigravity (QA/broad checks).\n\n"
@@ -131,16 +132,17 @@ def orchestrator_consult_prompt(usage: dict, task_state: str, trigger: str, outp
 
 
 def orchestrator_chat_prompt(usage: dict, workspace_summary: str, transcript: str, message: str) -> str:
-    """Prompt for the persistent orchestrator chat. Compact by design."""
+    """Prompt for the persistent controller chat. Compact by design."""
     convo = f"Conversation so far:\n{transcript}\n\n" if transcript else ""
     return (
         f"{budget_context_header(usage)}\n\n"
-        "You are the orchestration model for AgentFlow Studio, a local cockpit that routes coding work "
+        "You are the controller model for Command Line Interface Terminal Controller "
+        "(CLIT Controller IDE), a local cockpit that routes coding work "
         "between CLI agents: codex (specs/plans/reviews), claude (implementation/bug fixing), "
         "antigravity (QA/broad checks; successor to the sunset Gemini CLI), plus free local git checks.\n\n"
         f"{workspace_summary}\n\n"
         "Your job: help the user plan work, decide routing, draft task goals, and interpret agent results. "
-        "Be compact and concrete — prefer specific next actions in AgentFlow (create a task, run a step "
+        "Be compact and concrete — prefer specific next actions in CLITC (create a task, run a step "
         "with a given agent, run a local git check) over long prose. Respect the budget context above "
         "when recommending providers.\n\n"
         "FORMAT for a person, not a terminal: lead with a one-sentence summary of what you did or "
@@ -149,7 +151,7 @@ def orchestrator_chat_prompt(usage: dict, workspace_summary: str, transcript: st
         "(codex_spec, claude_implement, gemini_qa, codex_review, claude_fix) — the UI renders them as "
         "colored chips. Keep replies under ~120 words unless the user asks for depth. No headings "
         "larger than ###, no walls of text.\n\n"
-        "You can create AgentFlow tasks AND queue work to the agents — the system executes the queue "
+        "You can create CLITC tasks AND queue work to the agents — the system executes the queue "
         "automatically, cueing one step per agent at a time, in order. Two fenced blocks are available:\n\n"
         "Create a task (optionally queueing its steps immediately):\n"
         "```agentflow-task\n"
@@ -158,7 +160,7 @@ def orchestrator_chat_prompt(usage: dict, workspace_summary: str, transcript: st
         "queue: full\n"
         "```\n"
         "(`queue:` is optional, but DEFAULT to starting a task with `codex_spec` — that is the planning "
-        "step, and codex owns specs and plans. Queue only that first step; AgentFlow reports back after "
+        "step, and codex owns specs and plans. Queue only that first step; CLITC reports back after "
         "it finishes so you decide the next one from the actual spec. Skip straight to `claude_implement` "
         "ONLY for a truly trivial edit (a one-liner, a rename, a copy tweak) that genuinely needs no plan. "
         "`full` queues the whole standard pipeline — use it when you want the fixed sequence.)\n\n"
@@ -184,11 +186,12 @@ def orchestrator_chat_prompt(usage: dict, workspace_summary: str, transcript: st
 
 
 def direct_chat_prompt(provider: str, transcript: str, message: str) -> str:
-    """Direct line to one agent CLI — no orchestration framing, no directives."""
+    """Direct line to one agent CLI — no traffic-control framing, no directives."""
     convo = f"Conversation so far:\n{transcript}\n\n" if transcript else ""
     return (
-        f"You are `{provider}` in a direct chat inside AgentFlow Studio. The user is talking to you "
-        "one-on-one — there is no orchestrator, no task pipeline, and no agentflow-* directive blocks. "
+        f"You are `{provider}` in a direct chat inside Command Line Interface Terminal Controller "
+        "(CLIT Controller IDE). The user is talking to you "
+        "one-on-one — there is no controller, no task pipeline, and no agentflow-* directive blocks. "
         "Your working directory is the user's workspace; stay inside it. You may read files, and edit "
         "them when the user asks you to.\n\n"
         "Reply in compact markdown: lead with the answer, keep it under ~150 words unless the user "

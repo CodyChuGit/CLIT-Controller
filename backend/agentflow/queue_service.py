@@ -1,4 +1,4 @@
-"""Execution queue: the orchestrator enqueues steps, the system cues each agent.
+"""Execution queue: the controller enqueues steps, the system cues each agent.
 
 One step per agent at a time, queue order preserved within a task. Items live in
 <workspace>/.agentflow/queue.json so the queue survives restarts.
@@ -49,7 +49,7 @@ def queue_state(workspace: Path) -> dict:
 
 
 def summary_line(workspace: Path) -> str:
-    """Compact queue summary for the orchestrator's context."""
+    """Compact queue summary for the controller's context."""
     items = load_queue(workspace)["items"]
     active = [i for i in items if i["status"] in ACTIVE_STATUSES]
     if not active:
@@ -182,7 +182,7 @@ def _apply_status(workspace: Path, item: dict, fields: dict) -> None:
 
 
 def _request_consult(data: dict, item: dict, record) -> None:
-    """Ask the orchestrator to review a finished step of an orchestrated task."""
+    """Ask the controller to review a finished step of a traffic-controlled task."""
     if any(c["taskId"] == item["taskId"] for c in data.get("consults", [])):
         return  # one pending consult per task is enough
     tail = ""
@@ -227,7 +227,7 @@ def _finalize_running(workspace: Path) -> None:
             if not ok:
                 failed_tasks.add(item["taskId"])
             changed = True
-            # Closed loop: orchestrated tasks go back to the orchestrator after every step.
+            # Closed loop: traffic-controlled tasks go back to the controller after every step.
             try:
                 meta = task_service._load_meta(workspace, item["taskId"])
                 if meta.get("orchestrated"):
@@ -426,7 +426,7 @@ def reroute_item(workspace: Path, item_id: str, provider: str) -> dict:
 
 
 async def _process_consults(workspace: Path, manual: bool) -> None:
-    """Run at most one pending orchestrator consult, when the orchestrator is free."""
+    """Run at most one pending controller consult, when the controller is free."""
     from . import chat_service  # local import: chat_service ↔ queue_service
 
     data = load_queue(workspace)
@@ -441,17 +441,17 @@ async def _process_consults(workspace: Path, manual: bool) -> None:
             try:
                 task_service._add_event(
                     workspace, c["taskId"], "needs_user",
-                    "orchestrator consult skipped (Manual Approval mode) — queue the next step yourself",
+                    "controller consult skipped (Manual Approval mode) — queue the next step yourself",
                 )
             except FileNotFoundError:
                 pass
         return
     if chat_service.pending_state(workspace) is not None:
-        return  # the user is mid-conversation with the orchestrator — wait
+        return  # the user is mid-conversation with the controller — wait
     routing = config.get_workspace_routing(workspace)
-    orchestrator = routing.get("orchestrator", "antigravity")
+    controller = routing.get("orchestrator", "antigravity")
     busy = {r.provider for r in RUNNER.running_runs() if r.provider}
-    if orchestrator in busy or any(r.step == "orchestrate" for r in RUNNER.running_runs()):
+    if controller in busy or any(r.step == "orchestrate" for r in RUNNER.running_runs()):
         return
     consult = consults.pop(0)
     _save(workspace, data)

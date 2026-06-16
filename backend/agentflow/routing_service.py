@@ -25,7 +25,7 @@ def budget_context_header(usage: dict) -> str:
     mode = usage.get("orchestrationMode", "balanced")
     return (
         "Budget context:\n"
-        f"- Current mode: {MODE_LABELS.get(mode, mode)}\n"
+        f"- Current traffic control mode: {MODE_LABELS.get(mode, mode)}\n"
         f"- Claude usage: {provider_health(usage, 'claude')}\n"
         f"- Antigravity usage: {provider_health(usage, 'antigravity')}\n"
         f"- Codex usage: {provider_health(usage, 'codex')}\n"
@@ -67,7 +67,7 @@ def recommend(usage: dict, task_type: str = "feature", diff_size: int | None = N
         lines.append("Claude is green — standard chain: Codex spec → Claude implement → Antigravity QA → Codex review.")
 
     if antigravity == "green":
-        lines.append("Antigravity is green — prefer Antigravity for orchestration and QA.")
+        lines.append("Antigravity is green — prefer Antigravity for traffic control and QA.")
     elif antigravity == "red":
         warnings.append("Antigravity is RED — route QA to Codex or run local checks only.")
 
@@ -120,7 +120,7 @@ def _decision_block(usage: dict, routing: dict, task_title: str) -> str:
         "## Task\n"
         f"{task_title}\n\n"
         "## Budget Context\n"
-        f"- Mode: {rec['modeLabel']}\n"
+        f"- Traffic control mode: {rec['modeLabel']}\n"
         f"- Claude: {claude} / {HEALTH_NOTES[claude]}\n"
         f"- Codex: {codex} / {HEALTH_NOTES[codex]}\n"
         f"- Antigravity: {antigravity} / {HEALTH_NOTES[antigravity]}\n\n"

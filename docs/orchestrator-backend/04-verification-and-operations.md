@@ -1,6 +1,6 @@
 # Verification And Operations
 
-The backend is only fully functional if orchestration can be trusted under failure,
+The backend is only fully functional if traffic control can be trusted under failure,
 restart, missing-provider, and approval-heavy conditions. This document defines the
 verification matrix and operational checks.
 
@@ -32,7 +32,7 @@ Use temporary workspaces and fake providers:
 - Dispatch fake provider command.
 - Capture prompt and log files.
 - Mark run succeeded, failed, cancelled, provider missing, and policy denied.
-- Consult orchestrator with fake output.
+- Consult controller with fake output.
 - Retry, skip, reroute, approve, and reject.
 - Recover after simulated backend restart.
 
@@ -54,7 +54,7 @@ Use FastAPI test clients:
 - Agent list/check endpoints with mocked provider registry.
 - Task detail endpoint before and after runs.
 - Queue add/approve/remove/clear/retry/skip endpoints.
-- Chat send/direct endpoints with fake orchestrator decisions.
+- Chat send/direct endpoints with fake controller decisions.
 - Logs and events endpoints.
 - Approval endpoints.
 
@@ -70,7 +70,7 @@ Required scenarios:
 - Queue item was `running` and log file has terminal status.
 - Run record exists but queue item is missing.
 - Task step says `running` but no matching run exists.
-- Orchestrator consult was pending.
+- Controller consult was pending.
 - Approval was pending.
 
 Expected result:
@@ -109,14 +109,14 @@ Keep coverage for current beta behavior:
 | Scenario | Expected outcome |
 |---|---|
 | User asks for a simple local command | Backend runs safe command directly and reports result |
-| User asks for a feature | Orchestrator creates task and queues appropriate first step |
+| User asks for a feature | Controller creates task and queues appropriate first step |
 | Provider executable is missing | Step becomes `provider_missing`, prompt is saved, queue continues or blocks according to policy |
 | Claude health is red | Implementation step requires explicit approval |
 | Manual Approval mode is enabled | Queue items become approval holds, no automatic process starts |
 | Agent step fails | Later steps for same task block; user can retry, skip, or reroute |
 | Backend restarts mid-run | State recovers to truthful terminal or blocked status |
-| Orchestrator emits invalid directive | Task records parse/validation error and requests user input |
-| Orchestrator says done | Task gets durable final verdict and final event |
+| Controller emits invalid directive | Task records parse/validation error and requests user input |
+| Controller says done | Task gets durable final verdict and final event |
 | User cancels run | Process group is terminated, run and queue item become `cancelled` |
 
 ## Operational Requirements
@@ -183,6 +183,5 @@ Every persisted schema should have:
 - Safety tests prove denied commands do not execute.
 - Existing frontend endpoints remain compatible or are intentionally versioned.
 - Task folders remain readable and useful without the UI.
-- The final task report explains what the orchestrator decided, what agents ran, what
+- The final task report explains what the controller decided, what agents ran, what
   changed, what failed or was skipped, and why the task is done or needs the user.
-

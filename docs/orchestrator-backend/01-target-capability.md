@@ -1,21 +1,22 @@
 # Target Capability
 
-The orchestrator backend is complete when a user can describe work once, then let
-AgentFlow route, execute, verify, recover, and report the task without manually
-juggling CLIs or losing control of risky operations.
+The controller backend is complete when a user can describe work once, then let
+Command Line Interface Terminal Controller (CLIT Controller IDE) route, execute,
+verify, recover, and report the task without manually juggling CLIs or losing
+control of risky operations.
 
 ## End-To-End User Flow
 
 1. The user selects a workspace.
 2. The backend initializes `.agentflow/` and loads routing, usage, provider, queue,
    task, and run state.
-3. The user asks the orchestrator for work.
-4. The orchestrator either answers directly, creates a task, queues agent steps, or
+3. The user asks the controller for work.
+4. The controller either answers directly, creates a task, queues agent steps, or
    runs a safe local command.
 5. The dispatcher executes eligible work in order, with one active run per provider.
 6. Each run writes prompt, output, logs, artifacts, state transitions, usage, and a
    human-readable timeline event.
-7. After each orchestrated step, the orchestrator receives the actual task state and
+7. After each controlled step, the controller receives the actual task state and
    decides the next action.
 8. The loop ends with a durable `done`, `needs_user`, `failed`, or `cancelled` verdict.
 9. The user can restart the backend and still see accurate task, queue, log, and run
@@ -28,16 +29,16 @@ juggling CLIs or losing control of risky operations.
 - Open one active workspace at a time.
 - Create and maintain `<workspace>/.agentflow/`.
 - Never preview or leak sensitive files such as `.env`.
-- Keep generated AgentFlow files out of the user's repository by default.
+- Keep generated CLITC files out of the user's repository by default.
 - Confine all automated commands to the selected workspace unless the user explicitly
   approves a shared-resource action.
 
 ### Provider Management
 
 - Detect installed providers and their executable paths.
-- Track provider roles: orchestrator, PM, engineer, QA, local tools, optional local LLMs.
+- Track provider roles: controller, PM, engineer, QA, local tools, optional local LLMs.
 - Support configurable command templates and model selections.
-- Keep provider-specific CLI syntax outside orchestration logic.
+- Keep provider-specific CLI syntax outside traffic-control logic.
 - Expose install and login helpers without storing API keys, passwords, or tokens.
 - Report provider availability, auth hints, model options, and usage health in a
   stable shape.
@@ -60,9 +61,9 @@ juggling CLIs or losing control of risky operations.
 - Represent terminal task outcomes explicitly: `done`, `needs_user`, `failed`,
   `cancelled`, and `abandoned`.
 
-### Orchestration
+### Traffic Control
 
-- Accept structured decisions from the orchestrator:
+- Accept structured decisions from the controller:
   - create task
   - queue steps
   - run safe local command
@@ -73,7 +74,7 @@ juggling CLIs or losing control of risky operations.
 - Prevent duplicate active work for the same task/step.
 - Preserve intra-task order.
 - Enforce one active run per provider.
-- Consult the orchestrator after every orchestrated step, with bounded consult loops.
+- Consult the controller after every controlled step, with bounded consult loops.
 - Allow manual approval mode where automatic execution becomes preview-only.
 
 ### Execution
@@ -107,7 +108,7 @@ juggling CLIs or losing control of risky operations.
 
 ## Non-Goals
 
-- Hosted orchestration service.
+- Hosted traffic-control service.
 - Storing API keys or provider tokens.
 - Replacing provider CLIs with direct provider APIs.
 - Multi-user team synchronization in the first full backend milestone.
@@ -123,4 +124,3 @@ juggling CLIs or losing control of risky operations.
   all produce useful, durable states rather than silent failures.
 - The frontend can render task, queue, run, log, and usage state from stable API
   responses without reconstructing backend logic.
-

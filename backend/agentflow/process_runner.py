@@ -182,10 +182,10 @@ class ProcessRunner:
             if captured <= MAX_CAPTURE_CHARS:
                 parts.append(text)
             elif not record.truncated:
-                parts.append("\n[output truncated by AgentFlow]\n")
+                parts.append("\n[output truncated by CLITC]\n")
                 record.truncated = True
 
-    # Generic terminal-status -> failure-kind map. The orchestration layer may refine
+    # Generic terminal-status -> failure-kind map. The traffic-control layer may refine
     # this (e.g. provider_missing, policy_denied) before persisting to the run ledger.
     _FAILURE_KIND = {"failed": "exit_nonzero", "cancelled": "cancelled", "error": "start_error"}
 
@@ -204,7 +204,7 @@ class ProcessRunner:
             path = Path(record.log_file)  # type: ignore[arg-type]
             path.parent.mkdir(parents=True, exist_ok=True)
             body = (
-                f"# AgentFlow run {record.id}\n"
+                f"# Command Line Interface Terminal Controller run {record.id}\n"
                 f"# command: {record.command_preview()}\n"
                 f"# cwd: {record.cwd}\n"
                 f"# task: {record.task_id or '-'}  step: {record.step or '-'}  provider: {record.provider or '-'}\n"
@@ -257,7 +257,7 @@ class ProcessRunner:
             argv, cwd, task_id=task_id, step=step, provider=provider, log_file=log_file
         )
         # Children must not inherit OUR port assignment: dev servers honor PORT and
-        # would bind on top of the AgentFlow backend, hijacking localhost:8787.
+        # would bind on top of the CLITC backend, hijacking localhost:8787.
         child_env = {k: v for k, v in os.environ.items() if k not in ("PORT", "AGENTFLOW_PORT")}
         try:
             proc = await asyncio.create_subprocess_exec(

@@ -65,11 +65,11 @@ PROVIDERS: list[dict] = [
         # binary in ~/.local/bin (source: antigravity.google/download#antigravity-cli).
         "id": "antigravity",
         "displayName": "Google Antigravity CLI",
-        "role": "orchestrator/qa",
+        "role": "controller/qa",
         "executableNames": ["agy", "antigravity"],
         "authMode": "Google login preferred",
         "usageMode": "daily/quota preferred",
-        "preferredUse": "orchestration, QA, broad checks",
+        "preferredUse": "traffic control, QA, broad checks",
         "installHint": "curl -fsSL https://antigravity.google/cli/install.sh | bash  (installs `agy` to ~/.local/bin)",
         "installCommand": "bash -c 'curl -fsSL https://antigravity.google/cli/install.sh | bash'",
         "loginCommand": "agy",
@@ -374,11 +374,11 @@ def login_provider(provider_id: str, workspace: Optional[Path]) -> dict:
     script.write_text(
         "#!/bin/zsh\n"
         f"cd {subprocess.list2cmdline([cwd])}\n"
-        f'echo "AgentFlow Studio — {d["displayName"]} login/setup"\n'
+        f'echo "Command Line Interface Terminal Controller — {d["displayName"]} login/setup"\n'
         f'echo "$ {command}"\n'
         f"{command}\n"
         'echo ""\n'
-        'echo "AgentFlow: command finished. You can close this window."\n'
+        'echo "Command Line Interface Terminal Controller: command finished. You can close this window."\n'
         "exec /bin/zsh -i\n",
         encoding="utf-8",
     )

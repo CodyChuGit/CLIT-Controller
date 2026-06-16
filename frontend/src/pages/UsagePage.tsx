@@ -127,7 +127,7 @@ export default function UsagePage() {
         {usage && (
           <>
             <div className="flex items-center gap-3">
-              <span className="label">Mode</span>
+              <span className="label">Traffic control</span>
               <BudgetModePicker value={usage.orchestrationMode} onChange={(m) => void setMode(m)} />
             </div>
 

@@ -317,7 +317,7 @@ export interface ChatPending {
 export interface ChatState {
   messages: ChatMessage[];
   pending: ChatPending | null;
-  /** Direct (non-orchestrated) chat history per agent provider. */
+  /** Direct chat history per agent provider, outside the traffic-control loop. */
   channels: Record<string, ChatMessage[]>;
   channelPending: Record<string, ChatPending | null>;
   defaultProvider: string;

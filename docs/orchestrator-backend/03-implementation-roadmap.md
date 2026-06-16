@@ -1,7 +1,7 @@
 # Implementation Roadmap
 
 This roadmap keeps the current architecture recognizable while adding the missing
-pieces needed for a fully functional orchestrator backend.
+pieces needed for a fully functional controller backend.
 
 ## Phase 0: Baseline And Invariants
 
@@ -26,7 +26,7 @@ Acceptance criteria:
 
 ## Phase 1: Durable Run And Event Ledger
 
-Goal: make orchestration recoverable and inspectable.
+Goal: make traffic control recoverable and inspectable.
 
 Tasks:
 
@@ -69,7 +69,7 @@ Acceptance criteria:
 
 ## Phase 3: Provider Adapter Layer
 
-Goal: remove provider-specific branching from orchestration flow.
+Goal: remove provider-specific branching from traffic-control flow.
 
 Tasks:
 
@@ -90,7 +90,7 @@ Acceptance criteria:
 
 ## Phase 4: Policy And Approval Engine
 
-Goal: let the orchestrator act autonomously only inside clear safety boundaries.
+Goal: let the controller act autonomously only inside clear safety boundaries.
 
 Tasks:
 
@@ -112,7 +112,7 @@ Acceptance criteria:
 - Denied commands never reach `ProcessRunner`.
 - Every approval and denial is visible in task events or global logs.
 
-## Phase 5: Typed Orchestrator Decisions
+## Phase 5: Typed Controller Decisions
 
 Goal: turn LLM output into validated backend intents.
 
@@ -120,7 +120,7 @@ Tasks:
 
 - Replace one-off regex side effects with a parser that returns a list of decision
   objects.
-- Parse all valid directive blocks in an orchestrator response.
+- Parse all valid directive blocks in a controller response.
 - Keep fenced markdown directives for compatibility, but normalize them into typed
   decisions before mutation.
 - Add support for retry, skip, reroute, mark done, and request user decisions.
@@ -130,7 +130,7 @@ Tasks:
 
 Acceptance criteria:
 
-- One orchestrator response can create a task and queue multiple validated actions.
+- One controller response can create a task and queue multiple validated actions.
 - Invalid step names, missing task refs, and denied commands produce useful events.
 - A consult that gives no actionable decision marks the task `needs_user`.
 
@@ -189,7 +189,45 @@ Acceptance criteria:
 
 - A user can inspect a single final report to understand what happened.
 - Tasks can be paused, resumed, retried, and completed without editing files.
-- The backend is ready for desktop packaging without changing core orchestration logic.
+- The backend is ready for desktop packaging without changing core traffic-control logic.
+
+## Phase 9: VS Code-Style Agent Dock And Tasks Tab
+
+Goal: turn the right-hand chat dock and Tasks tab into native CLITC feature
+parity surfaces that feel like VS Code plugin panels without embedding VS Code.
+
+Tasks:
+
+- Evolve the current chat dock into provider tabs for controller, Codex, Claude
+  Code, and Antigravity.
+- Evolve the Tasks tab into the durable task/session parity surface for history,
+  prompt/output replay, diffs, approvals, logs, retries, reroutes, and final
+  reports.
+- Add a compact command row, command palette actions, styled transcripts, approval
+  cards, diff summaries, task context, queue context, and dock status footer.
+- Add task exchange cards that summarize budget context, commands, raw prompts,
+  raw outputs, provider decisions, and artifacts before showing raw markdown.
+- Reuse the PTY/WebSocket/xterm.js terminal stack as provider-scoped terminal
+  drawers inside the dock and as linked terminal/log context from task details.
+- Keep backend scope additive: expose structured run, queue, terminal, approval,
+  usage, and task projections without replacing current APIs.
+- Add provider action descriptors for native dock/task actions, structured
+  approval/diff summaries, unified status data, task exchange summaries, and
+  command palette action descriptors.
+- Do not add `.vsix` execution, VS Code extension hosting, vendor webview iframes,
+  `vscode://` links, launch actions, or external VS Code controls.
+
+Acceptance criteria:
+
+- The Agent Dock gives Codex, Claude Code, Antigravity, and controller workflows
+  a live VS Code-style panel experience inside CLITC.
+- The Tasks tab gives the same workflows a durable VS Code-style history,
+  approval, diff, retry, and final-report experience.
+- Commands, logs, approvals, diffs, and queue blockers are summarized and styled
+  by default, with raw details available behind expanders.
+- Existing backend traffic control, task files, CLI execution, policy, approvals, and
+  redaction remain authoritative.
+- No feature requires VS Code to be installed or opened.
 
 ## Recommended Build Order
 
@@ -202,6 +240,6 @@ Acceptance criteria:
 7. SSE event stream.
 8. Context builder.
 9. Final reports and exports.
+10. VS Code-style Agent Dock and Tasks tab.
 
 This order fixes correctness and recovery before adding richer routing features.
-

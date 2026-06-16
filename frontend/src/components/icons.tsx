@@ -120,7 +120,14 @@ export const ChatBubble = (p: SVGProps<SVGSVGElement>) => (
 
 function BrandIcon({ children, className = "h-4 w-4", ...rest }: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" fillRule="evenodd" aria-hidden="true" className={className} {...rest}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      fillRule="evenodd"
+      aria-hidden="true"
+      className={`block shrink-0 overflow-visible ${className}`}
+      {...rest}
+    >
       {children}
     </svg>
   );
@@ -144,13 +151,22 @@ export const AntigravityMark = (p: SVGProps<SVGSVGElement>) => (
   </BrandIcon>
 );
 
-/** The AgentFlow mark: the orchestrator's top hat. */
-export const TopHat = (p: SVGProps<SVGSVGElement>) => (
-  <Icon {...p}>
-    <path d="M7 16V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v10" />
-    <path d="M3.5 16.5c2.7.7 5.5 1 8.5 1s5.8-.3 8.5-1" />
-    <path d="M7 12.5h10" />
-  </Icon>
+/** SF Symbols-style bean mark for the controller channel. */
+export const BeanMark = (p: SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.15"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    className={p.className ?? "h-4 w-4"}
+    {...p}
+  >
+    <path d="M16.9 3.7c-2.7-1.1-6.2.2-7.9 3.1-.7 1.2-1.7 2.1-3 2.7-2.8 1.3-3.7 4.8-2 7.4 2.2 3.4 7.4 4.4 11.6 2.2 4.6-2.4 6.5-8.3 4.4-12.1-.7-1.4-1.8-2.5-3.1-3.3z" />
+    <path d="M13.9 7.2c1.5.3 2.7 1.3 3.4 2.7" />
+  </svg>
 );
 
 export const Send = (p: SVGProps<SVGSVGElement>) => (

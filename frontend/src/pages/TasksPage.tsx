@@ -220,7 +220,7 @@ function fmtStamp(stamp: string): string {
   return t.length === 6 ? `${t.slice(0, 2)}:${t.slice(2, 4)}:${t.slice(4, 6)}` : stamp;
 }
 
-/** One step's conversation: every prompt AgentFlow sent (right) and what the
+/** One step's conversation: every prompt CLITC sent (right) and what the
  *  agent returned (left), oldest first, scrollable. Exchanges come from the
  *  task's logs dir, so they survive backend restarts. */
 function StepChat({
@@ -536,7 +536,7 @@ export default function TasksPage() {
     return { budget: all[all.length - 1], repeated: all.length };
   }, [exchanges]);
 
-  // Direct commands the orchestrator ran for this task (step="run", shell), not
+  // Direct commands the controller ran for this task (step="run", shell), not
   // agent steps — surfaced as command cards rather than hidden in the run log.
   const commandRuns = useMemo<RunInfo[]>(
     () => (detail?.runs ?? []).filter((r) => r.step === "run" || r.provider === "shell"),
@@ -685,7 +685,7 @@ export default function TasksPage() {
         )}
 
         {tasks.length === 0 && !error && (
-          <EmptyState icon={<Inbox />} message="No tasks yet — ask the orchestrator." />
+          <EmptyState icon={<Inbox />} message="No tasks yet — ask the controller." />
         )}
 
         {detail && (
@@ -733,7 +733,7 @@ export default function TasksPage() {
               </Card>
             )}
 
-            <Card title="Orchestrator log" pad>
+            <Card title="Controller log" pad>
               <HandoffLog events={detail.task.events ?? []} onOpenFile={openFile} />
             </Card>
 

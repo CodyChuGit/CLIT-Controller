@@ -1,4 +1,4 @@
-"""Chat with the orchestration model."""
+"""Chat with the traffic-control model."""
 
 from __future__ import annotations
 

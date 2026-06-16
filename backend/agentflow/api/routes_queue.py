@@ -1,4 +1,4 @@
-"""Execution queue: what the orchestrator has cued up for each agent."""
+"""Execution queue: what the controller has cued up for each agent."""
 
 from __future__ import annotations
 
