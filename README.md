@@ -13,7 +13,7 @@ Running several coding agents by hand means juggling terminals, re-pasting conte
 | Controller / QA | Antigravity | broad checks, QA, cheap verification |
 | PM | Codex | specs, markdown plans, final reviews |
 | Engineer | Claude Code | implementation and bug fixing **only** |
-| Local deterministic code | none (free) | file scanning, task folders, git status/diff, logs, usage tracking |
+| Local Tasks | oMLX/Ollama (WIP) | file scanning, task folders, git status/diff, logs, usage tracking |
 
 ## How it saves tokens
 
