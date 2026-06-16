@@ -270,6 +270,13 @@ export interface LogsResponse {
   running: RunInfo[];
 }
 
+/** Metadata for the live Terminals tab; the sessions themselves stream over
+ *  WebSocket. `installed` says whether each CLI was found on PATH. */
+export interface TerminalsStatus {
+  providers: string[];
+  installed: Record<string, boolean>;
+}
+
 export interface Settings {
   routing: RoutingConfig;
   commandTemplates: Record<string, string>;

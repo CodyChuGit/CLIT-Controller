@@ -418,10 +418,13 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
                     title, goal, queue_steps = directive
                     try:
                         meta = task_service.create_task(workspace, title, goal, orchestrated=True)
-                        note = f"Created \u201c{title}\u201d"
-                        if queue_steps:
-                            queue_service.add_steps(workspace, meta["id"], queue_steps, source="orchestrator")
-                            note += f" · queued {', '.join(queue_steps)}"
+                        # Auto-start the task. If the orchestrator named no steps,
+                        # default to the planning step so a task the user hands
+                        # over always begins running on its own — the closed loop
+                        # then consults the orchestrator for what to do next.
+                        steps_to_queue = queue_steps or ["codex_spec"]
+                        queue_service.add_steps(workspace, meta["id"], steps_to_queue, source="orchestrator")
+                        note = f"Created \u201c{title}\u201d · queued {', '.join(steps_to_queue)}"
                         append_message(workspace, "system", note, provider=provider)
                         add_log_entry(
                             "chat", f"orchestrator created task {meta['id']}: {title}",

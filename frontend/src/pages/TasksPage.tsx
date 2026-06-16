@@ -1,10 +1,13 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { Close, FileIcon, Folder, Inbox, Spinner, StopSquare } from "../components/icons";
 import StatusBadge from "../components/StatusBadge";
+import { Markdown } from "../components/Markdown";
+import { CommandCard, ContextSummary } from "../components/TaskViews";
 import { Card, EmptyState } from "../components/ui";
+import { parsePrompt, type BudgetSummary } from "../lib/taskFormat";
 import { loadState, saveState } from "../persist";
-import type { Exchange, QueueState, StepState, TaskDetail, TaskEvent, TaskMeta } from "../types";
+import type { Exchange, QueueState, RunInfo, StepState, TaskDetail, TaskEvent, TaskMeta } from "../types";
 
 const STEP_ORDER = ["codex_spec", "claude_implement", "gemini_qa", "codex_review", "claude_fix"];
 const SHORT_LABELS: Record<string, string> = {
@@ -286,26 +289,39 @@ function StepChat({
             {involved ? "Queued — nothing sent yet." : "Not used in this task."}
           </p>
         ) : (
-          exchanges.map((ex) => (
-            <Fragment key={ex.stamp}>
-              <div className="flex justify-end">
-                <div className="max-w-[94%] rounded-lg rounded-br-sm border border-blue-200 bg-blue-50/60 px-2.5 py-1.5 dark:border-blue-900 dark:bg-blue-950/30">
-                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-blue-600/80 dark:text-blue-300/80">
-                    prompt · {fmtStamp(ex.stamp)}
+          exchanges.map((ex, idx) => {
+            const brief = parsePrompt(ex.prompt).brief || ex.prompt;
+            // The last exchange with no output yet IS the in-flight run — the
+            // live progress bubble below already shows it, so don't also render
+            // a misleading "No output." reply for it.
+            const isLive = idx === exchanges.length - 1 && !!liveRun && !ex.output.trim();
+            return (
+              <Fragment key={ex.stamp}>
+                <div className="flex justify-end">
+                  <div className="max-w-[94%] rounded-lg rounded-br-sm border border-blue-200 bg-blue-50/60 px-2.5 py-1.5 dark:border-blue-900 dark:bg-blue-950/30">
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-blue-600/80 dark:text-blue-300/80">
+                      task brief · {fmtStamp(ex.stamp)}
+                    </div>
+                    <LongText text={brief} />
                   </div>
-                  <LongText text={ex.prompt} />
                 </div>
-              </div>
-              <div className="flex justify-start">
-                <div className="max-w-[94%] rounded-lg rounded-bl-sm border border-neutral-200 bg-white px-2.5 py-1.5 dark:border-neutral-700 dark:bg-neutral-900">
-                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
-                    {preview?.provider} · reply
+                {!isLive && (
+                  <div className="flex justify-start">
+                    <div className="max-w-[94%] rounded-lg rounded-bl-sm border border-neutral-200 bg-white px-2.5 py-1.5 dark:border-neutral-700 dark:bg-neutral-900">
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+                        {preview?.provider} · reply
+                      </div>
+                      {ex.output.trim() ? (
+                        <Markdown content={ex.output} fade="from-white to-transparent dark:from-neutral-900" />
+                      ) : (
+                        <p className="text-[11px] italic text-neutral-400">No output.</p>
+                      )}
+                    </div>
                   </div>
-                  <LongText text={ex.output || "(no output)"} />
-                </div>
-              </div>
-            </Fragment>
-          ))
+                )}
+              </Fragment>
+            );
+          })
         )}
         {liveRun && (
           <div className="flex justify-start">
@@ -506,6 +522,27 @@ export default function TasksPage() {
     }
   }, [selectedId, loadDetail]);
 
+  // The budget/context header is identical across every step prompt. Hoist it
+  // out of the conversations into one compact summary, counting repeats.
+  const budgetContext = useMemo<{ budget: BudgetSummary; repeated: number } | null>(() => {
+    const all: BudgetSummary[] = [];
+    for (const list of Object.values(exchanges)) {
+      for (const ex of list) {
+        const b = parsePrompt(ex.prompt).budget;
+        if (b) all.push(b);
+      }
+    }
+    if (all.length === 0) return null;
+    return { budget: all[all.length - 1], repeated: all.length };
+  }, [exchanges]);
+
+  // Direct commands the orchestrator ran for this task (step="run", shell), not
+  // agent steps — surfaced as command cards rather than hidden in the run log.
+  const commandRuns = useMemo<RunInfo[]>(
+    () => (detail?.runs ?? []).filter((r) => r.step === "run" || r.provider === "shell"),
+    [detail],
+  );
+
   const anythingRunning =
     detail !== null &&
     (detail.task.fullSequence?.status === "running" ||
@@ -671,6 +708,8 @@ export default function TasksPage() {
               />
             )}
 
+            {budgetContext && <ContextSummary budget={budgetContext.budget} repeated={budgetContext.repeated} />}
+
             {/* One conversation per pipeline step: what was sent, what came back. */}
             <div className="grid gap-3 md:grid-cols-2">
               {STEP_ORDER.map((step, i) => (
@@ -685,6 +724,14 @@ export default function TasksPage() {
                 </div>
               ))}
             </div>
+
+            {commandRuns.length > 0 && (
+              <Card title="Commands" pad bodyClassName="space-y-2">
+                {commandRuns.map((run) => (
+                  <CommandCard key={run.id} run={run} />
+                ))}
+              </Card>
+            )}
 
             <Card title="Orchestrator log" pad>
               <HandoffLog events={detail.task.events ?? []} onOpenFile={openFile} />

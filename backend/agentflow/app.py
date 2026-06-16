@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import __version__, config, paths, queue_service, state_store
 from .process_runner import add_log_entry
+from .terminal_service import TERMINALS
 from .api import (
     routes_agents,
     routes_chat,
@@ -21,6 +22,7 @@ from .api import (
     routes_queue,
     routes_state,
     routes_tasks,
+    routes_terminals,
     routes_usage,
 )
 
@@ -47,6 +49,7 @@ async def _lifespan(app: FastAPI):
     dispatcher = asyncio.create_task(queue_service.dispatcher_loop())
     yield
     dispatcher.cancel()
+    await TERMINALS.shutdown()
 
 
 def create_app() -> FastAPI:
@@ -69,6 +72,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_tasks.router, prefix="/api/tasks", tags=["tasks"])
     app.include_router(routes_usage.router, prefix="/api/usage", tags=["usage"])
     app.include_router(routes_logs.router, prefix="/api/logs", tags=["logs"])
+    app.include_router(routes_terminals.router, prefix="/api/terminals", tags=["terminals"])
     app.include_router(routes_chat.router, prefix="/api/chat", tags=["chat"])
     app.include_router(routes_queue.router, prefix="/api/queue", tags=["queue"])
     app.include_router(routes_state.router, prefix="/api", tags=["state"])

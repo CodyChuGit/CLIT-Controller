@@ -24,6 +24,7 @@ import type {
   Settings,
   TaskDetail,
   TaskMeta,
+  TerminalsStatus,
   Tree,
   Usage,
 } from "./types";
@@ -122,6 +123,11 @@ export const api = {
   // logs
   logs: () => get<LogsResponse>("/logs"),
   clearLogView: () => post<{ ok: boolean }>("/logs/clear-view"),
+
+  // terminals (live PTY sessions are over WebSocket; these are control/metadata)
+  terminalsStatus: () => get<TerminalsStatus>("/terminals/status"),
+  terminalKill: (provider: string) =>
+    post<{ ok: boolean }>(`/terminals/${encodeURIComponent(provider)}/kill`),
 
   // queue
   queue: () => get<QueueState>("/queue"),
