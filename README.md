@@ -57,11 +57,19 @@ vendor plugin UI, or launch real VS Code as part of this workflow.
 
 ## Install
 
+### Manual Install
+
 ```bash
 ./scripts/install.sh
 ```
 
 Creates a Python 3.11+ virtualenv at `.venv`, installs backend deps (FastAPI, Uvicorn, Pydantic), and runs `npm install` for the frontend.
+
+### Install via Coding Agent
+
+You can copy and paste the following prompt into your CLI agent (e.g., Claude Code or Antigravity) to have it install and run the app for you:
+
+> Clone the repository https://github.com/CodyChuGit/CLIT-Controller.git, navigate into it, run `./scripts/install.sh`, and then start the dev server with `./scripts/dev.sh`.
 
 ## Run
 
