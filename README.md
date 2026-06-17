@@ -1,43 +1,108 @@
 # CLIT Controller IDE
 
 <p align="center">
-  <img src="frontend/public/icons/bean_web.svg" alt="CLIT Controller IDE bean icon" width="96" height="96">
+  <img src="frontend/public/icons/bean_web.svg" alt="CLIT Controller IDE bean icon" width="112" height="112">
 </p>
 
-CLIT Controller IDE is a local workspace for UI/UX designers who use AI assistants to plan, hand off, and review interface work.
+<p align="center">
+  <strong>A local-first AI workbench for UI/UX designers.</strong><br>
+  Plan design tasks, coordinate coding assistants, review changes, and keep the whole flow in one calm interface.
+</p>
 
-It brings project files, design tasks, assistant activity, change reviews, approvals, and logs into one app so designers can stay focused on product quality instead of managing separate terminal sessions.
+---
 
-## Core Functionality
+## ✨ What It Is
 
-- **Workspace view**: open a local project, browse files, inspect changes, and keep task context beside the work.
-- **Design task intake**: turn design requests, references, constraints, and QA notes into organized tasks.
-- **Assistant coordination**: send work to configured AI assistants such as Codex, Claude Code, and Antigravity from one place.
-- **Review flow**: check generated output, file changes, logs, and status before continuing or accepting work.
-- **Usage control**: choose quality or budget modes and mark assistant availability so expensive AI runs stay intentional.
-- **Local-first privacy**: project state stays on your machine, and assistant login stays with the official tools.
+**CLIT Controller IDE** is a visual control room for designers who use AI coding assistants to bring interface ideas to life.
 
-## Screenshots
+Instead of bouncing between chats, terminals, folders, diffs, and task notes, you get one place to describe the work, route it to the right assistant, watch progress, and review the result before moving forward.
 
 ![CLITC Files](docs/assets/dark_mode_files.png)
-*Workspace view with project files, active tasks, and the task queue.*
+*Workspace view with project files, active tasks, file changes, and the task queue.*
 
 ![CLITC Agents](docs/assets/dark_mode_CLI.png)
-*Agents view for checking connected assistants and their setup status.*
+*Agents view for checking connected assistants, setup status, and configuration.*
 
-## Basic Workflow
+## 💡 Why You Need It
 
-1. Open a workspace folder.
-2. Check which AI assistants are installed and logged in.
-3. Choose a usage mode that matches the task.
-4. Describe the design or UI change from the task/chat surface.
-5. Review the generated work, file changes, logs, and approvals in Tasks.
-6. Continue, reroute, or stop the task as needed.
+AI-assisted design work gets messy fast. One assistant is good at planning, another is better at implementation, another is useful for review. Without a controller, the designer becomes the glue: copying prompts, pasting context, checking files, repeating constraints, and hoping the expensive model is used for the right job.
 
-## Privacy And Control
+CLIT Controller keeps that workflow tidy.
 
-- The app does not ask for or store provider keys or tokens.
-- Each assistant uses its own official login.
-- Logs redact common secret patterns.
-- Workspace configuration and task history are stored locally.
-- Changes, approvals, and assistant runs stay under user control.
+| Problem | How CLIT Controller Helps |
+|---|---|
+| Token waste | Routes work intentionally so high-cost assistants are saved for the tasks that need them. |
+| Copy-paste fatigue | Keeps project context, task notes, logs, and handoffs together. |
+| Lost design intent | Preserves requests, references, approvals, and review history inside the workspace. |
+| Slow review loops | Surfaces generated output, file changes, and logs in one place. |
+| Too many terminals | Lets designers coordinate Codex, Claude Code, and Antigravity from a single UI. |
+
+The goal is simple: **less prompt wrangling, more product shaping**.
+
+## 🚀 Install
+
+Clone the project, then run:
+
+```bash
+./scripts/install.sh
+```
+
+Start the app:
+
+```bash
+./scripts/dev.sh
+```
+
+Open the local app:
+
+```text
+http://localhost:5173
+```
+
+The install script creates a local Python environment, installs the app backend, and installs the frontend packages. If an assistant is missing, the app shows setup guidance in the Agents view.
+
+## 🧰 Requirements
+
+### Core App
+
+- **Python 3.11+** for the local backend.
+- **Node.js and npm** for the frontend.
+- **git** for workspace status, diffs, and source control context.
+- **GitHub CLI (`gh`)** for GitHub-aware workflows.
+
+### AI Assistants
+
+CLIT Controller works with the official command-line tools you already use:
+
+- **Codex CLI**: `npm install -g @openai/codex`
+- **Claude Code**: `npm install -g @anthropic-ai/claude-code`
+- **Antigravity CLI**: `curl -fsSL https://antigravity.google/cli/install.sh | bash`
+
+Each assistant keeps its own official login. CLIT Controller does not ask for or store provider keys or tokens.
+
+### Packages Installed By The App
+
+- Backend: FastAPI, Uvicorn, Pydantic.
+- Frontend: React, Vite, TypeScript, Tailwind CSS, xterm, Prism.
+- Dev/test support: pytest.
+
+## 🗺️ Roadmap
+
+- **Richer designer task briefs**: clearer intake for goals, references, constraints, acceptance notes, and visual QA.
+- **UI/UX reference library**: collect reusable style references and local design examples for faster frontend iteration.
+- **Live output everywhere**: smoother real-time assistant progress across tasks, logs, approvals, and reviews.
+- **App-mode launcher**: a more polished standalone desktop-style launch experience.
+- **Local voice I/O**: optional dictation and spoken summaries for hands-light task review.
+- **More review intelligence**: better summaries of what changed, what still needs attention, and where design intent may have drifted.
+
+## 🙌 Credits
+
+Built for designers who want AI help without losing control of the craft.
+
+Powered by the work of the OpenAI Codex, Anthropic Claude Code, Google Antigravity, React, Vite, FastAPI, and open-source communities.
+
+---
+
+<p align="center">
+  <em>Vibe with CLIT Controller.</em>
+</p>
