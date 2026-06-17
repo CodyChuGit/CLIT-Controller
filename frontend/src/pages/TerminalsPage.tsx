@@ -34,6 +34,7 @@ function TerminalPane({ provider, installed }: { provider: string; installed: bo
   const meta = META[provider] ?? { name: provider, icon: null };
   const mountRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimer = useRef<number | null>(null);
   const [connected, setConnected] = useState(false);
   const [epoch, setEpoch] = useState(0); // bump to reconnect / restart the session
 
@@ -60,7 +61,7 @@ function TerminalPane({ provider, installed }: { provider: string; installed: bo
         /* element not measurable yet */
       }
     };
-    requestAnimationFrame(doFit);
+    const rafId = requestAnimationFrame(doFit);
 
     const ws = new WebSocket(wsUrl(provider));
     ws.binaryType = "arraybuffer";
@@ -75,7 +76,14 @@ function TerminalPane({ provider, installed }: { provider: string; installed: bo
       if (ev.data instanceof ArrayBuffer) term.write(new Uint8Array(ev.data));
       else term.write(ev.data as string);
     };
-    ws.onclose = () => setConnected(false);
+    // Unexpected drops (e.g. the backend restarted) leave a dead pane otherwise:
+    // xterm still takes keystrokes but they go nowhere. Auto-reconnect so the
+    // session self-heals. Intentional teardown nulls onclose first (see cleanup),
+    // so this only fires on real drops.
+    ws.onclose = () => {
+      setConnected(false);
+      reconnectTimer.current = window.setTimeout(() => setEpoch((e) => e + 1), 1500);
+    };
     ws.onerror = () => setConnected(false);
 
     const dataSub = term.onData((d) => {
@@ -89,10 +97,15 @@ function TerminalPane({ provider, installed }: { provider: string; installed: bo
     ro.observe(el);
 
     return () => {
+      cancelAnimationFrame(rafId); // don't fit a disposed terminal after teardown
+      if (reconnectTimer.current !== null) {
+        clearTimeout(reconnectTimer.current);
+        reconnectTimer.current = null;
+      }
       ro.disconnect();
       dataSub.dispose();
       resizeSub.dispose();
-      ws.onclose = null; // avoid setState after unmount
+      ws.onclose = null; // avoid setState + reconnect after unmount/teardown
       ws.close();
       term.dispose();
       wsRef.current = null;

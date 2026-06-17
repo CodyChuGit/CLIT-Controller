@@ -23,6 +23,11 @@ def login_scripts_dir() -> Path:
     return global_config_dir() / "bin"
 
 
+def terminals_run_dir() -> Path:
+    """Per-run state for live PTY sessions (pidfiles used to reap orphans)."""
+    return global_config_dir() / "run" / "terminals"
+
+
 def repo_root() -> Path:
     # backend/agentflow/paths.py -> repo root
     return Path(__file__).resolve().parents[2]

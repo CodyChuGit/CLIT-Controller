@@ -8,7 +8,7 @@
    It caches only the built app shell + hashed static assets so the window opens
    fast and offline; everything dynamic is network-only. */
 
-const CACHE = "clitc-shell-v5";
+const CACHE = "clitc-shell-v6";
 const SHELL = [
   "/",
   "/index.html",
@@ -16,6 +16,8 @@ const SHELL = [
   "/icons/bean.svg",
   "/icons/bean-192.png",
   "/icons/bean-512.png",
+  "/icons/bean-maskable-192.png",
+  "/icons/bean-maskable-512.png",
 ];
 
 self.addEventListener("install", (event) => {

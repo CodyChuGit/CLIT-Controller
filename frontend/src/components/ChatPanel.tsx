@@ -427,9 +427,19 @@ export default function ChatPanel({
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-    // streamRev: refetch chat/queue snapshots immediately when a structural event
-    // (chat.finished, queue.changed, approval.*, …) arrives over the stream.
-  }, [open, hasWorkspace, load, busy, streamRev]);
+    // NOTE: streamRev is deliberately NOT a dependency here. It bumps on every
+    // structural stream event; including it tore down and recreated the interval
+    // + visibility listener on each event, firing an immediate multi-request
+    // load() per event — a fetch storm during active orchestration. The
+    // event-driven refetch lives in its own effect below.
+  }, [open, hasWorkspace, load, busy]);
+
+  // Refetch immediately when a structural event (chat.finished, queue.changed,
+  // approval.*, …) arrives over the stream — without disturbing the poll timer.
+  useEffect(() => {
+    if (!hasWorkspace || streamRev === 0) return;
+    void load();
+  }, [streamRev, hasWorkspace, load]);
 
   // The active tab is always caught up; other tabs flag replies that arrived meanwhile.
   useEffect(() => {

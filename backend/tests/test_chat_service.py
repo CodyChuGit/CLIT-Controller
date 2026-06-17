@@ -21,7 +21,7 @@ def test_chat_prompt_includes_budget_and_message():
     assert prompt.startswith("Budget context:")
     assert "Workspace: /tmp/x" in prompt
     assert "user: what next?" in prompt
-    assert "orchestration model" in prompt
+    assert "traffic control" in prompt
 
 
 def test_append_load_clear_roundtrip(tmp_path):

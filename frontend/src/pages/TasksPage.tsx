@@ -1,491 +1,26 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
-import { Close, FileIcon, Folder, Inbox, Spinner, StopSquare } from "../components/icons";
+import { Close, FileIcon, Folder, Inbox, StopSquare } from "../components/icons";
 import StatusBadge from "../components/StatusBadge";
-import { Markdown, StepChip } from "../components/Markdown";
-import { ApprovalCard, CommandCard, ContextSummary, Disclosure } from "../components/TaskViews";
-import SmoothStreamingText from "../components/SmoothStreamingText";
+import { ApprovalCard, CommandCard, ContextSummary } from "../components/TaskViews";
 import TimelineCard from "../components/TimelineCard";
 import RawDetail from "../components/RawDetail";
 import Composer, { ComposerChip } from "../components/Composer";
 import { Card, EmptyState } from "../components/ui";
-import { useRunStream, useStructuralRevision } from "../stream";
-import { cardFromTaskEvent, type CardModel, type CardType } from "../lib/displayModel";
-import { formatDuration, parsePrompt, type BudgetSummary } from "../lib/taskFormat";
+import { useStructuralRevision } from "../stream";
 import { loadState, saveState } from "../persist";
-import type { Approval, Exchange, QueueState, RunInfo, StepState, TaskDetail, TaskEvent, TaskMeta } from "../types";
-
-const STEP_ORDER = ["codex_spec", "claude_implement", "gemini_qa", "codex_review", "claude_fix"];
-const SHORT_LABELS: Record<string, string> = {
-  codex_spec: "Spec",
-  claude_implement: "Implement",
-  gemini_qa: "QA",
-  codex_review: "Review",
-  claude_fix: "Fix",
-};
-
-const QUEUE_ACTIVE = ["queued", "awaiting_approval", "blocked", "running"];
-
-const SPECIAL_ARTIFACTS: Record<string, string> = {
-  "@code": "production code",
-  "@diff": "git diff",
-  "@folder": "task folder",
-};
-
-function ArtifactChip({ name, onOpen }: { name: string; onOpen?: (name: string) => void }) {
-  const special = SPECIAL_ARTIFACTS[name];
-  if (special) {
-    return (
-      <span className="rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 font-mono text-[10px] text-violet-700 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-300">
-        {special}
-      </span>
-    );
-  }
-  return (
-    <button
-      onClick={() => onOpen?.(name)}
-      disabled={!onOpen}
-      title={onOpen ? `Open ${name}` : name}
-      className={`focusable rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 font-mono text-[10px] text-emerald-700 transition-colors dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 ${
-        onOpen ? "cursor-pointer hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-300" : ""
-      }`}
-    >
-      {name.replace(".md", "")}
-    </button>
-  );
-}
-
-/* ----------------------------------------------------------- the flow chart */
-
-type NodeState =
-  | "idle"
-  | "queued"
-  | "awaiting_approval"
-  | "blocked"
-  | "running"
-  | "succeeded"
-  | "failed"
-  | "error"
-  | "cancelled"
-  | "provider_missing"
-  | "skipped_budget";
-
-const NODE_STYLE: Record<string, { ring: string; fill: string; mark: string }> = {
-  queued: { ring: "border-neutral-400", fill: "", mark: "·" },
-  awaiting_approval: { ring: "border-amber-500", fill: "bg-amber-500/10", mark: "!" },
-  blocked: { ring: "border-amber-500", fill: "bg-amber-500/10", mark: "!" },
-  succeeded: { ring: "border-emerald-500", fill: "bg-emerald-500/10", mark: "✓" },
-  failed: { ring: "border-rose-500", fill: "bg-rose-500/10", mark: "✕" },
-  error: { ring: "border-rose-500", fill: "bg-rose-500/10", mark: "✕" },
-  cancelled: { ring: "border-neutral-400", fill: "", mark: "–" },
-  provider_missing: { ring: "border-amber-500", fill: "bg-amber-500/10", mark: "–" },
-  skipped_budget: { ring: "border-amber-400", fill: "", mark: "–" },
-};
-
-/** One horizontal chain — only the steps this task actually uses light up.
- *  Fixed-width nodes + equal flex connectors keep the spacing even.
- *  Clicking a node scrolls to that step's conversation. */
-function FlowChart({
-  detail,
-  queue,
-  onSelect,
-}: {
-  detail: TaskDetail;
-  queue: QueueState | null;
-  onSelect: (step: string) => void;
-}) {
-  const overlay: Record<string, string> = {};
-  for (const item of queue?.items ?? []) {
-    if (item.taskId === detail.task.id && QUEUE_ACTIVE.includes(item.status)) {
-      overlay[item.step] = item.status;
-    }
-  }
-
-  return (
-    <div className="card flex items-start px-4 py-3">
-      {STEP_ORDER.map((step, i) => {
-        const preview = detail.stepPreviews[step];
-        const state = (overlay[step] ?? detail.task.steps[step]?.status ?? "idle") as NodeState;
-        const involved = state !== "idle";
-        const style = NODE_STYLE[state];
-        return (
-          <Fragment key={step}>
-            {i > 0 && (
-              <div
-                className={`mt-3.5 h-px min-w-4 flex-1 ${
-                  involved ? "bg-neutral-300 dark:bg-neutral-600" : "bg-neutral-200 dark:bg-neutral-800"
-                }`}
-                aria-hidden="true"
-              />
-            )}
-            <button
-              onClick={() => onSelect(step)}
-              title={`${preview?.label ?? step} — ${state.replace(/_/g, " ")}`}
-              className="focusable flex w-20 shrink-0 cursor-pointer flex-col items-center gap-1 rounded"
-            >
-              <span
-                className={`flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs font-bold transition-all duration-150 ${
-                  state === "running"
-                    ? "border-blue-500 bg-blue-500/10"
-                    : involved && style
-                      ? `${style.ring} ${style.fill}`
-                      : "border-neutral-200 dark:border-neutral-800"
-                }`}
-              >
-                {state === "running" ? (
-                  <Spinner className="h-3.5 w-3.5 text-blue-500" />
-                ) : involved && style ? (
-                  <span
-                    className={
-                      state === "succeeded"
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : ["failed", "error"].includes(state)
-                          ? "text-rose-600 dark:text-rose-400"
-                          : "text-amber-600 dark:text-amber-400"
-                    }
-                  >
-                    {style.mark}
-                  </span>
-                ) : null}
-              </span>
-              <span
-                className={`text-[10px] font-medium leading-none ${
-                  involved ? "text-neutral-800 dark:text-neutral-200" : "text-neutral-300 dark:text-neutral-700"
-                }`}
-              >
-                {SHORT_LABELS[step]}
-              </span>
-              <span
-                className={`max-w-full truncate font-mono text-[10px] leading-none ${
-                  involved ? "text-neutral-400" : "text-neutral-300 dark:text-neutral-700"
-                }`}
-              >
-                {preview?.provider}
-              </span>
-            </button>
-          </Fragment>
-        );
-      })}
-    </div>
-  );
-}
-
-/* -------------------------------------------------------- step conversations */
-
-const STEP_COLOR: Record<string, { dot: string; border: string }> = {
-  codex_spec: { dot: "bg-sky-500", border: "border-t-sky-400" },
-  claude_implement: { dot: "bg-indigo-500", border: "border-t-indigo-400" },
-  gemini_qa: { dot: "bg-teal-500", border: "border-t-teal-400" },
-  codex_review: { dot: "bg-fuchsia-500", border: "border-t-fuchsia-400" },
-  claude_fix: { dot: "bg-orange-500", border: "border-t-orange-400" },
-};
-
-/** Long mono text that starts clamped — chats stay skimmable. */
-function LongText({ text }: { text: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const long = text.length > 600;
-  return (
-    <div>
-      <pre
-        className={`whitespace-pre-wrap break-words font-mono text-[10px] leading-relaxed text-neutral-700 dark:text-neutral-300 ${
-          long && !expanded ? "max-h-28 overflow-hidden" : ""
-        }`}
-      >
-        {text}
-      </pre>
-      {long && (
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="focusable mt-1 cursor-pointer rounded text-[10px] font-medium text-blue-600 hover:underline dark:text-blue-400"
-        >
-          {expanded ? "Show less" : "Show more"}
-        </button>
-      )}
-    </div>
-  );
-}
-
-function fmtStamp(stamp: string): string {
-  // 20260612-201938 → 20:19:38
-  const t = stamp.split("-")[1] ?? "";
-  return t.length === 6 ? `${t.slice(0, 2)}:${t.slice(2, 4)}:${t.slice(4, 6)}` : stamp;
-}
-
-/** One step's conversation: every prompt CLITC sent (right) and what the
- *  agent returned (left), oldest first, scrollable. Exchanges come from the
- *  task's logs dir, so they survive backend restarts. */
-function StepChat({
-  detail,
-  step,
-  exchanges,
-  onRun,
-  onOpenFile,
-}: {
-  detail: TaskDetail;
-  step: string;
-  exchanges: Exchange[];
-  onRun: () => void;
-  onOpenFile: (name: string) => void;
-}) {
-  const preview = detail.stepPreviews[step];
-  const state: StepState = detail.task.steps[step] ?? { status: "idle" };
-  const liveRun = detail.runs.find((r) => r.step === step && r.status === "running");
-  // Prefer progressively-streamed text from the shared event bus (same source the
-  // Agent Dock reads), falling back to the polled run tail.
-  const stream = useRunStream(liveRun?.id);
-  const liveText = stream?.stdout || liveRun?.stdout || "";
-  const involved = state.status !== "idle" || exchanges.length > 0;
-  const color = STEP_COLOR[step];
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [exchanges.length, liveText]);
-
-  return (
-    <Card
-      id={`step-${step}`}
-      className={`border-t-2 ${color.border} ${involved ? "" : "opacity-50"}`}
-      title={
-        <span className="flex min-w-0 items-center gap-2">
-          <span className={`h-2 w-2 rounded-full ${color.dot}`} aria-hidden="true" />
-          <span className="text-xs font-semibold">{SHORT_LABELS[step]}</span>
-          <span className="font-mono text-[10px] text-neutral-400">{preview?.provider}</span>
-          {state.status !== "idle" && <StatusBadge state={state.status} />}
-        </span>
-      }
-      actions={
-        <button className="btn-secondary btn-xs" onClick={onRun} disabled={state.status === "running"}>
-          {state.status === "running" ? "Running…" : "Run"}
-        </button>
-      }
-    >
-
-      {((state.artifactsWritten?.length ?? 0) > 0 || (state.codeChanged?.length ?? 0) > 0) && (
-        <div className="flex flex-wrap items-center gap-1 border-b border-neutral-100 px-3 py-1.5 dark:border-neutral-800/60">
-          {(state.artifactsWritten ?? []).map((a) => (
-            <ArtifactChip key={a} name={a} onOpen={onOpenFile} />
-          ))}
-          {(state.codeChanged?.length ?? 0) > 0 && (
-            <span
-              className="rounded border border-violet-300 bg-violet-50 px-1.5 py-0.5 font-mono text-[10px] text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300"
-              title={state.codeChanged?.join("\n")}
-            >
-              code: {state.codeChanged?.length}
-            </span>
-          )}
-        </div>
-      )}
-
-      <div ref={scrollRef} className="max-h-96 min-h-24 flex-1 space-y-2 overflow-y-auto p-3">
-        {exchanges.length === 0 && !liveRun ? (
-          <p className="text-[11px] text-neutral-400">
-            {involved ? "Queued — nothing sent yet." : "Not used in this task."}
-          </p>
-        ) : (
-          exchanges.map((ex, idx) => {
-            const brief = parsePrompt(ex.prompt).brief || ex.prompt;
-            // The last exchange with no output yet IS the in-flight run — the
-            // live progress bubble below already shows it, so don't also render
-            // a misleading "No output." reply for it.
-            const isLive = idx === exchanges.length - 1 && !!liveRun && !ex.output.trim();
-            return (
-              <Fragment key={ex.stamp}>
-                <div className="flex justify-end">
-                  <div className="max-w-[94%] rounded-lg rounded-br-sm border border-blue-200 bg-blue-50/60 px-2.5 py-1.5 dark:border-blue-900 dark:bg-blue-950/30">
-                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-blue-600/80 dark:text-blue-300/80">
-                      task brief · {fmtStamp(ex.stamp)}
-                    </div>
-                    <LongText text={brief} />
-                  </div>
-                </div>
-                {!isLive && (
-                  <div className="flex justify-start">
-                    <div className="max-w-[94%] rounded-lg rounded-bl-sm border border-neutral-200 bg-white px-2.5 py-1.5 dark:border-neutral-700 dark:bg-neutral-900">
-                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
-                        {preview?.provider} · reply
-                      </div>
-                      {ex.output.trim() ? (
-                        <Markdown content={ex.output} fade="from-white to-transparent dark:from-neutral-900" />
-                      ) : (
-                        <p className="text-[11px] italic text-neutral-400">No output.</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {!isLive && (ex.prompt || ex.output) && (
-                  <Disclosure label="Raw prompt / output" className="pl-1">
-                    <div className="space-y-1.5">
-                      {ex.prompt && <RawDetail text={ex.prompt} label="prompt" kind="prompt" pageSize={50} />}
-                      {ex.output && <RawDetail text={ex.output} label="output" kind="stdout" pageSize={50} />}
-                    </div>
-                  </Disclosure>
-                )}
-              </Fragment>
-            );
-          })
-        )}
-        {liveRun && (
-          <div className="flex justify-start">
-            <div className="max-w-[94%] rounded-lg rounded-bl-sm border border-blue-200 bg-white px-2.5 py-1.5 dark:border-blue-900 dark:bg-neutral-900">
-              <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-blue-500">
-                <Spinner className="h-3 w-3" /> {liveRun.provider} · working…
-              </div>
-              {liveText && (
-                <pre className="max-h-28 overflow-hidden whitespace-pre-wrap break-words font-mono text-[10px] leading-relaxed text-neutral-500">
-                  <SmoothStreamingText text={liveText} active mode="mono" maxChars={1200} />
-                </pre>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </Card>
-  );
-}
-
-/* ------------------------------------------------------------ handoff log */
-
-function HandoffLog({ events, onOpenFile }: { events: TaskEvent[]; onOpenFile: (name: string) => void }) {
-  const endRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "nearest" });
-  }, [events.length]);
-
-  if (events.length === 0) {
-    return <p className="text-xs text-neutral-500">Nothing yet.</p>;
-  }
-  // Render the durable timeline from the shared display model (structured events
-  // → CardModels), so the controller log uses the same card taxonomy as the dock.
-  return (
-    <div className="max-h-96 space-y-1.5 overflow-y-auto pr-1">
-      {events.map((e, i) => (
-        <TimelineCard key={`${e.time}-${i}`} card={cardFromTaskEvent(e, i)} density="compact" onOpenArtifact={onOpenFile} />
-      ))}
-      <div ref={endRef} />
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------ queue strip */
-
-function QueueStrip({
-  queue,
-  onApprove,
-  onRemove,
-  onRetry,
-  onSkip,
-}: {
-  queue: QueueState;
-  onApprove: (id: string) => void;
-  onRemove: (id: string) => void;
-  onRetry: (id: string) => void;
-  onSkip: (id: string) => void;
-}) {
-  const items = queue.items.filter((i) => QUEUE_ACTIVE.includes(i.status) || i.status === "failed");
-  if (items.length === 0) return null;
-  return (
-    <div className="card overflow-hidden">
-      {items.map((item) => (
-        <div
-          key={item.id}
-          className="flex items-center gap-2 border-b border-neutral-100 px-3 py-1.5 last:border-0 dark:border-neutral-800/60"
-        >
-          {item.status === "running" ? <Spinner className="h-3 w-3 shrink-0 text-blue-500" /> : <StatusBadge state={item.status} />}
-          <span className="text-xs font-medium">{item.label}</span>
-          <span className="chip">{item.provider}</span>
-          {item.note && (
-            <span className="min-w-0 flex-1 truncate text-[10px] text-amber-600 dark:text-amber-400" title={item.note}>
-              {item.note}
-            </span>
-          )}
-          <span className="flex-1" />
-          {(item.status === "blocked" || item.status === "awaiting_approval") && (
-            <button className="btn-primary btn-xs" onClick={() => onApprove(item.id)}>
-              Approve
-            </button>
-          )}
-          {(item.status === "failed" || item.status === "blocked" || item.status === "cancelled") && (
-            <button className="btn-secondary btn-xs" onClick={() => onRetry(item.id)}>
-              Retry
-            </button>
-          )}
-          {item.status !== "running" && item.status !== "skipped" && item.status !== "done" && (
-            <button className="btn-secondary btn-xs" onClick={() => onSkip(item.id)}>
-              Skip
-            </button>
-          )}
-          {item.status !== "running" && (
-            <button
-              onClick={() => onRemove(item.id)}
-              title="Remove"
-              aria-label={`Remove ${item.label}`}
-              className="focusable cursor-pointer rounded p-0.5 text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400"
-            >
-              <Close className="h-3 w-3" />
-            </button>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ----------------------------------------------------- state & validation */
-
-/** Compact current-state row: status, current step, queue/approval/validation
- *  signals, changed files, and last run duration — the doc's State & Validation
- *  surface, kept to one dense card. */
-function StateCard({
-  detail,
-  queue,
-  approvals,
-}: {
-  detail: TaskDetail;
-  queue: QueueState | null;
-  approvals: Approval[];
-}) {
-  const t = detail.task;
-  const items = (queue?.items ?? []).filter((i) => i.taskId === t.id);
-  const queued = items.filter((i) => i.status === "queued").length;
-  const blocked = items.filter((i) => ["blocked", "awaiting_approval"].includes(i.status)).length;
-  const pendingApprovals = approvals.filter((a) => !a.taskId || a.taskId === t.id).length;
-  const changed = new Set<string>();
-  Object.values(t.steps).forEach((s) => (s.codeChanged ?? []).forEach((f) => changed.add(f)));
-  const lastRun = [...(detail.runs ?? [])]
-    .filter((r) => r.durationMs != null)
-    .sort((a, b) => ((a.endedAt ?? "") < (b.endedAt ?? "") ? 1 : -1))[0];
-  const current = t.fullSequence?.currentStep;
-  return (
-    <div className="card flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 text-[11px]">
-      <span className="section-title">State</span>
-      <StatusBadge state={t.status} />
-      {current && (
-        <span className="inline-flex items-center gap-1 text-neutral-500">
-          step <StepChip name={current} />
-        </span>
-      )}
-      {queued > 0 && <span className="text-neutral-500 tabular-nums">{queued} queued</span>}
-      {blocked > 0 && <span className="text-amber-600 tabular-nums dark:text-amber-400">{blocked} blocked</span>}
-      {pendingApprovals > 0 && (
-        <span className="text-amber-600 tabular-nums dark:text-amber-400">
-          {pendingApprovals} approval{pendingApprovals === 1 ? "" : "s"}
-        </span>
-      )}
-      {changed.size > 0 && (
-        <span className="text-violet-600 tabular-nums dark:text-violet-400">
-          {changed.size} file{changed.size === 1 ? "" : "s"} changed
-        </span>
-      )}
-      {lastRun && formatDuration(lastRun.durationMs) && (
-        <span className="font-mono text-neutral-400">last {formatDuration(lastRun.durationMs)}</span>
-      )}
-    </div>
-  );
-}
-
-/* ---------------------------------------------------------------- the page */
+import TaskFlowChart from "./tasks/TaskFlowChart";
+import StepChat from "./tasks/StepChat";
+import { HandoffLog, QueueStrip, StateCard } from "./tasks/TaskStatusPanels";
+import {
+  STEP_ORDER,
+  buildFinalCard,
+  collectBudgetContext,
+  taskChangedFiles,
+  taskCommandRuns,
+  taskFileKind,
+} from "./tasks/taskPageModel";
+import type { Approval, Exchange, QueueState, TaskDetail, TaskMeta } from "../types";
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<TaskMeta[]>([]);
@@ -521,7 +56,6 @@ export default function TasksPage() {
     void loadQueue();
     const id = window.setInterval(loadQueue, 3000);
     return () => window.clearInterval(id);
-    // streamRev: a structural event (queue.*, run.*, approval.*) refreshes now.
   }, [loadQueue, streamRev]);
 
   const loadTasks = useCallback(async () => {
@@ -546,25 +80,20 @@ export default function TasksPage() {
     }
   }, []);
 
-  // Refresh the selected task's detail when the queue *transitions* into a busy
-  // state. The dedicated 2.5s poller below covers continuous refresh while it
-  // runs — depending on the whole `queue` object here would double every fetch.
-  const queueBusy = (queue?.items ?? []).some((i) => i.status === "running");
+  const queueBusy = (queue?.items ?? []).some((item) => item.status === "running");
   useEffect(() => {
     if (queueBusy && selectedId) void loadDetail(selectedId);
-  }, [queueBusy, selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [queueBusy, selectedId, loadDetail]);
 
-  // Refresh the selected task on structural stream events (run.finished,
-  // controller.decision_received, …) so the live → durable replay handoff is prompt.
   useEffect(() => {
     if (selectedId) void loadDetail(selectedId);
-  }, [streamRev]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [streamRev, selectedId, loadDetail]);
 
   useEffect(() => {
     void loadTasks().then((list) => {
       if (list.length > 0) {
         const remembered = loadState<string | null>("lastTask", null);
-        setSelectedId((cur) => cur ?? (remembered && list.some((t) => t.id === remembered) ? remembered : list[0].id));
+        setSelectedId((cur) => cur ?? (remembered && list.some((task) => task.id === remembered) ? remembered : list[0].id));
       }
     });
   }, [loadTasks]);
@@ -573,77 +102,28 @@ export default function TasksPage() {
     if (selectedId) {
       saveState("lastTask", selectedId);
       setTaskFile(null);
+      setDiffFile(null);
       void loadDetail(selectedId);
     } else {
       setDetail(null);
+      setExchanges({});
     }
   }, [selectedId, loadDetail]);
-
-  // The budget/context header is identical across every step prompt. Hoist it
-  // out of the conversations into one compact summary, counting repeats.
-  const budgetContext = useMemo<{ budget: BudgetSummary; repeated: number } | null>(() => {
-    const all: BudgetSummary[] = [];
-    for (const list of Object.values(exchanges)) {
-      for (const ex of list) {
-        const b = parsePrompt(ex.prompt).budget;
-        if (b) all.push(b);
-      }
-    }
-    if (all.length === 0) return null;
-    return { budget: all[all.length - 1], repeated: all.length };
-  }, [exchanges]);
-
-  // Direct commands the controller ran for this task (step="run", shell), not
-  // agent steps — surfaced as command cards rather than hidden in the run log.
-  const commandRuns = useMemo<RunInfo[]>(
-    () => (detail?.runs ?? []).filter((r) => r.step === "run" || r.provider === "shell"),
-    [detail],
-  );
-
-  // A FINAL_SUMMARY/NEEDS_USER/FAILURE card for a settled task: understand the
-  // outcome without reading raw output (structured-data driven, not prose-parsed).
-  const finalCard = useMemo<CardModel | null>(() => {
-    if (!detail) return null;
-    const status = detail.task.status;
-    if (!["done", "failed", "needs_user", "cancelled", "abandoned"].includes(status)) return null;
-    const events = detail.task.events ?? [];
-    const verdict = [...events].reverse().find((e) => ["done", "needs_user"].includes(e.type));
-    const changed = new Set<string>();
-    Object.values(detail.task.steps).forEach((s) => (s.codeChanged ?? []).forEach((f) => changed.add(f)));
-    const stepsRun = Object.values(detail.task.steps).filter((s) => s.status && s.status !== "idle").length;
-    const isDone = status === "done";
-    const type: CardType = isDone ? "FINAL_SUMMARY" : status === "needs_user" ? "NEEDS_USER" : "FAILURE";
-    const bullets: string[] = [];
-    if (verdict?.detail) bullets.push(verdict.detail);
-    bullets.push(`${stepsRun} step${stepsRun === 1 ? "" : "s"} run`);
-    if (changed.size) bullets.push(`${changed.size} file${changed.size === 1 ? "" : "s"} changed`);
-    return {
-      id: `final-${detail.task.id}`,
-      type,
-      action: { taskId: detail.task.id, stateTo: status },
-      display: {
-        cardType: type,
-        title: isDone ? "Task complete" : status === "needs_user" ? "Needs your input" : `Task ${status}`,
-        severity: isDone ? "ok" : status === "needs_user" ? "warn" : "error",
-        taskId: detail.task.id,
-        summary: { title: "Final report", bullets: bullets.slice(0, 5) },
-        artifacts: [...changed].slice(0, 8),
-      },
-    };
-  }, [detail]);
 
   const anythingRunning =
     detail !== null &&
     (detail.task.fullSequence?.status === "running" ||
-      Object.values(detail.task.steps).some((s) => s.status === "running"));
+      Object.values(detail.task.steps).some((step) => step.status === "running"));
 
   useEffect(() => {
-    if (anythingRunning && selectedId) {
-      pollRef.current = window.setInterval(() => void loadDetail(selectedId), 2500);
-      return () => {
-        if (pollRef.current) window.clearInterval(pollRef.current);
-      };
-    }
+    if (!anythingRunning || !selectedId) return;
+    pollRef.current = window.setInterval(() => void loadDetail(selectedId), 2500);
+    return () => {
+      if (pollRef.current !== null) {
+        window.clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
   }, [anythingRunning, selectedId, loadDetail]);
 
   useEffect(() => {
@@ -655,17 +135,22 @@ export default function TasksPage() {
     return () => window.clearInterval(id);
   }, [loadTasks]);
 
+  const budgetContext = useMemo(() => collectBudgetContext(exchanges), [exchanges]);
+  const commandRuns = useMemo(() => taskCommandRuns(detail), [detail]);
+  const finalCard = useMemo(() => buildFinalCard(detail), [detail]);
+  const changedFiles = useMemo(() => taskChangedFiles(detail), [detail]);
+
   const runStep = async (step: string, confirm = false) => {
     if (!selectedId) return;
     setNotice(null);
     const res = await api.runStep(selectedId, step, confirm);
     if (res.status === "needs_confirmation" && res.warning) {
       if (window.confirm(res.warning)) return runStep(step, true);
-      setNotice("Not run — Claude is red.");
+      setNotice("Not run - Claude is red.");
     } else if (res.status === "provider_missing") {
-      setNotice(res.message ?? "Provider missing — prompt saved to the task folder.");
+      setNotice(res.message ?? "Provider missing - prompt saved to the task folder.");
     } else if (res.status === "manual_preview") {
-      setNotice("Manual Approval mode — click Run on a step to execute it.");
+      setNotice("Manual Approval mode - click Run on a step to execute it.");
     } else if (res.status === "error") {
       setNotice(`Failed to start: ${res.message ?? "unknown error"}`);
     }
@@ -693,7 +178,6 @@ export default function TasksPage() {
     setQueue(res.queue);
   };
 
-  // Durable approval records (policy-held commands), distinct from queue approval.
   const resolveApproval = async (id: string, approve: boolean) => {
     try {
       await (approve ? api.approvalApprove(id) : api.approvalReject(id));
@@ -722,6 +206,7 @@ export default function TasksPage() {
     if (!selectedId) return;
     try {
       setTaskFile(await api.taskFile(selectedId, name));
+      setDiffFile(null);
       fileViewerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     } catch (e) {
       setNotice(e instanceof Error ? e.message : String(e));
@@ -731,15 +216,14 @@ export default function TasksPage() {
   const openDiff = async (path: string) => {
     try {
       const d = await api.gitFileDiff(path, false);
-      setDiffFile({ name: path, diff: d.diff?.trim() ? d.diff : "(no diff — file may be unchanged)" });
+      setDiffFile({ name: path, diff: d.diff?.trim() ? d.diff : "(no diff - file may be unchanged)" });
+      setTaskFile(null);
       fileViewerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     } catch (e) {
       setNotice(e instanceof Error ? e.message : String(e));
     }
   };
 
-  // Continuation prompt — issues a new instruction to the controller for this
-  // task using the same composer the dock uses; the reply streams in the dock.
   const sendContinue = async () => {
     const msg = continueText.trim();
     if (!msg || continuing) return;
@@ -749,7 +233,7 @@ export default function TasksPage() {
       const res = await api.chatSend(msg, null);
       if (res.status === "started") {
         setContinueText("");
-        setNotice("Sent to the controller — the reply streams in the controller dock.");
+        setNotice("Sent to the controller - the reply streams in the controller dock.");
       } else if (res.message) {
         setNotice(res.message);
       }
@@ -760,14 +244,9 @@ export default function TasksPage() {
     }
   };
 
-  const changedFiles = detail
-    ? Array.from(new Set(Object.values(detail.task.steps).flatMap((s) => s.codeChanged ?? [])))
-    : [];
-
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-5xl space-y-3 p-6 pt-0">
-        {/* Sticky task header — stays put while you scroll the conversations. */}
         <header className="sticky top-0 z-10 -mx-6 space-y-1.5 border-b border-neutral-200 bg-surface px-6 pb-2.5 pt-5 dark:border-neutral-800 dark:bg-neutral-950">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-semibold">Tasks</h1>
@@ -778,9 +257,9 @@ export default function TasksPage() {
                 onChange={(e) => setSelectedId(e.target.value)}
                 aria-label="Select task"
               >
-                {tasks.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}
+                {tasks.map((task) => (
+                  <option key={task.id} value={task.id}>
+                    {task.title}
                   </option>
                 ))}
               </select>
@@ -788,7 +267,9 @@ export default function TasksPage() {
             <span className="flex-1" />
             {detail && (
               <>
-                <button className="btn-secondary" onClick={runFull}>Run all</button>
+                <button className="btn-secondary" onClick={runFull}>
+                  Run all
+                </button>
                 <button className="btn-danger px-2" onClick={stopAll} title="Stop running processes" aria-label="Stop">
                   <StopSquare className="h-3.5 w-3.5" />
                 </button>
@@ -820,17 +301,15 @@ export default function TasksPage() {
           </div>
         )}
 
-        {tasks.length === 0 && !error && (
-          <EmptyState icon={<Inbox />} message="No tasks yet — ask the controller." />
-        )}
+        {tasks.length === 0 && !error && <EmptyState icon={<Inbox />} message="No tasks yet - ask the controller." />}
 
         {detail && (
           <>
-            <FlowChart
+            <TaskFlowChart
               detail={detail}
               queue={queue}
-              onSelect={(s) =>
-                document.getElementById(`step-${s}`)?.scrollIntoView({ behavior: "smooth", block: "center" })
+              onSelect={(step) =>
+                document.getElementById(`step-${step}`)?.scrollIntoView({ behavior: "smooth", block: "center" })
               }
             />
 
@@ -848,14 +327,14 @@ export default function TasksPage() {
               />
             )}
 
-            {approvals.filter((a) => !a.taskId || a.taskId === detail.task.id).length > 0 && (
+            {approvals.filter((approval) => !approval.taskId || approval.taskId === detail.task.id).length > 0 && (
               <div className="space-y-2">
                 {approvals
-                  .filter((a) => !a.taskId || a.taskId === detail.task.id)
-                  .map((a) => (
+                  .filter((approval) => !approval.taskId || approval.taskId === detail.task.id)
+                  .map((approval) => (
                     <ApprovalCard
-                      key={a.id}
-                      approval={a}
+                      key={approval.id}
+                      approval={approval}
                       onApprove={(id) => void resolveApproval(id, true)}
                       onReject={(id) => void resolveApproval(id, false)}
                     />
@@ -869,10 +348,12 @@ export default function TasksPage() {
                 onChange={setContinueText}
                 onSend={() => void sendContinue()}
                 busy={continuing}
-                placeholder="Tell the controller what to do next for this task…"
+                placeholder="Tell the controller what to do next for this task..."
                 contextChips={
                   <>
-                    <ComposerChip mono title="Task">{detail.task.id}</ComposerChip>
+                    <ComposerChip mono title="Task">
+                      {detail.task.id}
+                    </ComposerChip>
                     <StatusBadge state={detail.task.status} />
                   </>
                 }
@@ -881,7 +362,6 @@ export default function TasksPage() {
 
             {budgetContext && <ContextSummary budget={budgetContext.budget} repeated={budgetContext.repeated} />}
 
-            {/* One conversation per pipeline step: what was sent, what came back. */}
             <div className="grid gap-3 md:grid-cols-2">
               {STEP_ORDER.map((step, i) => (
                 <div key={step} className={i === STEP_ORDER.length - 1 ? "md:col-span-2" : ""}>
@@ -901,17 +381,19 @@ export default function TasksPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-violet-500" aria-hidden="true" />
                   <span className="text-xs font-semibold">Diff</span>
-                  <span className="chip">{changedFiles.length} file{changedFiles.length === 1 ? "" : "s"}</span>
+                  <span className="chip">
+                    {changedFiles.length} file{changedFiles.length === 1 ? "" : "s"}
+                  </span>
                 </div>
                 <div className="mt-1.5 flex flex-wrap gap-1">
-                  {changedFiles.map((f) => (
+                  {changedFiles.map((file) => (
                     <button
-                      key={f}
-                      onClick={() => void openDiff(f)}
-                      title={`Diff ${f}`}
+                      key={file}
+                      onClick={() => void openDiff(file)}
+                      title={`Diff ${file}`}
                       className="focusable rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 font-mono text-[10px] text-violet-700 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-300 dark:hover:text-blue-300"
                     >
-                      {f.split("/").pop()}
+                      {file.split("/").pop()}
                     </button>
                   ))}
                 </div>
@@ -935,9 +417,9 @@ export default function TasksPage() {
                 <RawDetail
                   text={(detail.task.events ?? [])
                     .map(
-                      (e) =>
-                        `${new Date(e.time).toLocaleTimeString()}  ${e.type}` +
-                        `${e.step ? ` ${e.step}` : ""}${e.provider ? ` ${e.provider}` : ""}  ${e.detail}`,
+                      (event) =>
+                        `${new Date(event.time).toLocaleTimeString()}  ${event.type}` +
+                        `${event.step ? ` ${event.step}` : ""}${event.provider ? ` ${event.provider}` : ""}  ${event.detail}`,
                     )
                     .join("\n")}
                   label="durable events"
@@ -964,15 +446,7 @@ export default function TasksPage() {
                   <RawDetail
                     text={taskFile.content}
                     label={taskFile.name}
-                    kind={
-                      taskFile.name.endsWith(".json")
-                        ? "json"
-                        : taskFile.name.endsWith(".log")
-                          ? "log"
-                          : taskFile.name.endsWith(".diff") || taskFile.name.endsWith(".patch")
-                            ? "diff"
-                            : "text"
-                    }
+                    kind={taskFileKind(taskFile.name)}
                     pageSize={100}
                     className="border-0"
                   />
@@ -986,7 +460,7 @@ export default function TasksPage() {
                   title={
                     <span className="flex min-w-0 items-center gap-1.5 font-mono text-[11px] text-neutral-500">
                       <FileIcon className="h-3 w-3 shrink-0" /> <span className="truncate">{diffFile.name}</span>
-                      <span className="text-neutral-400">· diff</span>
+                      <span className="text-neutral-400">- diff</span>
                     </span>
                   }
                   actions={

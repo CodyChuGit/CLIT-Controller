@@ -72,13 +72,25 @@ Add a web app manifest, served by the frontend/backend:
       "src": "/icons/bean-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icons/bean-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/bean-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/bean-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
@@ -106,6 +118,8 @@ PWA install flow:
 - Open `http://localhost:8787` in Chrome and use the address-bar install action.
 - Do not install from the Vite dev server; the service worker only registers in
   production builds.
+- If a previously installed copy has a blank icon, remove that installed app and
+  install again so Chrome/macOS refreshes the cached app icon.
 
 ## Launcher Requirements
 
@@ -179,7 +193,7 @@ state.
 ## Acceptance Criteria
 
 - `manifest.webmanifest` is served from `http://localhost:8787` and points to
-  the CLITC bean icons.
+  separate no-alpha `any` and safe-zone `maskable` CLITC bean icons.
 - Chrome can install or run CLITC as a standalone PWA-style app window.
 - `scripts/app-mode.sh` starts the backend if needed and opens Chrome with
   `--app=http://localhost:8787` by default.

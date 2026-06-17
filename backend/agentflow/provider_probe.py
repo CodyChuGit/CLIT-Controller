@@ -238,10 +238,14 @@ async def check_provider(provider_id: str) -> dict:
     if path is not None:
         logs: list[str] = []
         # "{exe}" lets multi-binary providers (e.g. MLX) probe whichever binary was found.
-        version_cmd = d["versionCommand"].replace("{exe}", path)
-        rec = await RUNNER.run_and_wait(version_cmd.split(), Path.home(), timeout=15, provider=provider_id)
+        # Split the template FIRST, then substitute {exe} into the token — the
+        # resolved path may contain spaces (e.g. ~/Library/Application Support/…),
+        # which a post-substitution .split() would shatter into bad argv tokens
+        # and make the probe falsely report the provider broken/missing.
+        version_argv = [tok.replace("{exe}", path) for tok in d["versionCommand"].split()]
+        rec = await RUNNER.run_and_wait(version_argv, Path.home(), timeout=15, provider=provider_id)
         out = (rec.stdout + rec.stderr).strip()
-        logs.append(f"$ {version_cmd}\n{out}")
+        logs.append(f"$ {' '.join(version_argv)}\n{out}")
         if rec.exit_code == 0 and out:
             result["version"] = out.splitlines()[0][:120]
             result["status"] = "ok"
@@ -258,12 +262,12 @@ async def check_provider(provider_id: str) -> dict:
                 result["status"] = "ok" if rec2.exit_code == 0 else "needs_login"
 
         if d.get("modelsCommand"):
-            models_cmd = d["modelsCommand"].replace("{exe}", path)
-            rec3 = await RUNNER.run_and_wait(models_cmd.split(), Path.home(), timeout=10, provider=provider_id)
+            models_argv = [tok.replace("{exe}", path) for tok in d["modelsCommand"].split()]
+            rec3 = await RUNNER.run_and_wait(models_argv, Path.home(), timeout=10, provider=provider_id)
             parsed = _parse_model_lines(rec3.stdout)
             if parsed:
                 result["modelOptions"] = parsed
-                logs.append(f"$ {models_cmd}\n{rec3.stdout.strip()[:600]}")
+                logs.append(f"$ {' '.join(models_argv)}\n{rec3.stdout.strip()[:600]}")
 
         result["lastLog"] = redact("\n\n".join(logs))[-4000:]
 

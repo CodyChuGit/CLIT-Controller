@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
-import re
 import shlex
 from pathlib import Path
 from typing import Optional
 
 from . import config, git_service, paths, policy_service, prompt_templates, queue_service, state_store, task_service, usage_service
+from .agent_commands import build_argv, provider_busy_result
+from .chat_directives import (
+    parse_done_directive,
+    parse_needs_user_directive,
+    parse_queue_directive,
+    parse_run_directives,
+    parse_task_directive,
+    strip_action_blocks,
+)
 from .process_runner import RUNNER, RunRecord, add_log_entry, now_iso
 from .provider_probe import AGENT_PROVIDER_IDS, resolve_executable
 from .redaction import redact
@@ -25,27 +33,8 @@ ORCHESTRATOR_CHANNEL = "orchestrator"
 def _pkey(workspace: Path, channel: str) -> str:
     return f"{workspace}::{channel}"
 
-_TASK_DIRECTIVE_RE = re.compile(r"```agentflow-task\s*\n(.*?)```", re.DOTALL)
-_QUEUE_DIRECTIVE_RE = re.compile(r"```agentflow-queue\s*\n(.*?)```", re.DOTALL)
-_DONE_DIRECTIVE_RE = re.compile(r"```agentflow-done\s*\n(.*?)```", re.DOTALL)
-_NEEDS_USER_DIRECTIVE_RE = re.compile(r"```agentflow-needs-user\s*\n(.*?)```", re.DOTALL)
-_RUN_DIRECTIVE_RE = re.compile(r"```agentflow-run\s*\n(.*?)```", re.DOTALL)
-
 MAX_CONSULTS_PER_TASK = 6
-MAX_RUN_DIRECTIVES = 3
 RUN_WAIT_SECONDS = 15  # quick commands report their result; longer ones keep running
-
-
-def parse_run_directives(text: str) -> list[str]:
-    """All `command:` lines from ```agentflow-run``` blocks (capped)."""
-    commands: list[str] = []
-    for m in _RUN_DIRECTIVE_RE.finditer(text or ""):
-        for line in m.group(1).splitlines():
-            if line.lower().startswith("command:"):
-                cmd = line[8:].strip()
-                if cmd:
-                    commands.append(cmd)
-    return commands[:MAX_RUN_DIRECTIVES]
 
 
 def command_denied(command: str, workspace: Optional[Path] = None) -> Optional[str]:
@@ -153,79 +142,6 @@ async def execute_run_directive(
     )
 
 
-def _parse_reason_block(regex: re.Pattern[str], text: str) -> Optional[str]:
-    m = regex.search(text or "")
-    if not m:
-        return None
-    for line in m.group(1).splitlines():
-        if line.lower().startswith("reason:"):
-            return line[7:].strip() or "no reason given"
-    return "no reason given"
-
-
-def parse_done_directive(text: str) -> Optional[str]:
-    return _parse_reason_block(_DONE_DIRECTIVE_RE, text)
-
-
-def parse_needs_user_directive(text: str) -> Optional[str]:
-    return _parse_reason_block(_NEEDS_USER_DIRECTIVE_RE, text)
-
-
-def _parse_steps(raw: str) -> Optional[list[str]]:
-    """'full' → the standard sequence; otherwise a comma list of valid step ids."""
-    raw = raw.strip().lower()
-    if not raw:
-        return None
-    if raw == "full":
-        return list(task_service.FULL_SEQUENCE)
-    steps = [s.strip() for s in raw.split(",") if s.strip()]
-    if steps and all(s in task_service.STEP_DEFS for s in steps):
-        return steps
-    return None
-
-
-def parse_task_directive(text: str) -> Optional[tuple[str, str, Optional[list[str]]]]:
-    """Extract (title, goal, queue_steps) from an ```agentflow-task``` block."""
-    m = _TASK_DIRECTIVE_RE.search(text or "")
-    if not m:
-        return None
-    title, goal_lines, queue_steps, in_goal = None, [], None, False
-    for line in m.group(1).splitlines():
-        lower = line.lower()
-        if lower.startswith("title:") and title is None:
-            title = line[6:].strip()
-            in_goal = False
-        elif lower.startswith("goal:"):
-            goal_lines.append(line[5:].strip())
-            in_goal = True
-        elif lower.startswith("queue:"):
-            queue_steps = _parse_steps(line[6:])
-            in_goal = False
-        elif in_goal and line.strip():
-            goal_lines.append(line.strip())
-    goal = " ".join(goal_lines).strip()
-    if not title or not goal:
-        return None
-    return title[:200], goal, queue_steps
-
-
-def parse_queue_directive(text: str) -> Optional[tuple[str, list[str]]]:
-    """Extract (task_ref, steps) from an ```agentflow-queue``` block. task_ref may be 'latest'."""
-    m = _QUEUE_DIRECTIVE_RE.search(text or "")
-    if not m:
-        return None
-    task_ref, steps = None, None
-    for line in m.group(1).splitlines():
-        lower = line.lower()
-        if lower.startswith("task:"):
-            task_ref = line[5:].strip()
-        elif lower.startswith("steps:"):
-            steps = _parse_steps(line[6:])
-    if not task_ref or not steps:
-        return None
-    return task_ref, steps
-
-
 def _slug(task_id: str) -> str:
     """Human part of a task id: 20260612-201312-create-simple-calendar-app → create-simple-calendar-app."""
     parts = task_id.split("-", 2)
@@ -317,13 +233,7 @@ def _provider_busy(provider: str) -> Optional[dict]:
     record = RUNNER.running_for_provider(provider)
     if record is None:
         return None
-    step = record.step or "request"
-    return {
-        "status": "provider_busy",
-        "provider": provider,
-        "runId": record.id,
-        "message": f"`{provider}` is already running `{step}`. Wait for it to finish or stop it before starting another `{provider}` request.",
-    }
+    return provider_busy_result(provider, record.id, record.step)
 
 
 async def _workspace_summary(workspace: Path) -> str:
@@ -397,7 +307,7 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
     # Build the prompt only after the cheap checks pass.
     summary = await _workspace_summary(workspace)
     prompt = prompt_templates.orchestrator_chat_prompt(usage, summary, transcript, message)
-    argv = task_service._build_argv(template, prompt, config.get_models().get(provider))
+    argv = build_argv(template, prompt, config.get_models().get(provider))
 
     ws_key = _pkey(workspace, ORCHESTRATOR_CHANNEL)
 
@@ -528,7 +438,7 @@ async def send_direct(workspace: Path, provider: str, message: str) -> dict:
         return {"status": "provider_missing", "message": note}
 
     prompt = prompt_templates.direct_chat_prompt(provider, transcript, message)
-    argv = task_service._build_argv(template, prompt, config.get_models().get(provider))
+    argv = build_argv(template, prompt, config.get_models().get(provider))
     key = _pkey(workspace, provider)
 
     async def on_complete(record: RunRecord) -> None:
@@ -605,7 +515,7 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
 
     state = task_service.task_state_summary(workspace, task_id)
     prompt = prompt_templates.orchestrator_consult_prompt(usage, state, trigger, redact(output_tail[-1500:]))
-    argv = task_service._build_argv(template, prompt, config.get_models().get(provider))
+    argv = build_argv(template, prompt, config.get_models().get(provider))
 
     from datetime import datetime
 
@@ -648,9 +558,7 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
             done_reason = parse_done_directive(out)
             user_reason = parse_needs_user_directive(out)
             commands = parse_run_directives(out)
-            reasoning = _TASK_DIRECTIVE_RE.sub("", _QUEUE_DIRECTIVE_RE.sub("", out))
-            reasoning = _RUN_DIRECTIVE_RE.sub("", reasoning)
-            reasoning = _DONE_DIRECTIVE_RE.sub("", _NEEDS_USER_DIRECTIVE_RE.sub("", reasoning)).strip()[:240]
+            reasoning = strip_action_blocks(out)[:240]
 
             for cmd in commands:
                 try:

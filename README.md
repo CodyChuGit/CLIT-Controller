@@ -82,6 +82,7 @@ You can copy and paste the following prompt into your coding CLI (e.g., Claude C
 ### Chrome PWA Install
 
 Install the PWA from the production single-port app, not the Vite dev server.
+If you previously installed a blank-icon copy, remove that installed app first so Chrome refreshes the icon cache.
 
 To run the app in its own standalone window like a native app:
 

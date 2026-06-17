@@ -1,41 +1,13 @@
 import { StepChip } from "./Markdown";
 import { Disclosure } from "./TaskViews";
 import RawDetail from "./RawDetail";
+import ArtifactChip from "./ArtifactChip";
 import { CARD_STYLE, SEVERITY_TEXT, type CardModel } from "../lib/displayModel";
 
 /* The one card renderer shared by the controller dock (compact) and the Tasks
    page (detailed). Driven entirely by a CardModel's DisplayData so the same
    structured state renders identically at two densities — same dot, title,
    provider/step chips, and status. See docs/task-controller-io-surface.md. */
-
-const SPECIAL_ARTIFACTS: Record<string, string> = {
-  "@code": "production code",
-  "@diff": "git diff",
-  "@folder": "task folder",
-};
-
-function ArtifactChip({ name, onOpen }: { name: string; onOpen?: (name: string) => void }) {
-  const special = SPECIAL_ARTIFACTS[name];
-  if (special) {
-    return (
-      <span className="rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 font-mono text-[10px] text-violet-700 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-300">
-        {special}
-      </span>
-    );
-  }
-  return (
-    <button
-      onClick={() => onOpen?.(name)}
-      disabled={!onOpen}
-      title={onOpen ? `Open ${name}` : name}
-      className={`focusable rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 font-mono text-[10px] text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 ${
-        onOpen ? "cursor-pointer hover:border-blue-400 hover:text-blue-600" : ""
-      }`}
-    >
-      {name.replace(".md", "")}
-    </button>
-  );
-}
 
 export default function TimelineCard({
   card,
@@ -103,8 +75,12 @@ export default function TimelineCard({
         </div>
       )}
 
-      {(d.rawDetail ?? []).map((r, i) => (
-        <Disclosure key={i} label={r.label} className="mt-1.5">
+      {(d.rawDetail ?? []).map((r) => (
+        // Stable, position-independent key: the Disclosure holds open/closed state
+        // and RawDetail holds paging/filter state — array-index keys would bind
+        // that state to a slot and show it against the wrong raw payload when the
+        // list grows/reorders during streaming. (kind+label is unique per card.)
+        <Disclosure key={`${r.kind}:${r.label}`} label={r.label} className="mt-1.5">
           <RawDetail text={r.text ?? ""} kind={r.kind} label={r.label} />
         </Disclosure>
       ))}

@@ -15,10 +15,12 @@ import os
 import pty
 import signal
 import struct
+import subprocess
 import termios
 from pathlib import Path
 from typing import Optional
 
+from . import paths
 from .provider_probe import EXTRA_BIN_DIRS, which
 
 SCROLLBACK_BYTES = 256_000
@@ -45,6 +47,93 @@ def _child_env() -> dict[str, str]:
     return env
 
 
+# -- orphan reaping ---------------------------------------------------------
+# Sessions detach from the backend (start_new_session=True) so their TUIs get
+# clean keystroke delivery — but that also means they outlive a backend that is
+# SIGKILLed or crashes before its shutdown hook runs. We drop a pidfile per
+# session and sweep stale ones on the next startup, so leaked agy/codex/claude
+# process groups (each holding memory + random ports) can't pile up across runs.
+
+
+def _record_session(pid: int, shell: str) -> Optional[Path]:
+    try:
+        run_dir = paths.terminals_run_dir()
+        run_dir.mkdir(parents=True, exist_ok=True)
+        pidfile = run_dir / f"{pid}.session"
+        pidfile.write_text(shell)
+        return pidfile
+    except OSError:
+        return None
+
+
+def _clear_session_file(pidfile: Optional[Path]) -> None:
+    if pidfile is None:
+        return
+    try:
+        pidfile.unlink()
+    except OSError:
+        pass
+
+
+def _proc_tty_and_cmd(pid: int) -> tuple[str, str]:
+    """(controlling tty, command) for a live pid, or ("", "") if it's gone."""
+    try:
+        out = subprocess.run(
+            ["ps", "-o", "tty=", "-o", "command=", "-p", str(pid)],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "", ""
+    line = out.stdout.strip()
+    if not line:
+        return "", ""
+    tty, _, cmd = line.partition(" ")
+    return tty, cmd.strip()
+
+
+def sweep_orphaned_sessions() -> int:
+    """Reap terminal process-groups left behind by a previously crashed or
+    SIGKILLed backend. Safe to call on startup: it only signals a recorded pid
+    that is still a detached shell we plausibly spawned (no controlling tty plus a
+    matching shell name), which guards against pid reuse pointing at an unrelated
+    process. Returns the number of groups signalled."""
+    try:
+        run_dir = paths.terminals_run_dir()
+    except OSError:
+        return 0
+    if not run_dir.is_dir():
+        return 0
+    reaped = 0
+    for pidfile in run_dir.glob("*.session"):
+        try:
+            pid = int(pidfile.stem)
+        except ValueError:
+            _clear_session_file(pidfile)
+            continue
+        try:
+            shell_base = os.path.basename(pidfile.read_text().strip())
+        except OSError:
+            shell_base = ""
+        tty, cmd = _proc_tty_and_cmd(pid)
+        # Our PTY shells have no controlling tty ("??"); a real user shell always
+        # has one. Together with the recorded shell name this avoids killing an
+        # unrelated process that happened to reuse the pid.
+        ours = bool(cmd) and tty in ("??", "?") and (not shell_base or shell_base in cmd)
+        if ours:
+            # SIGKILL the whole group: these are already abandoned, and an
+            # interactive shell ignores SIGTERM while a TUI ignores the pty EOF,
+            # so a gentle signal would leave them lingering.
+            try:
+                os.killpg(os.getpgid(pid), signal.SIGKILL)
+                reaped += 1
+            except (ProcessLookupError, PermissionError, OSError):
+                pass
+        _clear_session_file(pidfile)
+    return reaped
+
+
 class TerminalSession:
     """One PTY + child process, fanning output out to any connected clients."""
 
@@ -59,6 +148,7 @@ class TerminalSession:
         self.rows = 24
         self.cols = 80
         self.exited = False
+        self._pidfile: Optional[Path] = None
 
     async def start(self) -> None:
         loop = asyncio.get_running_loop()
@@ -75,10 +165,19 @@ class TerminalSession:
             stdin=slave_fd,
             stdout=slave_fd,
             stderr=slave_fd,
+            # New session so the shell owns its own process group, but WITHOUT
+            # claiming the pty as a controlling terminal. That keeps bash -i's
+            # job control effectively off, so keystrokes flow straight through
+            # to an auto-launched TUI like `agy` (bubbletea). Making the shell a
+            # controlling-tty owner turns job control on and swallows input.
             start_new_session=True,
             env=_child_env(),
         )
         os.close(slave_fd)
+        # Record the child's pid (== its process-group id, since start_new_session
+        # makes it the group leader) so a future backend can reap this session if
+        # we die abruptly without running our shutdown hook. See sweep_orphaned_sessions.
+        self._pidfile = _record_session(self.proc.pid, _shell())
         loop.add_reader(master_fd, self._on_readable)
         asyncio.create_task(self._watch_exit())
 
@@ -145,7 +244,18 @@ class TerminalSession:
         if self.proc is not None:
             await self.proc.wait()
         self.exited = True
+        _clear_session_file(self._pidfile)
         self._detach_reader()
+        # Close the PTY master here too: a child that exits on its own (the user
+        # typed `exit`, the CLI quit) leaves the session in the manager until
+        # someone reconnects, so without this the master fd leaks for the life of
+        # the process and eventually exhausts the fd limit.
+        if self.master_fd >= 0:
+            try:
+                os.close(self.master_fd)
+            except OSError:
+                pass
+            self.master_fd = -1
         note = b"\r\n\x1b[2m[session ended \xe2\x80\x94 reconnect to restart]\x1b[0m\r\n"
         self.buffer += note
         self._broadcast(bytes(note))
@@ -153,21 +263,41 @@ class TerminalSession:
 
     async def terminate(self) -> None:
         self._detach_reader()
+        pgid: Optional[int] = None
         if self.proc is not None and self.proc.returncode is None:
             try:
-                os.killpg(os.getpgid(self.proc.pid), signal.SIGTERM)
-            except (ProcessLookupError, PermissionError, OSError):
-                try:
+                pgid = os.getpgid(self.proc.pid)
+            except (ProcessLookupError, OSError):
+                pgid = None
+            try:
+                if pgid is not None:
+                    os.killpg(pgid, signal.SIGTERM)
+                else:
                     self.proc.terminate()
-                except ProcessLookupError:
-                    pass
+            except (ProcessLookupError, PermissionError, OSError):
+                pass
         if self.master_fd >= 0:
             try:
                 os.close(self.master_fd)
             except OSError:
                 pass
             self.master_fd = -1
+        # Force-kill backstop: an interactive shell ignores SIGTERM and a TUI can
+        # ignore the EOF from closing the pty, so without this a restarted/closed
+        # session could linger as an orphan (and slip past the startup sweep, since
+        # we clear its pidfile below). Give it ~1s to go on its own, then SIGKILL.
+        if pgid is not None:
+            for _ in range(10):
+                if self.proc is None or self.proc.returncode is not None:
+                    break
+                await asyncio.sleep(0.1)
+            else:
+                try:
+                    os.killpg(pgid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError, OSError):
+                    pass
         self.exited = True
+        _clear_session_file(self._pidfile)
         self._broadcast(CLOSED)
 
 
@@ -199,6 +329,13 @@ def session_key(workspace: Path, provider: str) -> str:
     return f"{workspace}::{provider}"
 
 
+# NOTE: do NOT auto-submit a starter prompt to Antigravity's `agy` via
+# `-i <prompt>`. agy spends several seconds after launch on auth / experiment /
+# quota init (the log shows transient "You are not logged into Antigravity"
+# errors until it settles). A prompt handed to it during that window — whether
+# typed or passed with `-i` — is accepted, cleared, and never dispatched, leaving
+# the TUI stuck in a busy state that won't take input. Launch the bare CLI and
+# let the user type once it's ready.
 def launch_command(provider: str) -> Optional[str]:
     """The bare CLI command to auto-run for a provider, or None if not installed."""
     found = which(provider)

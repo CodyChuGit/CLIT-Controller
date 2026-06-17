@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import __version__, config, paths, queue_service, state_store
 from .process_runner import add_log_entry
-from .terminal_service import TERMINALS
+from .terminal_service import TERMINALS, sweep_orphaned_sessions
 from .api import (
     routes_agents,
     routes_chat,
@@ -44,6 +44,18 @@ async def _lifespan(app: FastAPI):
                 )
     except Exception as exc:  # noqa: BLE001 — recovery must never block startup
         add_log_entry("system", f"startup recovery failed: {exc}", status="error")
+
+    # Reap PTY terminal sessions orphaned by a prior backend that died without
+    # running its shutdown hook (crash / SIGKILL), so leaked agy/codex/claude
+    # process groups don't accumulate across restarts.
+    try:
+        reaped = sweep_orphaned_sessions()
+        if reaped:
+            add_log_entry(
+                "system", f"startup cleanup: reaped {reaped} orphaned terminal session(s)", status="warn"
+            )
+    except Exception as exc:  # noqa: BLE001 — cleanup must never block startup
+        add_log_entry("system", f"terminal cleanup failed: {exc}", status="error")
 
     # The dispatcher cues queued steps to agents for as long as the app runs.
     dispatcher = asyncio.create_task(queue_service.dispatcher_loop())

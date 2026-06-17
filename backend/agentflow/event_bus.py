@@ -100,7 +100,11 @@ class EventBus:
                 if e["id"] > after_id and (ws is None or e["workspacePath"] in (ws, None))
             ]
         if limit is not None:
-            items = items[-limit:]
+            # Keep the OLDEST `limit` unseen events, not the newest. Readers resume
+            # by cursor (the id of the last event they consumed); returning the tail
+            # would advance the cursor past the oldest unseen events and silently
+            # drop them. Oldest-first means the next fetch picks up the remainder.
+            items = items[:limit]
         return items
 
     def cursor(self) -> int:

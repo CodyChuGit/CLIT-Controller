@@ -69,10 +69,15 @@ async def terminal_ws(ws: WebSocket, provider: str) -> None:
     session = await TERMINALS.get_or_create(key, str(workspace), launch_command(provider))
 
     queue: asyncio.Queue = asyncio.Queue(maxsize=2000)
-    # Replay scrollback so a (re)connecting client sees the session so far.
-    if session.buffer:
-        await ws.send_bytes(bytes(session.buffer))
+    # Snapshot the scrollback and register for live output in one synchronous
+    # step (no await between), then send the snapshot. Registering after an
+    # `await ws.send_bytes(...)` would let the PTY reader append + broadcast bytes
+    # during that await with no queue attached yet — those bytes would be missing
+    # from both the snapshot and the live stream, leaving a gap on (re)connect.
+    snapshot = bytes(session.buffer)
     session.clients.add(queue)
+    if snapshot:
+        await ws.send_bytes(snapshot)
 
     async def pump() -> None:
         while True:

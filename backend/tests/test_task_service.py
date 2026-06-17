@@ -43,7 +43,7 @@ def test_routing_decisions_written(tmp_path):
     decisions = (ws / ".agentflow" / "tasks" / meta["id"] / "ROUTING_DECISIONS.md").read_text()
     assert "# Routing Decisions" in decisions
     assert "## Budget Context" in decisions
-    assert "Mode:" in decisions
+    assert "Traffic control mode:" in decisions
 
 
 def test_task_listing_and_detail(tmp_path):

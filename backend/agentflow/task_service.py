@@ -16,51 +16,15 @@ from . import (
     git_service,
     paths,
     prompt_templates,
-    provider_probe,
     routing_service,
     state_store,
     transitions,
     usage_service,
 )
+from .agent_commands import build_argv as _build_argv, provider_busy_result
 from .process_runner import RUNNER, RunRecord, add_log_entry, now_iso
 from .redaction import redact
-
-# step id -> (routing role, human label)
-STEP_DEFS: dict[str, dict] = {
-    # Labels are provider-neutral; the routed provider is shown alongside in the UI.
-    "codex_spec": {"role": "pm", "label": "Write Spec"},
-    "claude_implement": {"role": "engineer", "label": "Implement"},
-    "gemini_qa": {"role": "qa", "label": "QA / Test"},
-    "codex_review": {"role": "pm", "label": "Final Review"},
-    "claude_fix": {"role": "engineer", "label": "Fix Bugs"},
-}
-
-# What each step reads and writes — the handoff contract between agents.
-# "@diff" = current git diff, "@code" = production code, "@folder" = whole task folder.
-STEP_IO: dict[str, dict] = {
-    "codex_spec": {
-        "reads": ["00_USER_GOAL.md"],
-        "writes": ["01_CODEX_SPEC.md", "02_CODEX_IMPLEMENTATION_PLAN.md"],
-    },
-    "claude_implement": {
-        "reads": ["01_CODEX_SPEC.md", "02_CODEX_IMPLEMENTATION_PLAN.md"],
-        "writes": ["@code", "04_CLAUDE_IMPLEMENTATION_SUMMARY.md"],
-    },
-    "gemini_qa": {
-        "reads": ["@diff", "04_CLAUDE_IMPLEMENTATION_SUMMARY.md"],
-        "writes": ["05_QA_RESULTS.md", "06_BUGS_FOR_CLAUDE.md"],
-    },
-    "codex_review": {
-        "reads": ["@diff", "@folder"],
-        "writes": ["07_CODEX_FINAL_REVIEW.md"],
-    },
-    "claude_fix": {
-        "reads": ["06_BUGS_FOR_CLAUDE.md"],
-        "writes": ["@code", "04_CLAUDE_IMPLEMENTATION_SUMMARY.md"],
-    },
-}
-
-FULL_SEQUENCE = ["codex_spec", "claude_implement", "gemini_qa", "codex_review"]
+from .workflow import FULL_SEQUENCE, STEP_DEFS, STEP_IO
 
 MAX_EVENTS = 300
 
@@ -328,29 +292,6 @@ def list_task_logs(workspace: Path, task_id: str) -> list[dict]:
 # ------------------------------------------------------------------ run a step
 
 
-def _build_argv(template: str, prompt: str, model: Optional[str] = None) -> list[str]:
-    tokens = shlex.split(template)
-    argv: list[str] = []
-    replaced = False
-    for token in tokens:
-        if token == "{model}":
-            # Expands to `--model <name>` when a model is configured, vanishes otherwise.
-            if model:
-                argv.extend(["--model", model])
-        elif "{prompt}" in token:
-            argv.append(token.replace("{prompt}", prompt))
-            replaced = True
-        else:
-            argv.append(token)
-    if not replaced:
-        argv.append(prompt)
-    # Resolve binaries that live outside the backend's PATH (e.g. ~/.local/bin/agy).
-    resolved = provider_probe.resolve_executable(argv[0])
-    if resolved:
-        argv[0] = resolved
-    return argv
-
-
 def build_step_preview(
     workspace: Path, task_id: str, step: str, usage: Optional[dict] = None, provider_override: Optional[str] = None
 ) -> dict:
@@ -448,15 +389,7 @@ async def run_step(
 
     busy = RUNNER.running_for_provider(provider)
     if busy is not None:
-        return {
-            "status": "provider_busy",
-            "message": (
-                f"`{provider}` is already running `{busy.step or 'request'}`. "
-                f"Wait for it to finish or stop it before starting another `{provider}` request."
-            ),
-            "runId": busy.id,
-            **preview,
-        }
+        return {**provider_busy_result(provider, busy.id, busy.step), **preview}
 
     # Keep 03_CLAUDE_PROMPT.md current whenever a Claude implementation runs.
     if step == "claude_implement":
@@ -588,15 +521,7 @@ async def run_step(
 
     busy = RUNNER.running_for_provider(provider)
     if busy is not None:
-        return {
-            "status": "provider_busy",
-            "message": (
-                f"`{provider}` is already running `{busy.step or 'request'}`. "
-                f"Wait for it to finish or stop it before starting another `{provider}` request."
-            ),
-            "runId": busy.id,
-            **preview,
-        }
+        return {**provider_busy_result(provider, busy.id, busy.step), **preview}
 
     record, consume_task = await RUNNER.start(
         argv, workspace,

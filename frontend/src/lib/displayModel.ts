@@ -159,7 +159,10 @@ export function cardFromTaskEvent(e: TaskEvent, index: number): CardModel {
       step: e.step,
       timestamp: e.time,
       summary: { title: CARD_STYLE[type].label, bullets: e.detail ? [e.detail] : [] },
-      artifacts: e.artifacts ?? [],
+      // Surface changed production files too — they're carried separately from
+      // written artifacts but both render as file chips on the card; dropping
+      // codeChanged silently hid the most important "what changed" signal.
+      artifacts: Array.from(new Set([...(e.artifacts ?? []), ...(e.codeChanged ?? [])])),
     },
   };
 }
