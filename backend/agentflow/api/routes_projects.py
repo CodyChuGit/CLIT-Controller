@@ -9,7 +9,13 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 
 from .. import config, git_service, paths, state_store, workspace as workspace_service
-from ..models import GitCommitRequest, GitPathRequest, SettingsUpdateRequest, WorkspaceRequest
+from ..models import (
+    FileWriteRequest,
+    GitCommitRequest,
+    GitPathRequest,
+    SettingsUpdateRequest,
+    WorkspaceRequest,
+)
 from ..process_runner import add_log_entry
 
 router = APIRouter()
@@ -63,6 +69,18 @@ def read_file(path: str):
         raise HTTPException(status_code=404, detail=f"File not found: {exc}") from exc
     except (PermissionError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/file")
+def write_file(body: FileWriteRequest):
+    try:
+        result = workspace_service.write_text_file(require_workspace(), body.path, body.content)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"File not found: {exc}") from exc
+    except (PermissionError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    add_log_entry("system", f"saved {body.path} ({result['size']} bytes)")
+    return result
 
 
 @router.get("/git")

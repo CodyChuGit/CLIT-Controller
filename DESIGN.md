@@ -95,6 +95,9 @@ icon buttons, status badges, markdown renderer, terminal stack, and task views.
 - **Transcript:** user prompts, agent replies, system notices, command results,
   failures, task directives, and queue updates render as styled rows. Raw prompts,
   raw logs, and long outputs live behind expanders.
+- **Live output:** active runs append transcript deltas, command output chunks,
+  approval waits, queue changes, errors, and completion status in place. The user
+  should never need a separate terminal to know whether a run is still moving.
 - **Terminal drawer:** provider-scoped PTY terminals are docked inside the Agent
   Dock as a drawer or split pane, using the same xterm.js theme as Terminals.
 - **Approval and diff cards:** use compact bordered panels for approval holds,
@@ -110,7 +113,7 @@ icon buttons, status badges, markdown renderer, terminal stack, and task views.
 
 ## Tasks Tab
 
-The Tasks tab is the durable VS Code-extension parity surface. It should expose
+The Tasks tab is the durable VS Code-style parity surface. It should expose
 the same provider capabilities as the Agent Dock, but optimized for review,
 audit, recovery, and continuing work after a run finishes.
 
@@ -120,6 +123,9 @@ audit, recovery, and continuing work after a run finishes.
 - **Conversation replay:** prompt/output exchanges render as styled transcript
   rows with provider marks, step chips, elapsed time, status, and expandable raw
   prompt/output. Budget context and commands render as summarized cards first.
+- **Active task stream:** when a selected task is running, show the same live
+  output, queue, approval, error, and completion events as the Agent Dock. Once
+  complete, the stream settles into the durable replay view.
 - **Artifacts and files:** task markdown, changed files, diffs, logs, approvals,
   and final reports appear as tabs or panel sections inside the task detail view;
   raw markdown remains available but is never the default reading experience.

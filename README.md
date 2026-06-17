@@ -45,13 +45,19 @@ Missing CLIs are handled gracefully: the step's prompt is saved into the task fo
 *The CLIT Controller Agents view for managing installed CLI agents and their configuration.*
 
 
-CLITC's preferred UI direction is native VS Code extension feature parity across
+CLITC's preferred UI direction is native VS Code-style agent feature parity across
 two surfaces without running VS Code plugins. The right-hand Agent Dock should
 feel like live provider panels for Codex, Claude Code, Antigravity, and the
 controller: dense tabs with chat, terminal, queue, approval, diff, and status
 context. The Tasks tab should carry the same parity into durable task review:
 session timelines, prompt/output exchanges, task files, approvals, diffs, logs,
 retries, reroutes, and final reports.
+
+In that revision, live output is required in both places. Active runs should show
+streaming transcript updates, command output, approval waits, queue changes,
+errors, and completion status in the Agent Dock and in the selected Tasks tab
+detail. Polling can remain as a compatibility fallback, but the target UX is not
+final-snapshot-only.
 
 Both surfaces stay inside CLITC. They use the official CLIs through the existing
 backend traffic control, PTY terminal, task, log, policy, and approval systems.
@@ -90,9 +96,9 @@ Backend alone: `.venv/bin/python -m agentflow`. If you build the frontend once (
 1. **Explorer** → enter a workspace folder path and open it. The backend creates `<workspace>/.agentflow/` (config, usage.json, tasks/). The explorer is laid out like an IDE: side panel (workspace, source control, files), tabbed read-only editor with line numbers, a collapsible Output/Logs panel, and a status bar (backend, workspace, branch, traffic control mode). The **Source Control** section works like VS Code's: live per-file status (M/A/D/U badges), click a file to open its color-coded diff in a tab, stage/unstage per file or Stage All, and commit with a message — staging and committing only ever happen when you click them. Local folder paths are resolved by the Python backend — browsers can't pick arbitrary folders.
 2. **Agents** → Check All. See versions, auth status (`gh auth status`), and launch login/setup commands in Terminal (macOS) or copy them. Each agent card has a **Model** field — set the model that CLI should use (passed as `--model <name>` via the `{model}` placeholder in its command template; empty = the CLI's own default).
 3. **Usage** → pick a traffic control mode and set provider health (green/yellow/red) to match your real quota state.
-4. **Chat (right-hand dock)** → ask for work from the right-hand dock. The controller creates tasks (```agentflow-task``` with an optional `queue:` line) and queues steps to agents (```agentflow-queue```). The planned Agent Dock is the live VS Code-extension parity surface for Codex, Claude Code, Antigravity, and controller chat: provider tabs, command actions, chat panes, terminal context, approval cards, diff summaries, and compact status. CLITC writes the task folder with all markdown handoff files (`00_USER_GOAL.md` … `07_CODEX_FINAL_REVIEW.md`, `ROUTING_DECISIONS.md`).
-5. **Tasks** → review the durable side of the same parity path. The Tasks tab should summarize prompt/output exchanges, budget context, commands, approvals, diffs, queue state, logs, retries, reroutes, and final reports without forcing users to read raw markdown or CLI output first.
-6. **The execution queue runs itself**: a background dispatcher cues one step per agent at a time, preserving queue order within a task. A failed step pauses that task's queue (Approve to continue); Manual Approval mode holds every item for a click; red-Claude items wait for explicit approval. The queue lives in `.agentflow/queue.json`, shows on the Tasks tab and in the status bar, and steps can also be run directly from the flow board. Logs stream into the UI (polling) and are saved, redacted, under the task's `logs/` folder.
+4. **Chat (right-hand dock)** → ask for work from the right-hand dock. The controller creates tasks (```agentflow-task``` with an optional `queue:` line) and queues steps to agents (```agentflow-queue```). The planned Agent Dock is the live VS Code-style parity surface for Codex, Claude Code, Antigravity, and controller chat: provider tabs, command actions, chat panes, terminal context, approval cards, diff summaries, active output, and compact status. CLITC writes the task folder with all markdown handoff files (`00_USER_GOAL.md` … `07_CODEX_FINAL_REVIEW.md`, `ROUTING_DECISIONS.md`).
+5. **Tasks** → review the durable side of the same parity path. The Tasks tab should summarize prompt/output exchanges, budget context, commands, approvals, diffs, queue state, logs, retries, reroutes, and final reports without forcing users to read raw markdown or CLI output first. For active work, the selected task should show the same live output stream as the dock before becoming the durable replay.
+6. **The execution queue runs itself**: a background dispatcher cues one step per agent at a time, preserving queue order within a task. A failed step pauses that task's queue (Approve to continue); Manual Approval mode holds every item for a click; red-Claude items wait for explicit approval. The queue lives in `.agentflow/queue.json`, shows on the Tasks tab and in the status bar, and steps can also be run directly from the flow board. Current beta logs update in the UI by polling and are saved, redacted, under the task's `logs/` folder; the VS Code-style dock/tasks revision should use event-backed live output with polling as a fallback.
 7. **Logs** → global redacted activity console.
 
 ## Auth & security model
@@ -111,7 +117,9 @@ Usage is **approximate by design**: calls per provider, estimated prompt/output 
 
 ## Known limitations
 
-- Logs update by polling (2.5–3s), not streaming.
+- Current beta logs update by polling (2.5–3s). The planned VS Code-style Agent
+  Dock and Tasks tab require event-backed live output, with polling only as a
+  fallback.
 - Agent CLIs run **non-interactively** (`codex exec`, `claude -p`, `agy --sandbox -p`). Interactive sessions (logins) open in Terminal.app on macOS. Agents that want to edit files may need permission flags added to their command template in Settings (e.g. Claude Code permission modes) — deliberately not defaulted for safety.
 - The planned Agent Dock and Tasks tab are native VS Code-style parity surfaces, not real VS Code plugin UI.
 - Command templates are global (`~/.agentflow/config.json`), editable in Settings.

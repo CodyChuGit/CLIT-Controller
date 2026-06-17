@@ -122,3 +122,41 @@ def read_text_file(workspace: Path, rel_path: str) -> dict:
         "truncated": size > PREVIEW_LIMIT_BYTES,
         "content": raw.decode("utf-8", errors="replace"),
     }
+
+
+def _resolve_in_workspace(workspace: Path, rel_path: str) -> Path:
+    """Resolve rel_path inside workspace, refusing escapes and .env files."""
+    workspace = workspace.resolve()
+    target = (workspace / rel_path).resolve()
+    if not str(target).startswith(str(workspace) + os.sep) and target != workspace:
+        raise PermissionError("Path escapes the workspace")
+    name = target.name
+    if name.startswith(".env") and name != ".env.example":
+        raise PermissionError(".env files are never written")
+    if not _is_previewable(name):
+        raise ValueError(f"Not an editable text file: {name}")
+    return target
+
+
+def write_text_file(workspace: Path, rel_path: str, content: str) -> dict:
+    """Overwrite an existing text file with new content. Mirrors the read
+    guards (in-workspace, no .env, previewable text only) and refuses to write
+    files large enough that the editor would have only loaded a truncated head."""
+    target = _resolve_in_workspace(workspace, rel_path)
+    if not target.is_file():
+        raise FileNotFoundError(rel_path)
+
+    encoded = content.encode("utf-8")
+    if len(encoded) > PREVIEW_LIMIT_BYTES:
+        raise ValueError(f"File too large to save from the editor (max {PREVIEW_LIMIT_BYTES // 1024} KB)")
+
+    with open(target, "wb") as f:
+        f.write(encoded)
+
+    size = target.stat().st_size
+    return {
+        "path": rel_path,
+        "size": size,
+        "truncated": False,
+        "content": content,
+    }

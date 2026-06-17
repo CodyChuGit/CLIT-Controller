@@ -205,6 +205,9 @@ Tasks:
   reports.
 - Add a compact command row, command palette actions, styled transcripts, approval
   cards, diff summaries, task context, queue context, and dock status footer.
+- Add live output to both surfaces: transcript deltas, terminal output chunks,
+  command lifecycle events, approval waits, queue position changes, errors, and
+  completion status while a run is active.
 - Add task exchange cards that summarize budget context, commands, raw prompts,
   raw outputs, provider decisions, and artifacts before showing raw markdown.
 - Reuse the PTY/WebSocket/xterm.js terminal stack as provider-scoped terminal
@@ -223,6 +226,8 @@ Acceptance criteria:
   a live VS Code-style panel experience inside CLITC.
 - The Tasks tab gives the same workflows a durable VS Code-style history,
   approval, diff, retry, and final-report experience.
+- Active run output is visible from both the Agent Dock and the selected Tasks tab
+  without opening a separate terminal or waiting for the final result.
 - Commands, logs, approvals, diffs, and queue blockers are summarized and styled
   by default, with raw details available behind expanders.
 - Existing backend traffic control, task files, CLI execution, policy, approvals, and

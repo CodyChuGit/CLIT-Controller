@@ -25,6 +25,11 @@ class FileRequest(BaseModel):
     path: str
 
 
+class FileWriteRequest(BaseModel):
+    path: str = Field(min_length=1)
+    content: str
+
+
 class AgentActionRequest(BaseModel):
     id: str
 

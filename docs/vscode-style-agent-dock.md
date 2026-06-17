@@ -25,6 +25,11 @@ workbench. The Tasks tab should evolve the durable task folder and queue views
 into the review, history, approval, diff, retry, and final-report surface. Both
 are native CLITC product surfaces, not wrappers around VS Code.
 
+Live output is part of the product decision, not a follow-up nice-to-have. During
+an active controller, Codex, Claude Code, or Antigravity run, CLITC should show
+progress in both the Agent Dock and the selected Tasks tab detail without making
+the user open a separate terminal or wait for a final snapshot.
+
 ## Target UX
 
 Right-hand Agent Dock:
@@ -35,6 +40,9 @@ Right-hand Agent Dock:
   stop, clear, and command palette actions.
 - Chat panes that render user prompts, agent replies, task directives, command
   results, and failures as styled rows instead of raw text dumps.
+- Active run streams that show transcript deltas, tool or command start/finish
+  events, terminal output chunks, approval waits, queue changes, errors, and
+  completion status as the run progresses.
 - A terminal drawer per provider for live CLI sessions, reusing the existing
   PTY/WebSocket/xterm.js terminal stack.
 - Diff and approval cards for risky actions, failed steps, changed files, and
@@ -52,6 +60,8 @@ Tasks tab:
 - Task list, queue state, and active runs presented as a dense IDE work queue.
 - Per-task conversation replay with styled prompt/output exchanges, provider
   marks, step chips, status, elapsed time, and expandable raw details.
+- Live output for the selected active task, using the same event stream as the
+  Agent Dock. When the run finishes, the live view becomes the durable replay.
 - Budget context, repeated command blocks, approvals, failures, and queue updates
   summarized as human-readable cards instead of raw markdown or log dumps.
 - Task artifacts grouped into compact tabs or panel sections: task files, diffs,
@@ -77,6 +87,14 @@ The implementation should keep the current architecture:
 
 Future additive interface needs:
 
+- Structured live run events for `run.started`, `run.output`, `run.finished`,
+  failures, cancellation, and final summaries.
+- Terminal output chunks that can be attached to a provider, task, run, step, and
+  log file without duplicating raw log rendering in the UI.
+- Tool and command lifecycle events for start, output, finish, error, retry, and
+  stop.
+- Approval, diff, queue-position, and task-status events that update the dock and
+  Tasks tab while work is still running.
 - Provider action descriptors for native dock actions.
 - Structured approval and diff summaries.
 - A unified status projection from queue, runs, terminals, usage, and task state
@@ -99,13 +117,15 @@ Future additive interface needs:
 
 ## Acceptance Criteria
 
-- The right-hand dock reads as a VS Code-style agent panel while remaining an
+- The right-hand dock reads as a VS Code-style agent panel while remaining a
   CLITC-native React component.
 - The Tasks tab reads as the durable VS Code-style session/history surface for
   the same agents, with equivalent task review and continuation controls.
 - Codex, Claude Code, and Antigravity chats are available from provider tabs.
 - The controller, queue, task context, approvals, terminals, and logs are visible
   from the dock and Tasks tab without forcing users to read raw CLI output first.
+- Active runs show live output in both the Agent Dock and the selected Tasks tab,
+  including command output, approval waits, errors, queue changes, and completion.
 - Commands, failures, approvals, and diffs use compact styled rows/cards with raw
   details available behind expanders.
 - No feature requires VS Code to be installed or opened.

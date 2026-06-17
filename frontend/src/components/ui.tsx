@@ -1,7 +1,29 @@
 import type { ReactNode } from "react";
+import { Spinner } from "./icons";
 
 /* Shared layout primitives — every page and panel composes these so the shell
    reads as one design. See DESIGN.md. */
+
+/** Centered spinner + one muted line, for panes waiting on their first fetch
+    (usage, agents, …). Use `.skeleton` instead when the shape is known ahead. */
+export function Loading({
+  label = "Loading…",
+  className = "py-24",
+}: {
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`flex flex-col items-center justify-center gap-2 text-center text-neutral-400 ${className}`}
+      role="status"
+      aria-live="polite"
+    >
+      <Spinner className="h-5 w-5" />
+      <p className="text-xs">{label}</p>
+    </div>
+  );
+}
 
 /** Standard page: scrollable canvas, centered max-w-5xl column, h1 + actions row. */
 export function PageShell({

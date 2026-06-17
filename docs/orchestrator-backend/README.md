@@ -53,6 +53,10 @@ provider contracts, predictable approvals, and a complete verification matrix.
   parity surfaces. They should use backend task, queue, terminal, approval, and
   log contracts directly; they should not run VS Code plugins, load `.vsix`
   packages, or launch real VS Code.
+- Treat live output as a shared backend contract for the Agent Dock and Tasks tab.
+  Active runs should emit structured output, command lifecycle, approval, queue,
+  error, and completion events that both surfaces can render immediately, with
+  polling endpoints kept only as compatibility fallbacks.
 
 ## Current Backend Map
 
@@ -68,4 +72,4 @@ provider contracts, predictable approvals, and a complete verification matrix.
 | Usage | `backend/agentflow/usage_service.py` | Approximate usage, live best-effort provider usage |
 | Workspace | `backend/agentflow/config.py`, `paths.py`, `workspace.py` | Local config and `.agentflow/` layout |
 | Frontend contract | `frontend/src/api.ts`, `frontend/src/types.ts` | Existing API shapes the backend must preserve or version |
-| Right dock primitives | `frontend/src/components/ChatPanel.tsx`, `frontend/src/pages/TerminalsPage.tsx` | Current chat and terminal surfaces that form the basis for the future native Agent Dock |
+| Dock and task primitives | `frontend/src/components/ChatPanel.tsx`, `frontend/src/pages/TasksPage.tsx`, `frontend/src/pages/TerminalsPage.tsx` | Current chat, task, and terminal surfaces that form the basis for the future native Agent Dock and Tasks tab |

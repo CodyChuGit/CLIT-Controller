@@ -16,10 +16,13 @@ interface Props {
   onProjectChange: () => void;
   openFiles: EditorFile[];
   activePath: string | null;
+  drafts: Record<string, string>;
   onOpenFile: (path: string) => void;
   onOpenDiff: (path: string, staged: boolean) => void;
   onCloseFile: (path: string) => void;
   onActivateFile: (path: string) => void;
+  onDraftChange: (path: string, content: string) => void;
+  onSaveFile: (path: string, content: string) => Promise<void>;
 }
 
 /** VS Code-style explorer: side panel (workspace, source control, files) + tabbed editor + output panel. */
@@ -28,10 +31,13 @@ export default function ProjectsPage({
   onProjectChange,
   openFiles,
   activePath,
+  drafts,
   onOpenFile,
   onOpenDiff,
   onCloseFile,
   onActivateFile,
+  onDraftChange,
+  onSaveFile,
 }: Props) {
   const [pathInput, setPathInput] = useState("");
   const [saving, setSaving] = useState(false);
@@ -187,6 +193,11 @@ export default function ProjectsPage({
             {openFiles.map((f) => {
               const active = f.path === activePath;
               const name = f.path.split("/").pop() ?? f.path;
+              const dirty = drafts[f.path] !== undefined && drafts[f.path] !== f.content;
+              const close = () => {
+                if (dirty && !window.confirm(`Discard unsaved changes to ${name}?`)) return;
+                onCloseFile(f.path);
+              };
               return (
                 <div
                   key={f.path}
@@ -208,9 +219,10 @@ export default function ProjectsPage({
                   >
                     <FileTypeIcon name={name} className="shrink-0" />
                     {name}
+                    {dirty && <span className="text-amber-500" title="Unsaved changes" aria-label="unsaved">•</span>}
                     {f.error && <span className="text-rose-500">!</span>}
                   </button>
-                  <IconButton label={`Close ${name}`} onClick={() => onCloseFile(f.path)}>
+                  <IconButton label={`Close ${name}`} onClick={close}>
                     <Close className="h-3 w-3" />
                   </IconButton>
                 </div>
@@ -221,7 +233,12 @@ export default function ProjectsPage({
 
         <div className="min-h-0 flex-1">
           {hasWorkspace ? (
-            <CodeReader file={activeFile} />
+            <CodeReader
+              file={activeFile}
+              draft={activeFile ? drafts[activeFile.path] : undefined}
+              onDraftChange={onDraftChange}
+              onSave={onSaveFile}
+            />
           ) : (
             <EmptyState
               className="h-full bg-white dark:bg-neutral-900"

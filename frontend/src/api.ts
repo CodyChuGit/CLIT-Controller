@@ -67,6 +67,7 @@ export const api = {
   setWorkspace: (path: string) => post<{ ok: boolean; workspacePath: string }>("/projects/workspace", { path }),
   tree: () => get<Tree>("/projects/tree"),
   file: (path: string) => get<FileContent>(`/projects/file?path=${encodeURIComponent(path)}`),
+  saveFile: (path: string, content: string) => post<FileContent>("/projects/file", { path, content }),
   git: () => get<GitInfo>("/projects/git"),
   gitStatus: () => get<GitStatus>("/projects/git/status"),
   gitFileDiff: (path: string, staged: boolean) =>

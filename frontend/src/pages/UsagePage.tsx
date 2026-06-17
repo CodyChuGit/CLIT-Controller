@@ -3,7 +3,7 @@ import { api } from "../api";
 import BudgetModePicker from "../components/BudgetModePicker";
 import { Refresh } from "../components/icons";
 import RoutingRecommendationCard from "../components/RoutingRecommendationCard";
-import { PageShell } from "../components/ui";
+import { Loading, PageShell } from "../components/ui";
 import UsageHealthBadge from "../components/UsageHealthBadge";
 import type { Health, LiveProviderUsage, OrchestrationMode, Recommendation, Usage } from "../types";
 
@@ -23,8 +23,18 @@ function pctColor(used: number): string {
 }
 
 /** One aligned row per CLI-reported window: label · bar (fill = remaining) · % left · reset. */
-function QuotaCell({ liveData }: { liveData?: LiveProviderUsage }) {
+function QuotaCell({ liveData, loading }: { liveData?: LiveProviderUsage; loading?: boolean }) {
   const windows = liveData?.available ? liveData.windows ?? [] : [];
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2.5 text-[11px]">
+        <span className="w-16 shrink-0" aria-hidden="true" />
+        <span className="skeleton h-1.5 min-w-0 flex-1" />
+        <span className="w-16 shrink-0" aria-hidden="true" />
+        <span className="w-28 shrink-0" aria-hidden="true" />
+      </div>
+    );
+  }
   if (windows.length === 0) {
     return (
       <div className="flex items-center gap-2.5 text-[11px]">
@@ -79,14 +89,22 @@ export default function UsagePage() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    // Base usage + recommendations are cheap; render the table from them right
+    // away. Live quota shells out to each CLI (slow, 120s-cached) — fetch it
+    // separately so the cells show their own loading state meanwhile.
     try {
-      const [u, r, l] = await Promise.all([api.usage(), api.recommendations(), api.usageLive()]);
+      const [u, r] = await Promise.all([api.usage(), api.recommendations()]);
       setUsage(u);
       setRec(r);
-      setLive(l);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    try {
+      setLive(await api.usageLive());
+    } catch {
+      setLive({}); // clear the loading state; cells fall back to "NA"
     }
   }, []);
 
@@ -123,6 +141,7 @@ export default function UsagePage() {
         </button>
       }
     >
+        {!usage && <Loading label="Loading usage…" />}
 
         {usage && (
           <>
@@ -165,7 +184,7 @@ export default function UsagePage() {
                         <UsageHealthBadge value={p.health} onChange={(h) => void setHealth(id, h)} name={id} />
                       </td>
                       <td className="px-3 py-2.5">
-                        <QuotaCell liveData={live?.[id]} />
+                        <QuotaCell liveData={live?.[id]} loading={live === null} />
                       </td>
                     </tr>
                   ))}

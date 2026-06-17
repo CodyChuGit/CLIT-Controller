@@ -34,6 +34,33 @@ export default function App() {
   // Editor tabs live here so open files survive page switches.
   const [openFiles, setOpenFiles] = useState<EditorFile[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
+  // Unsaved editor edits, keyed by path — survive tab/page switches until saved.
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+
+  const setDraft = useCallback((path: string, content: string) => {
+    setDrafts((prev) => ({ ...prev, [path]: content }));
+  }, []);
+  const clearDraft = useCallback((path: string) => {
+    setDrafts((prev) => {
+      if (!(path in prev)) return prev;
+      const next = { ...prev };
+      delete next[path];
+      return next;
+    });
+  }, []);
+
+  const saveFile = useCallback(
+    async (path: string, content: string) => {
+      const saved = await api.saveFile(path, content);
+      setOpenFiles((prev) =>
+        prev.map((f) =>
+          f.path === path ? { ...f, content: saved.content, size: saved.size, truncated: saved.truncated, error: undefined } : f,
+        ),
+      );
+      clearDraft(path);
+    },
+    [clearDraft],
+  );
 
   const loadProject = useCallback(async () => {
     try {
@@ -88,6 +115,7 @@ export default function App() {
   useEffect(() => {
     setOpenFiles([]);
     setActivePath(null);
+    setDrafts({});
     setGit(null);
     setUsage(null);
     const ws = project?.workspacePath;
@@ -175,8 +203,9 @@ export default function App() {
         }
         return next;
       });
+      clearDraft(path);
     },
-    [activePath],
+    [activePath, clearDraft],
   );
 
   const needsWorkspace = page !== "projects" && page !== "agents" && page !== "settings" && !project?.workspacePath;
@@ -219,10 +248,13 @@ export default function App() {
                   onProjectChange={loadProject}
                   openFiles={openFiles}
                   activePath={activePath}
+                  drafts={drafts}
                   onOpenFile={openFile}
                   onOpenDiff={openDiff}
                   onCloseFile={closeFile}
                   onActivateFile={setActivePath}
+                  onDraftChange={setDraft}
+                  onSaveFile={saveFile}
                 />
               )}
               {page === "agents" && <AgentsPage />}
