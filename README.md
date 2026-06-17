@@ -5,8 +5,8 @@
 </p>
 
 <p align="center">
-  <strong>A local-first AI workbench for UI/UX designers.</strong><br>
-  Plan design tasks, coordinate coding assistants, review changes, and keep the whole flow in one calm interface.
+  <strong>Vibe with CLIT Controller</strong><br>
+  Plan design tasks, coordinate coding assistants, review changes, and keep the whole flow in one unified interface.
 </p>
 
 ---
