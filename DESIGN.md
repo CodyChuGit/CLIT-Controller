@@ -69,6 +69,10 @@ Edge-to-edge layouts (Explorer, Tasks console) own their scroll areas; centered 
   status bar (24px, bottom — quiet neutral strip; offline state signals in rose text, never a
   colored banner). Panels are solid surfaces separated by hairline borders; centered pages
   use `max-w-5xl p-6`.
+- **Chrome app-mode shell:** the installed/PWA-style window uses the same app
+  chrome as the browser version. Do not add landing pages, splash screens, or
+  package-specific UI; the bean icon, title, theme color, and startup health state
+  are the only app-mode differences.
 - **Panel section** (Explorer sidebar pattern): collapsible header row — chevron + uppercase
   micro-label + optional mono badge + right-aligned icon actions — then content, then
   `border-b`. No outer margin; sections stack flush.
@@ -101,6 +105,10 @@ icon buttons, status badges, markdown renderer, terminal stack, and task views.
   need a separate terminal or final result before reviewing progress.
   All surfaces should consume the same event stream so dock, task detail, logs,
   terminals, and status/footer state stay synchronized.
+- **Streaming renderer:** active generated text should smooth through the
+  internal `SmoothStreamingText` renderer. It paces newly received deltas like a
+  real CLI, respects reduced motion, and never replays completed/history output
+  as an animation.
 - **Terminal drawer:** provider-scoped PTY terminals are docked inside the Agent
   Dock as a drawer or split pane, using the same xterm.js theme as Terminals.
 - **Approval and diff cards:** use compact bordered panels for approval holds,

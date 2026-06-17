@@ -18,6 +18,12 @@ the same events as the durable record. The user should be able to start work fro
 the Agent Dock, Tasks tab, or a queue action and see partial progress without
 opening a separate terminal or waiting for a final response.
 
+Rendering should be handled by CLITC's own stream-aware component, not by a
+package that owns SSE or chat state. See
+[Streaming Renderer Decision](./streaming-renderer-decision.md) for the
+`react-text-stream`, `@magicul/react-chat-stream`, and internal
+`SmoothStreamingText` comparison.
+
 This applies to:
 
 - Direct provider chat in the Agent Dock.
@@ -119,6 +125,9 @@ Required behavior:
 - Use event IDs to dedupe resumed or fallback events.
 - Render active text immediately in the relevant surface as a progressively
   growing transcript, log row, or terminal line.
+- Smooth visible active text with an internal renderer that consumes accumulated
+  `textDelta` output from the shared event store. The renderer may pace display
+  for readability, but it must not create its own event stream or message state.
 - Keep selected task detail and Agent Dock synchronized when they are watching
   the same run.
 - Coalesce rapid text chunks only for rendering performance; do not batch in a way
@@ -151,6 +160,8 @@ Surface requirements:
 - No fake typewriter animation that starts only after the backend already has the
   full output.
 - No duplicate streaming systems per page.
+- No runtime dependency on `react-text-stream`, `@magicul/react-chat-stream`, or
+  generic typewriter packages for CLITC generated output.
 
 ## Acceptance Criteria
 

@@ -7,6 +7,7 @@ import { Markdown, STEP_META, StepChip, withStepChips } from "./Markdown";
 import { ApprovalCard, LiveOutput } from "./TaskViews";
 import CommandPalette, { type PaletteAction } from "./CommandPalette";
 import { EmptyState } from "./ui";
+import { useRunStream, useStructuralRevision } from "../stream";
 import { loadState, saveState } from "../persist";
 import {
   AntigravityMark,
@@ -377,6 +378,9 @@ export default function ChatPanel({
     id === ORCH ? data?.messages ?? [] : data?.channels?.[id] ?? [];
   const messages = channelMessages(channel);
   const pending = (isOrch ? data?.pending : data?.channelPending?.[channel]) ?? null;
+  // Progressive text for the in-flight reply, streamed from the shared event bus.
+  const liveReply = useRunStream(pending?.runId);
+  const streamRev = useStructuralRevision();
 
   const busy =
     data?.pending != null ||
@@ -415,7 +419,9 @@ export default function ChatPanel({
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [open, hasWorkspace, load, busy]);
+    // streamRev: refetch chat/queue snapshots immediately when a structural event
+    // (chat.finished, queue.changed, approval.*, …) arrives over the stream.
+  }, [open, hasWorkspace, load, busy, streamRev]);
 
   // The active tab is always caught up; other tabs flag replies that arrived meanwhile.
   useEffect(() => {
@@ -710,9 +716,9 @@ export default function ChatPanel({
               <ProviderMark id={isOrch ? selected : channel} className="h-3 w-3" />
               thinking…
             </span>
-            {pending.outputTail && (
+            {(liveReply?.stdout || pending.outputTail) && (
               <pre className="max-h-36 w-full overflow-auto whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50/60 p-2 font-mono text-[10px] leading-relaxed text-neutral-600 dark:border-blue-900 dark:bg-blue-950/30 dark:text-neutral-300">
-                {pending.outputTail}
+                {liveReply?.stdout || pending.outputTail}
               </pre>
             )}
           </div>

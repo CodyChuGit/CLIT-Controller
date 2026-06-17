@@ -63,6 +63,12 @@ The same event-backed text stream should also feed global logs, terminal-linked
 run output, queue/status state, approvals, failures, cancellation, and durable
 task replay, so every surface shows the same redacted progress record.
 
+The frontend should smooth active generated output with an internal
+`SmoothStreamingText` renderer over the shared event store. CLITC should not add
+`react-text-stream`, `@magicul/react-chat-stream`, hosted chat SDKs, or generic
+typewriter packages as runtime dependencies for generated output; those packages
+either duplicate SSE ownership, own chat state, or animate completed strings.
+
 Both surfaces stay inside CLITC. They use the official CLIs through the existing
 backend traffic control, PTY terminal, task, log, policy, and approval systems.
 CLITC does not embed `.vsix` packages, run a VS Code extension host, iframe
@@ -94,6 +100,21 @@ You can copy and paste the following prompt into your coding CLI (e.g., Claude C
 - Frontend dev server (hot reload): **http://localhost:5173**
 
 Backend alone: `.venv/bin/python -m agentflow`. If you build the frontend once (`npm --prefix frontend run build`), the backend serves the whole app at **http://localhost:8787** with no dev server needed.
+
+## App-Mode Launch
+
+Planned standalone-window support is documented in
+[PWA And Chrome App-Mode Launcher](docs/pwa-chrome-app-mode.md). The intended
+path is a PWA manifest plus a launcher script that starts the local FastAPI
+backend, waits for health, then opens:
+
+```bash
+open -na "Google Chrome" --args --app="http://127.0.0.1:${AGENTFLOW_PORT:-8787}"
+```
+
+This is the near-term app-like shell for CLITC. It deliberately does not use
+Electron, Tauri, native desktop packaging, deprecated Chrome Apps, or a Chrome
+Extension shell.
 
 ## Beta workflow
 

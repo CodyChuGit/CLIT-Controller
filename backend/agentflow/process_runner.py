@@ -13,14 +13,33 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Awaitable, Callable, Optional
 
+from . import event_bus
 from .redaction import redact
 
 MAX_CAPTURE_CHARS = 2_000_000  # per stream, in memory
 LOG_BUFFER_MAX = 500
+HEARTBEAT_SECONDS = 10  # while a run is alive but quiet, prove liveness to the UI
+_STREAM_HOLD_MAX = 65536  # force-flush a whitespace-less blob beyond this
 
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _split_emittable(carry: str) -> tuple[str, str]:
+    """Return ``(emit, remaining)``: text safe to emit now vs. the held tail.
+
+    Cuts at the last whitespace so a secret — which never contains whitespace (the
+    redaction patterns match ``[^\\s"']+``) — is never split across a delta
+    boundary and emitted half-redacted. A pathological whitespace-less blob is
+    force-flushed past ``_STREAM_HOLD_MAX`` so we don't buffer forever.
+    """
+    cut = max(carry.rfind("\n"), carry.rfind(" "), carry.rfind("\t"), carry.rfind("\r"))
+    if cut >= 0:
+        return carry[: cut + 1], carry[cut + 1 :]
+    if len(carry) > _STREAM_HOLD_MAX:
+        return carry, ""
+    return "", carry
 
 
 @dataclass
@@ -43,7 +62,16 @@ class RunRecord:
     pid: Optional[int] = None           # OS pid, for restart liveness checks
     prompt_file: Optional[str] = None   # durable prompt artifact, for the run ledger
     failure_kind: Optional[str] = None  # set on terminal non-success (see state_store)
+    # Live-streaming context (only set for runs that should emit events).
+    workspace: Optional[str] = None
+    queue_item_id: Optional[str] = None
+    stream_kind: str = "run"            # run | command | chat | controller
+    seq: int = 0                        # per-run monotonic sequence for ordering
     _start_monotonic: float = field(default_factory=time.monotonic)
+
+    def next_seq(self) -> int:
+        self.seq += 1
+        return self.seq
 
     def to_ledger(self, workspace: "Path", tail: int = 4000) -> dict:
         """Durable, recovery-oriented projection (see docs 02 §Run). Output is tailed
@@ -177,8 +205,55 @@ class ProcessRunner:
                 self.runs.pop(stale.id, None)
         return record
 
-    async def _read_stream(self, stream: asyncio.StreamReader, parts: list[str], record: RunRecord) -> None:
+    # ----------------------------------------------------------- event emit
+
+    def _delta_type(self, record: RunRecord, channel: str) -> str:
+        if record.stream_kind == "chat":
+            return "chat.delta"
+        if record.stream_kind == "controller":
+            return "controller.delta"
+        return "run.stderr" if channel == "stderr" else "run.output"
+
+    def _emit(self, record: RunRecord, type_: str, *, channel: Optional[str] = None,
+              text_delta: Optional[str] = None, data: Optional[dict] = None) -> None:
+        """Emit one live event for a streaming run (no-op for non-streaming runs)."""
+        if not record.workspace:
+            return
+        event_bus.BUS.publish(
+            record.workspace, type_,
+            provider=record.provider, task_id=record.task_id, run_id=record.id,
+            queue_item_id=record.queue_item_id, step=record.step,
+            sequence=record.next_seq(), channel=channel,
+            text_delta=text_delta, truncated=record.truncated, data=data,
+        )
+
+    def _emit_terminal(self, record: RunRecord) -> None:
+        data = {
+            "status": record.status, "exitCode": record.exit_code,
+            "failureKind": record.failure_kind, "durationMs": record.duration_ms,
+        }
+        if record.stream_kind in ("chat", "controller"):
+            self._emit(record, "chat.finished", data=data)
+        elif record.stream_kind == "command":
+            self._emit(record, "command.finished", data=data)
+        elif record.status == "cancelled":
+            # task-run completion is also recorded durably by task_service as
+            # run.finished; only the distinct cancellation needs emitting here.
+            self._emit(record, "run.cancelled", data=data)
+
+    async def _heartbeat(self, record: RunRecord) -> None:
+        while record.status == "running":
+            await asyncio.sleep(HEARTBEAT_SECONDS)
+            if record.status != "running":
+                break
+            self._emit(record, "run.heartbeat",
+                       data={"elapsedMs": int((time.monotonic() - record._start_monotonic) * 1000)})
+
+    async def _read_stream(self, stream: asyncio.StreamReader, parts: list[str],
+                           record: RunRecord, channel: str = "stdout") -> None:
         captured = 0
+        carry = ""  # held tail (unredacted) so a secret is never split across deltas
+        streaming = bool(record.workspace)
         while True:
             chunk = await stream.read(4096)
             if not chunk:
@@ -190,6 +265,13 @@ class ProcessRunner:
             elif not record.truncated:
                 parts.append("\n[output truncated by CLITC]\n")
                 record.truncated = True
+            if streaming:
+                carry += text
+                emit, carry = _split_emittable(carry)
+                if emit:
+                    self._emit(record, self._delta_type(record, channel), channel=channel, text_delta=emit)
+        if streaming and carry:
+            self._emit(record, self._delta_type(record, channel), channel=channel, text_delta=carry)
 
     # Generic terminal-status -> failure-kind map. The traffic-control layer may refine
     # this (e.g. provider_missing, policy_denied) before persisting to the run ledger.
@@ -257,10 +339,20 @@ class ProcessRunner:
         provider: Optional[str] = None,
         log_file: Optional[str] = None,
         on_complete: Optional[Callable[[RunRecord], Awaitable[None]]] = None,
+        *,
+        workspace: Optional[Path] = None,
+        queue_item_id: Optional[str] = None,
+        stream_kind: str = "run",
     ) -> tuple[RunRecord, asyncio.Task]:
-        """Start a process and return immediately; output is consumed in the background."""
+        """Start a process and return immediately; output is consumed in the background.
+
+        Pass ``workspace`` to make the run stream live events (deltas/heartbeat/
+        lifecycle) to the event bus. Quick probes/git omit it and stay silent.
+        """
         record = self._new_record(
-            argv, cwd, task_id=task_id, step=step, provider=provider, log_file=log_file
+            argv, cwd, task_id=task_id, step=step, provider=provider, log_file=log_file,
+            workspace=str(workspace) if workspace else None,
+            queue_item_id=queue_item_id, stream_kind=stream_kind,
         )
         # Children must not inherit OUR port assignment: dev servers honor PORT and
         # would bind on top of the CLITC backend, hijacking localhost:8787.
@@ -287,11 +379,22 @@ class ProcessRunner:
         self.procs[record.id] = proc
         record.pid = proc.pid
 
+        # Lifecycle start event. Task-run `run.started` is emitted durably by
+        # task_service; here we cover chat/controller/command runs and the
+        # liveness heartbeat for any streaming run.
+        if record.workspace:
+            if stream_kind == "command":
+                self._emit(record, "command.started", data={"command": record.command_preview()})
+            elif stream_kind in ("chat", "controller"):
+                self._emit(record, "run.started",
+                           data={"command": record.command_preview(), "streamKind": stream_kind})
+            asyncio.create_task(self._heartbeat(record))
+
         async def _consume() -> None:
             assert proc.stdout is not None and proc.stderr is not None
             await asyncio.gather(
-                self._read_stream(proc.stdout, record.stdout_parts, record),
-                self._read_stream(proc.stderr, record.stderr_parts, record),
+                self._read_stream(proc.stdout, record.stdout_parts, record, "stdout"),
+                self._read_stream(proc.stderr, record.stderr_parts, record, "stderr"),
             )
             code = await proc.wait()
             if record.status == "running":
@@ -303,6 +406,7 @@ class ProcessRunner:
                 record.exit_code = code
                 if record.log_file:
                     self._write_log_file(record)
+            self._emit_terminal(record)
             if on_complete is not None:
                 try:
                     await on_complete(record)

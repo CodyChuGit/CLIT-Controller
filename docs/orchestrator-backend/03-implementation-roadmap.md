@@ -153,6 +153,10 @@ Tasks:
 - Update the Agent Dock, Tasks tab, Logs page, status/footer state, and terminal
   context to consume the same event stream instead of separate ad hoc refresh
   loops.
+- Add an internal `SmoothStreamingText` renderer for active generated output.
+  It should consume accumulated text from the shared event store, smooth visible
+  deltas with `requestAnimationFrame`, respect reduced motion, and never open its
+  own SSE connection.
 - Keep existing polling endpoints for compatibility.
 - Update response DTOs so frontend types stay stable.
 
@@ -165,6 +169,8 @@ Acceptance criteria:
 - Reconnecting clients can resume from a cursor.
 - Task replay after completion is built from the same durable events that streamed
   during the active run.
+- Active text smooths like a real CLI stream without adding `react-text-stream`,
+  `@magicul/react-chat-stream`, or a generic typewriter dependency.
 - Polling still works if SSE is unavailable.
 
 ## Phase 7: Context Builder And Artifact Manager
@@ -203,7 +209,8 @@ Acceptance criteria:
 
 - A user can inspect a single final report to understand what happened.
 - Tasks can be paused, resumed, retried, and completed without editing files.
-- The backend is ready for desktop packaging without changing core traffic-control logic.
+- The backend is ready for PWA and Chrome app-mode launch without changing core
+  traffic-control logic.
 
 ## Phase 9: VS Code-Style Agent Dock And Tasks Tab
 
@@ -248,6 +255,41 @@ Acceptance criteria:
   redaction remain authoritative.
 - No feature requires VS Code to be installed or opened.
 
+## Phase 10: PWA And Chrome App-Mode Launcher
+
+Goal: give CLITC an independent app-window launch path without Electron, Tauri,
+native desktop packaging, deprecated Chrome Apps, or a Chrome Extension shell.
+
+Tasks:
+
+- Add a PWA manifest with CLIT Controller IDE naming, tagline, bean icons,
+  `display: standalone`, `start_url: /`, `scope: /`, and matching theme colors.
+- Add a service worker that caches only static built frontend assets and the app
+  shell.
+- Explicitly exclude `/api/*`, `/events/stream`, WebSocket/PTY traffic, task data,
+  logs, approvals, queue state, provider state, and streaming data from service
+  worker caching.
+- Add a launcher script such as `scripts/app-mode.sh` that resolves the repo root,
+  starts the FastAPI backend if needed, waits for the health endpoint, writes a
+  local backend log, and opens Chrome with
+  `--app=http://127.0.0.1:${AGENTFLOW_PORT:-8787}`.
+- Add an optional `scripts/create-macos-app-mode.sh` that generates a thin
+  `CLIT Controller IDE.app` wrapper using the bean icon and delegating to the
+  launcher script.
+- Keep the normal browser URL flow working exactly as it does today.
+
+Acceptance criteria:
+
+- Chrome can install or open CLITC as a standalone PWA-style window.
+- The app-mode script starts the backend when it is not already healthy, waits for
+  readiness, and reports clear errors with a log path.
+- Live text streaming, APIs, task state, logs, approvals, queue state, and
+  terminals remain live backend data and are not served from stale service-worker
+  cache.
+- The macOS app wrapper, if present, is only a launcher around the script.
+- No Electron, Tauri, native packager, Chrome Extension shell, or deprecated
+  Chrome App implementation is added.
+
 ## Recommended Build Order
 
 1. Durable run/event ledger.
@@ -260,5 +302,6 @@ Acceptance criteria:
 8. Context builder.
 9. Final reports and exports.
 10. VS Code-style Agent Dock and Tasks tab.
+11. PWA and Chrome app-mode launcher.
 
 This order fixes correctness and recovery before adding richer routing features.

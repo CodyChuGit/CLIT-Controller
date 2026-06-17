@@ -4,6 +4,7 @@ import ActivityBar, { type PageId } from "./components/ActivityBar";
 import ChatPanel from "./components/ChatPanel";
 import StatusBar from "./components/StatusBar";
 import { loadState, saveState } from "./persist";
+import { EventStreamProvider } from "./stream";
 
 const PAGE_IDS: PageId[] = ["projects", "agents", "tasks", "terminals", "preview", "usage", "logs", "settings"];
 import AgentsPage from "./pages/AgentsPage";
@@ -211,6 +212,7 @@ export default function App() {
   const needsWorkspace = page !== "projects" && page !== "agents" && page !== "settings" && !project?.workspacePath;
 
   return (
+    <EventStreamProvider workspacePath={project?.workspacePath ?? null}>
     <div className="flex h-screen flex-col bg-surface font-sans text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
       <a
         href="#main"
@@ -286,5 +288,6 @@ export default function App() {
         onNavigate={setPage}
       />
     </div>
+    </EventStreamProvider>
   );
 }

@@ -117,7 +117,10 @@ async def execute_run_directive(
         return
     argv[0] = resolved
 
-    record, consume = await RUNNER.start(argv, workspace, step="run", provider="shell", task_id=task_id)
+    record, consume = await RUNNER.start(
+        argv, workspace, step="run", provider="shell", task_id=task_id,
+        workspace=workspace, stream_kind="command",
+    )
     if record.status == "error":
         append_message(workspace, "system", f"`{command}` failed to start: {record.stderr.strip()[:200]}", provider=provider)
         return
@@ -481,7 +484,10 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
     busy = _provider_busy(provider)
     if busy is not None:
         return busy
-    record, _task = await RUNNER.start(argv, workspace, step="chat", provider=provider, on_complete=on_complete)
+    record, _task = await RUNNER.start(
+        argv, workspace, step="chat", provider=provider, on_complete=on_complete,
+        workspace=workspace, stream_kind="controller",
+    )
     if record.status == "error":
         _pending.pop(ws_key, None)
         note = f"Could not start `{provider}`: {record.stderr.strip()[:300]}"
@@ -557,7 +563,10 @@ async def send_direct(workspace: Path, provider: str, message: str) -> dict:
             if _pending.get(key) == record.id:
                 _pending.pop(key, None)
 
-    record, _task = await RUNNER.start(argv, workspace, step="chat", provider=provider, on_complete=on_complete)
+    record, _task = await RUNNER.start(
+        argv, workspace, step="chat", provider=provider, on_complete=on_complete,
+        workspace=workspace, stream_kind="chat",
+    )
     if record.status == "error":
         _pending.pop(key, None)
         note = f"Could not start `{provider}`: {record.stderr.strip()[:300]}"
@@ -672,6 +681,11 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
                     f"controller declared the task complete: {done_reason}",
                     provider=provider,
                 )
+                state_store.append_event(
+                    workspace, "task.summary_ready", done_reason,
+                    task_id=task_id, provider=provider,
+                    data={"status": "done", "verdict": "done"},
+                )
                 append_message(
                     workspace, "system",
                     f"\u201c{_slug(task_id)}\u201d complete — {done_reason}",
@@ -695,6 +709,13 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
                     + (f" (it said: {reasoning})" if reasoning else ""),
                     provider=provider,
                 )
+            if record.status == "succeeded":
+                state_store.append_event(
+                    workspace, "controller.decision_received",
+                    "controller decided the next step",
+                    task_id=task_id, provider=provider, step="orchestrate",
+                    data={"runId": record.id},
+                )
             add_log_entry(
                 "orchestrate",
                 f"consult for {task_id} via {provider}: {record.status} in {(record.duration_ms or 0) / 1000:.1f}s",
@@ -707,6 +728,7 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
         argv, workspace,
         task_id=task_id, step="orchestrate", provider=provider,
         log_file=str(log_file), on_complete=on_complete,
+        workspace=workspace, stream_kind="controller",
     )
     if record.status == "error":
         task_service._add_event(

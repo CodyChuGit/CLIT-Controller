@@ -7,20 +7,69 @@ that now survives restarts.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+import asyncio
+import json
 
-from .. import chat_service, state_store
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
+
+from .. import chat_service, event_bus, state_store
 from .routes_projects import require_workspace
 
 router = APIRouter()
 
 
 @router.get("/events")
-def events(cursor: int = 0, limit: int = 200):
-    """Timeline events with id > cursor (polling fallback for the future SSE stream)."""
+def events(cursor: int = 0, limit: int = 500):
+    """Live events with id > cursor (polling fallback for the SSE stream).
+
+    Reads the in-memory event bus so the same stream — including text deltas —
+    is available when SSE is unavailable. Dedupe by ``id`` on the client.
+    """
     ws = require_workspace()
-    items = state_store.read_events(ws, after=cursor, limit=limit)
-    return {"events": items, "cursor": state_store.events_cursor(ws)}
+    items = event_bus.BUS.events_after(ws, after_id=cursor, limit=limit)
+    return {"events": items, "cursor": event_bus.BUS.cursor()}
+
+
+@router.get("/events/stream")
+async def events_stream(request: Request, cursor: int = 0):
+    """Server-Sent Events stream of live workspace events, resumable by cursor.
+
+    On reconnect the browser sends ``Last-Event-ID``; we honor it so streamed text
+    is never duplicated. Heartbeat comments keep the connection alive.
+    """
+    ws = require_workspace()
+    try:
+        last = max(int(cursor), int(request.headers.get("last-event-id", 0)))
+    except (TypeError, ValueError):
+        last = int(cursor)
+
+    async def gen():
+        nonlocal last
+        idle = 0
+        while True:
+            if await request.is_disconnected():
+                break
+            items = event_bus.BUS.events_after(ws, after_id=last, limit=1000)
+            if items:
+                idle = 0
+                for e in items:
+                    last = e["id"]
+                    # No `event:` line — the browser's EventSource.onmessage then
+                    # receives every event; the type lives in the JSON payload.
+                    yield f"id: {e['id']}\ndata: {json.dumps(e)}\n\n"
+            else:
+                idle += 1
+                if idle >= 20:  # ~5s of quiet -> keep-alive comment
+                    idle = 0
+                    yield ": ping\n\n"
+            await asyncio.sleep(0.25)
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/runs/{run_id}")

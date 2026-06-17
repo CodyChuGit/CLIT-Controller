@@ -5,6 +5,7 @@ import StatusBadge from "../components/StatusBadge";
 import { Markdown } from "../components/Markdown";
 import { ApprovalCard, CommandCard, ContextSummary } from "../components/TaskViews";
 import { Card, EmptyState } from "../components/ui";
+import { useRunStream, useStructuralRevision } from "../stream";
 import { parsePrompt, type BudgetSummary } from "../lib/taskFormat";
 import { loadState, saveState } from "../persist";
 import type { Approval, Exchange, QueueState, RunInfo, StepState, TaskDetail, TaskEvent, TaskMeta } from "../types";
@@ -239,6 +240,10 @@ function StepChat({
   const preview = detail.stepPreviews[step];
   const state: StepState = detail.task.steps[step] ?? { status: "idle" };
   const liveRun = detail.runs.find((r) => r.step === step && r.status === "running");
+  // Prefer progressively-streamed text from the shared event bus (same source the
+  // Agent Dock reads), falling back to the polled run tail.
+  const stream = useRunStream(liveRun?.id);
+  const liveText = stream?.stdout || liveRun?.stdout || "";
   const involved = state.status !== "idle" || exchanges.length > 0;
   const color = STEP_COLOR[step];
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -246,7 +251,7 @@ function StepChat({
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [exchanges.length, liveRun?.stdout]);
+  }, [exchanges.length, liveText]);
 
   return (
     <Card
@@ -329,9 +334,9 @@ function StepChat({
               <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-blue-500">
                 <Spinner className="h-3 w-3" /> {liveRun.provider} · working…
               </div>
-              {liveRun.stdout && (
+              {liveText && (
                 <pre className="max-h-28 overflow-hidden whitespace-pre-wrap break-words font-mono text-[10px] leading-relaxed text-neutral-500">
-                  {liveRun.stdout.slice(-1200)}
+                  {liveText.slice(-1200)}
                 </pre>
               )}
             </div>
@@ -459,6 +464,7 @@ export default function TasksPage() {
   const [taskFile, setTaskFile] = useState<{ name: string; content: string } | null>(null);
   const [queue, setQueue] = useState<QueueState | null>(null);
   const [approvals, setApprovals] = useState<Approval[]>([]);
+  const streamRev = useStructuralRevision();
   const fileViewerRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<number | null>(null);
 
@@ -479,7 +485,8 @@ export default function TasksPage() {
     void loadQueue();
     const id = window.setInterval(loadQueue, 3000);
     return () => window.clearInterval(id);
-  }, [loadQueue]);
+    // streamRev: a structural event (queue.*, run.*, approval.*) refreshes now.
+  }, [loadQueue, streamRev]);
 
   const loadTasks = useCallback(async () => {
     try {
@@ -510,6 +517,12 @@ export default function TasksPage() {
   useEffect(() => {
     if (queueBusy && selectedId) void loadDetail(selectedId);
   }, [queueBusy, selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refresh the selected task on structural stream events (run.finished,
+  // controller.decision_received, …) so the live → durable replay handoff is prompt.
+  useEffect(() => {
+    if (selectedId) void loadDetail(selectedId);
+  }, [streamRev]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     void loadTasks().then((list) => {

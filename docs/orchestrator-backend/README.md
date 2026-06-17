@@ -32,6 +32,14 @@ provider contracts, predictable approvals, and a complete verification matrix.
 - [Text Streaming Across The Board](../text-streaming-across-the-board.md)
   defines the shared live text contract for chat, runs, tasks, logs, terminals,
   approvals, and replay.
+- [Streaming Renderer Decision](../streaming-renderer-decision.md) records the
+  renderer/package decision: keep one CLITC event stream and use an internal
+  `SmoothStreamingText` component rather than `react-text-stream`,
+  `@magicul/react-chat-stream`, or generic typewriter packages.
+- [PWA And Chrome App-Mode Launcher](../pwa-chrome-app-mode.md) defines the
+  near-term standalone-window path: PWA manifest, app-shell service worker, local
+  backend launcher script, and optional macOS `.app` wrapper without Electron or
+  Tauri.
 - [VS Code-Style Agent Dock And Tasks Tab](../vscode-style-agent-dock.md) defines
   the native feature-parity direction for Codex, Claude Code, Antigravity, and
   controller workflows.
@@ -63,6 +71,12 @@ provider contracts, predictable approvals, and a complete verification matrix.
 - Extend that contract across the product: direct chat, queued runs, task detail,
   global logs, terminals, approvals, status/footer state, and durable replay
   should consume the same redacted event stream.
+- Keep stream rendering separate from stream ownership. The frontend should use a
+  small internal smoothing renderer over the shared event store, not install a
+  package that opens its own SSE connection or owns chat message state.
+- Make the near-term app shell a PWA plus Chrome app-mode launcher. The backend
+  remains FastAPI, the frontend remains browser-delivered, and no Electron,
+  Tauri, Chrome Extension shell, or deprecated Chrome App is introduced.
 
 ## Current Backend Map
 

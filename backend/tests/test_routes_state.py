@@ -24,11 +24,15 @@ def _ws(tmp_path, monkeypatch):
 
 
 def test_events_endpoint_returns_cursor(tmp_path, monkeypatch):
+    # /api/events is now backed by the live event bus (global monotonic ids), so
+    # assert the resume-by-cursor contract rather than a fixed starting id.
     ws = _ws(tmp_path, monkeypatch)
     state_store.append_event(ws, "task.created", "hi")
     out = routes_state.events(cursor=0)
-    assert out["cursor"] == 1 and len(out["events"]) == 1
-    assert routes_state.events(cursor=1)["events"] == []
+    assert len(out["events"]) >= 1
+    assert out["events"][-1]["type"] == "task.created"
+    # Resuming from the returned cursor yields no duplicates.
+    assert routes_state.events(cursor=out["cursor"])["events"] == []
 
 
 def test_run_endpoint_404_then_found(tmp_path, monkeypatch):

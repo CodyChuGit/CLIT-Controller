@@ -364,6 +364,43 @@ export interface EventsResponse {
   cursor: number;
 }
 
+/** One live event from the workspace event bus (SSE `/api/events/stream` or the
+ *  `/api/events` polling fallback). Text deltas stream progressively. */
+export interface StreamEvent {
+  id: number;
+  type: string;
+  createdAt: string;
+  time: string;
+  workspacePath: string | null;
+  provider: string | null;
+  taskId: string | null;
+  runId: string | null;
+  queueItemId: string | null;
+  step: string | null;
+  sequence: number | null;
+  channel: string | null;
+  textDelta: string | null;
+  redacted: boolean;
+  truncated: boolean;
+  detail: string;
+  data: Record<string, unknown>;
+}
+
+/** Accumulated, progressively-growing output for one run, assembled from deltas. */
+export interface RunStream {
+  runId: string;
+  provider: string | null;
+  taskId: string | null;
+  step: string | null;
+  kind: "run" | "command" | "chat" | "controller";
+  stdout: string;
+  stderr: string;
+  status: "running" | "finished" | "cancelled";
+  updatedAt: number;
+}
+
+export type StreamConnection = "live" | "polling" | "off";
+
 export interface RunRecord {
   id: string;
   workspacePath: string;

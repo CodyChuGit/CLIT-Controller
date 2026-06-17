@@ -21,7 +21,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from . import config, paths
+from . import config, event_bus, paths
 from .process_runner import now_iso
 
 SCHEMA_VERSION = 1
@@ -101,6 +101,20 @@ def append_event(
     if len(events) > MAX_EVENTS:
         del events[: len(events) - MAX_EVENTS]
     config.write_json(events_file(workspace), doc)
+    # Mirror to the live event bus so every structural transition streams to the
+    # Agent Dock / Tasks / Logs / footer over SSE (and the polling fallback).
+    d = data or {}
+    event_bus.BUS.publish(
+        workspace,
+        type_,
+        detail=detail,
+        provider=provider,
+        task_id=task_id,
+        step=step,
+        run_id=d.get("runId"),
+        queue_item_id=d.get("itemId") or d.get("queueItemId"),
+        data=d,
+    )
     return event
 
 

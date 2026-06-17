@@ -44,6 +44,9 @@ Right-hand Agent Dock:
 - Active run streams that type out transcript deltas, terminal output chunks, tool
   or command start/finish events, approval waits, queue changes, errors, and
   completion status as the run progresses.
+- Live generated text should use the internal `SmoothStreamingText` renderer over
+  CLITC's shared event store so the dock feels like a real CLI without opening a
+  second SSE stream or owning separate chat state.
 - A terminal drawer per provider for live CLI sessions, reusing the existing
   PTY/WebSocket/xterm.js terminal stack.
 - Diff and approval cards for risky actions, failed steps, changed files, and

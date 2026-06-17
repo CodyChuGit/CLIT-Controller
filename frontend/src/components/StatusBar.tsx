@@ -1,5 +1,6 @@
 import type { PageId } from "./ActivityBar";
 import { Folder, GitBranch } from "./icons";
+import { useConnection } from "../stream";
 import type { CurrentProject, GitInfo, Usage } from "../types";
 
 const MODE_LABELS: Record<string, string> = {
@@ -44,6 +45,7 @@ function Item({
 /** Quiet status strip: neutral surface, color only as signal. */
 export default function StatusBar({ backendUp, project, git, usage, queuedCount, onNavigate }: Props) {
   const changed = git?.changedFileCount ?? 0;
+  const connection = useConnection();
   return (
     <footer
       className="flex h-6 shrink-0 items-center gap-0.5 border-t border-neutral-200 bg-white px-1.5 text-[11px] text-neutral-600 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400"
@@ -83,6 +85,15 @@ export default function StatusBar({ backendUp, project, git, usage, queuedCount,
       {usage && (
         <Item onClick={() => onNavigate("usage")} title="Traffic control mode (open Usage)">
           {MODE_LABELS[usage.orchestrationMode] ?? usage.orchestrationMode}
+        </Item>
+      )}
+      {project?.workspacePath && connection !== "live" && (
+        <Item title={connection === "polling" ? "Streaming degraded — polling for updates" : "Streaming offline"}>
+          <span
+            className={`h-2 w-2 rounded-full ${connection === "polling" ? "bg-amber-500" : "bg-neutral-400"}`}
+            aria-hidden="true"
+          />
+          {connection === "polling" ? "polling" : "stream off"}
         </Item>
       )}
       <Item>CLIT Controller IDE 0.1 beta</Item>

@@ -602,6 +602,7 @@ async def run_step(
         argv, workspace,
         task_id=task_id, step=step, provider=provider,
         log_file=str(log_file), on_complete=on_complete,
+        workspace=workspace, stream_kind="run",
     )
     record.prompt_file = prompt_file.name
     if record.status == "error":
