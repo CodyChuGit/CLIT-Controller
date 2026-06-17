@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from . import controller_protocol
 from .routing_service import budget_context_header
 
 TASK_FILES = [
@@ -108,34 +109,9 @@ def orchestrator_consult_prompt(usage: dict, task_state: str, trigger: str, outp
         f"{task_state}\n\n"
         f"Just happened: {trigger}\n\n"
         f"{tail}"
-        "Reply with AT MOST two sentences of reasoning, then your decision(s).\n\n"
-        "PREFERRED — emit ONE fenced `agentflow` block of structured JSON decisions "
-        "(version 1; kinds: queue/run/done/needs_user):\n"
-        "```agentflow\n"
-        '{"version":"1","decisions":[{"kind":"queue","taskRef":"<task id>","steps":["codex_spec"]},'
-        '{"kind":"run","command":"npm test"}]}\n'
-        "```\n"
-        "(steps come from: codex_spec, claude_implement, gemini_qa, codex_review, claude_fix; "
-        '`done` and `needs_user` take {"reason":"<one line>"}.)\n\n'
-        "Or use ONE of the legacy single blocks below (agentflow-run may accompany another block):\n\n"
-        "Queue the next step(s):\n"
-        "```agentflow-queue\n"
-        "task: <task id>\n"
-        "steps: <comma list from: codex_spec, claude_implement, gemini_qa, codex_review, claude_fix>\n"
-        "```\n\n"
-        "Run a simple command directly yourself (tests, builds, git, dev server — one plain command, "
-        "no pipes) instead of spending an agent on it:\n"
-        "```agentflow-run\n"
-        "command: npm test\n"
-        "```\n\n"
-        "The task is complete (or further agent spend isn't worth it):\n"
-        "```agentflow-done\n"
-        "reason: <one line>\n"
-        "```\n\n"
-        "A human decision is required:\n"
-        "```agentflow-needs-user\n"
-        "reason: <one line>\n"
-        "```"
+        "Reply with AT MOST two sentences of human-readable reasoning, then your decision.\n"
+        "For this consult the useful actions are queue_steps, run_command, complete_task, "
+        "request_user, or answer.\n\n" + controller_protocol.result_contract_prompt()
     )
 
 
@@ -160,42 +136,11 @@ def orchestrator_chat_prompt(usage: dict, workspace_summary: str, transcript: st
         "colored chips. Keep replies under ~120 words unless the user asks for depth. No headings "
         "larger than ###, no walls of text.\n\n"
         "You can create CLITC tasks AND queue work to the agents — the system executes the queue "
-        "automatically, cueing one step per agent at a time, in order.\n\n"
-        "PREFERRED — emit ONE fenced `agentflow` block of structured JSON decisions "
-        "(version 1; kinds: task/queue/run):\n"
-        "```agentflow\n"
-        '{"version":"1","decisions":[{"kind":"task","title":"<short imperative>","goal":"<compact goal>",'
-        '"queueSteps":["codex_spec"]},{"kind":"run","command":"npm run dev"}]}\n'
-        "```\n"
-        "(`queueSteps`/`steps` come from: codex_spec, claude_implement, gemini_qa, codex_review, claude_fix, "
-        'or ["full"]; `queue` takes {"taskRef":"latest","steps":[...]}.)\n\n'
-        "Or use the legacy fenced blocks below.\n\n"
-        "Create a task (optionally queueing its steps immediately):\n"
-        "```agentflow-task\n"
-        "title: <short imperative title>\n"
-        "goal: <compact goal description>\n"
-        "queue: full\n"
-        "```\n"
-        "(`queue:` is optional, but DEFAULT to starting a task with `codex_spec` — that is the planning "
-        "step, and codex owns specs and plans. Queue only that first step; CLITC reports back after "
-        "it finishes so you decide the next one from the actual spec. Skip straight to `claude_implement` "
-        "ONLY for a truly trivial edit (a one-liner, a rename, a copy tweak) that genuinely needs no plan. "
-        "`full` queues the whole standard pipeline — use it when you want the fixed sequence.)\n\n"
-        "Queue steps for an existing task:\n"
-        "```agentflow-queue\n"
-        "task: <task id, or `latest`>\n"
-        "steps: claude_implement, gemini_qa\n"
-        "```\n"
-        "Valid steps: codex_spec, claude_implement, gemini_qa, codex_review, claude_fix. "
-        "Steps within a task run in queue order; a failed step pauses that task's queue.\n\n"
-        "For SIMPLE operational work — start the dev server, git add/commit/push, install deps, run "
-        "tests or builds — do NOT create a task or involve other agents. Just run it directly:\n"
-        "```agentflow-run\n"
-        "command: npm run dev\n"
-        "```\n"
-        "One plain command per block (no pipes/redirection), up to three blocks; the system executes "
-        "them in the workspace and reports the result here.\n\n"
-        "Beyond these blocks you advise; the system runs the agents.\n\n"
+        "automatically, cueing one step per agent at a time, in order. Default to starting a task with "
+        "`codex_spec` (the planning step) and queueing only that first step; CLITC reports back after it "
+        "finishes so you decide the next one. Skip straight to `claude_implement` only for a truly trivial "
+        "edit. For SIMPLE operational work (dev server, git, install, tests/builds) prefer run_command over "
+        "involving agents.\n\n" + controller_protocol.result_contract_prompt() + "\n\n"
         f"{convo}"
         f"user: {message}\n\n"
         "Reply as the assistant."

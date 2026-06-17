@@ -1,18 +1,21 @@
-"""Parsing for controller decisions (Pillar 5).
+"""Parsing for controller decisions (I/O rebuild + Pillar 5).
 
-The controller may emit decisions in two forms:
+Controller output is read in priority order, newest-protocol first:
 
-1. **Native structured output (preferred)** — one fenced ``agentflow`` block holding
-   a JSON envelope ``{"version":"1","decisions":[{"kind":"task",...}, ...]}`` (a bare
-   list or single object is also accepted). Each decision is validated against the
-   versioned contracts in :mod:`agentflow.contracts`; invalid ones are dropped safely.
-2. **Legacy markdown directive blocks** — ``agentflow-task``/``-queue``/``-run``/
-   ``-done``/``-needs-user`` fenced ``key: value`` blocks.
+1. **CLITC_RESULT_V1 (authoritative)** — the deterministic, sentinel-framed result
+   parsed + validated by :mod:`agentflow.controller_protocol`. When a v1 block is
+   present, ONLY it is honored: a valid block drives the action, and an **invalid**
+   v1 block yields no action (so no state mutates) and is NEVER silently downgraded
+   to the legacy parsers. This is the primary controller protocol.
+2. **Legacy ``agentflow`` JSON decisions** — a fenced ``agentflow`` block of
+   contract-validated decisions (bounded migration fallback).
+3. **Legacy ``agentflow-*`` markdown blocks** — ``-task``/``-queue``/``-run``/
+   ``-done``/``-needs-user`` (bounded migration fallback).
 
-Every ``parse_*`` reader is **structured-first with markdown fallback**: if a reply
-contains any valid structured decisions, only those are used (no double-processing);
-otherwise the markdown blocks are parsed. All existing consumers therefore gain
-structured-output support with no change.
+Every ``parse_*`` reader applies this order. All existing consumers
+(``chat_service``) therefore use the deterministic protocol with no change, while
+the legacy forms remain available during migration. See
+docs/input-output-rebuild/02-protocols.md.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ import re
 from typing import Optional
 
 from . import contracts
+from . import controller_protocol as cp
 from .workflow import FULL_SEQUENCE, STEP_DEFS
 
 TASK_DIRECTIVE_RE = re.compile(r"```agentflow-task\s*\n(.*?)```", re.DOTALL)
@@ -33,6 +37,23 @@ RUN_DIRECTIVE_RE = re.compile(r"```agentflow-run\s*\n(.*?)```", re.DOTALL)
 STRUCTURED_RE = re.compile(r"```agentflow\s*\n(.*?)```", re.DOTALL)
 
 MAX_RUN_DIRECTIVES = 3
+
+
+def _v1(text: str):
+    """The CLITC_RESULT_V1 parse for ``text``: (result, failure, meta)."""
+    return cp.parse_controller_result(text)
+
+
+def controller_failure(text: str) -> Optional[contracts.FailureRecord]:
+    """A typed failure when a CLITC_RESULT_V1 block is present but invalid, else
+    None. Callers surface this instead of acting (the protocol mutates no state on
+    invalid output, and is never downgraded to the legacy parsers)."""
+    _result, failure, _meta = _v1(text)
+    return failure
+
+
+def _v1_blocks_present(text: str) -> bool:
+    return _v1(text)[2].source == "v1"
 
 
 def extract_structured_decisions(text: str) -> list[dict]:
@@ -76,6 +97,11 @@ def _normalize_steps(steps) -> Optional[list[str]]:
 
 
 def parse_run_directives(text: str) -> list[str]:
+    result, _failure, meta = _v1(text)
+    if meta.source == "v1":
+        if result and result.action.type == "run_command":
+            return [result.action.command.strip()][:MAX_RUN_DIRECTIVES]
+        return []  # v1 present but not a run (or invalid) — no legacy fallback
     structured = extract_structured_decisions(text)
     if structured:
         cmds = [str(d["command"]).strip() for d in structured if d["kind"] == "run" and d.get("command")]
@@ -108,6 +134,11 @@ def _structured_reason(structured: list[dict], kind: str) -> Optional[str]:
 
 
 def parse_done_directive(text: str) -> Optional[str]:
+    result, _failure, meta = _v1(text)
+    if meta.source == "v1":
+        if result and result.action.type == "complete_task":
+            return result.action.reason or "no reason given"
+        return None
     structured = extract_structured_decisions(text)
     if structured:
         return _structured_reason(structured, "done")
@@ -115,6 +146,11 @@ def parse_done_directive(text: str) -> Optional[str]:
 
 
 def parse_needs_user_directive(text: str) -> Optional[str]:
+    result, _failure, meta = _v1(text)
+    if meta.source == "v1":
+        if result and result.action.type == "request_user":
+            return result.action.reason or "no reason given"
+        return None
     structured = extract_structured_decisions(text)
     if structured:
         return _structured_reason(structured, "needs_user")
@@ -134,6 +170,11 @@ def _parse_steps(raw: str) -> Optional[list[str]]:
 
 
 def parse_task_directive(text: str) -> Optional[tuple[str, str, Optional[list[str]]]]:
+    result, _failure, meta = _v1(text)
+    if meta.source == "v1":
+        if result and result.action.type == "create_task":
+            return result.action.title[:200], result.action.goal, _normalize_steps(result.action.steps)
+        return None
     structured = extract_structured_decisions(text)
     if structured:
         for d in structured:
@@ -164,6 +205,13 @@ def parse_task_directive(text: str) -> Optional[tuple[str, str, Optional[list[st
 
 
 def parse_queue_directive(text: str) -> Optional[tuple[str, list[str]]]:
+    result, _failure, meta = _v1(text)
+    if meta.source == "v1":
+        if result and result.action.type == "queue_steps":
+            steps = _normalize_steps(result.action.steps)
+            if steps:
+                return result.action.taskId, steps
+        return None
     structured = extract_structured_decisions(text)
     if structured:
         for d in structured:
@@ -214,7 +262,9 @@ def controller_directive_records(text: str) -> list[dict]:
 
 
 def strip_action_blocks(text: str) -> str:
-    out = text or ""
+    # Remove the authoritative CLITC_RESULT_V1 block first so its JSON never renders
+    # as prose, then the legacy directive blocks.
+    out = cp.strip_result_block(text or "")
     for regex in (
         STRUCTURED_RE,
         TASK_DIRECTIVE_RE,
