@@ -17,6 +17,13 @@
 
 Instead of bouncing between chats, terminals, folders, diffs, and task notes, you get one place to describe the work, route it to the right assistant, watch progress, and review the result before moving forward.
 
+| CLI | Role | Best For |
+|---|---|---|
+| **Antigravity** | Controller / QA | Broad checks, second opinions, and lower-cost verification. |
+| **Codex** | Product partner | Specs, task plans, markdown handoffs, and final review. |
+| **Claude Code** | Implementation assistant | Code changes, bug fixes, and focused build work. |
+| **Local tools** | Workspace helper | File scanning, git status, diffs, logs, usage tracking, and task folders. |
+
 ![CLITC Files](docs/assets/dark_mode_files.png)
 *Workspace view with project files, active tasks, file changes, and the task queue.*
 
@@ -95,6 +102,8 @@ CLIT Controller works with the official command-line tools you already use:
 - **Codex CLI**: `npm install -g @openai/codex`
 - **Claude Code**: `npm install -g @anthropic-ai/claude-code`
 - **Antigravity CLI**: `curl -fsSL https://antigravity.google/cli/install.sh | bash`
+
+Prefer buttons over terminal commands? The Agents view also includes easy UI install/setup actions for supported assistants, so you can get connected without memorizing commands.
 
 Each assistant keeps its own official login. CLIT Controller does not ask for or store provider keys or tokens.
 
