@@ -7,3 +7,4 @@ frontend/dist/
 dist-app/
 .DS_Store
 *.egg-info/
+/dist/

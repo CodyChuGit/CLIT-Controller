@@ -6,6 +6,7 @@ import DragHandle from "./DragHandle";
 import { Markdown, STEP_META, StepChip, withStepChips } from "./Markdown";
 import { ApprovalCard, LiveOutput } from "./TaskViews";
 import CommandPalette, { type PaletteAction } from "./CommandPalette";
+import SmoothStreamingText from "./SmoothStreamingText";
 import { EmptyState } from "./ui";
 import { useRunStream, useStructuralRevision } from "../stream";
 import { loadState, saveState } from "../persist";
@@ -444,7 +445,7 @@ export default function ChatPanel({
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages.length, pending?.outputTail, busy, channel]);
+  }, [messages.length, pending?.outputTail, liveReply?.stdout, busy, channel]);
 
   const send = async () => {
     const message = input.trim();
@@ -718,7 +719,7 @@ export default function ChatPanel({
             </span>
             {(liveReply?.stdout || pending.outputTail) && (
               <pre className="max-h-36 w-full overflow-auto whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50/60 p-2 font-mono text-[10px] leading-relaxed text-neutral-600 dark:border-blue-900 dark:bg-blue-950/30 dark:text-neutral-300">
-                {liveReply?.stdout || pending.outputTail}
+                <SmoothStreamingText text={liveReply?.stdout || pending.outputTail || ""} active mode="mono" maxChars={6000} />
               </pre>
             )}
           </div>

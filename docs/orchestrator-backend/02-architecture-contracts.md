@@ -264,9 +264,16 @@ Capabilities should include:
 - `model_selection`
 - `usage_probe`
 - `installable`
+- `speech_to_text`
+- `text_to_speech`
 
 This makes Codex, Claude, Antigravity, Ollama, and future local models pluggable
 without spreading provider conditionals through task and queue code.
+
+Voice providers may use a narrower adapter contract than coding agents, but they
+should still report detection state, command rendering, failure classification,
+and local-only capability. The intended first adapters are MLX Parakeet for STT
+and `mlx-swift-dots-tts` for TTS.
 
 ## Controller Decision Contract
 

@@ -13,7 +13,7 @@ Running several coding agents by hand means juggling terminals, re-pasting conte
 | Controller / QA | Antigravity | broad checks, QA, cheap verification |
 | PM | Codex | specs, markdown plans, final reviews |
 | Engineer | Claude Code | implementation and bug fixing **only** |
-| Local Tasks | oMLX/Ollama (WIP) | file scanning, task folders, git status/diff, logs, usage tracking, STT & TTS (WIP) |
+| Local Tasks + Voice | oMLX/Ollama, MLX Parakeet STT, `mlx-swift-dots-tts` TTS (WIP) | file scanning, task folders, git status/diff, logs, usage tracking, local dictation, spoken summaries |
 
 ## How it saves tokens
 
@@ -33,6 +33,8 @@ CLIT Controller shells out to the official CLIs you already have installed and l
 - `agy` (Google Antigravity CLI — successor to the sunset Gemini CLI) — traffic control and QA. Official install: `curl -fsSL https://antigravity.google/cli/install.sh | bash` (puts `agy` in `~/.local/bin`; the Agents page Install button runs exactly this)
 - `ollama` — optional, future local routing
 - `omlx` (local Apple MLX LLM server; also detects `mlx_lm.*` / `mlx-omni-server`) — optional, future on-device routing on Apple Silicon
+- MLX Parakeet — optional future local STT for prompt dictation
+- `mlx-swift-dots-tts` — optional future local TTS for spoken task/run summaries
 
 Missing CLIs are handled gracefully: the step's prompt is saved into the task folder, the exact command is shown for copy/paste, and the Agents page shows an install hint. Providers with a known installer (npm/brew) support **one-click install** — click the "not installed" badge or the Install button and the real install command runs in the background (npm installs use an isolated cache at `/tmp/agentflow-npm-cache` to dodge broken `~/.npm` permissions); the card flips to its detected version when done.
 
@@ -115,6 +117,15 @@ open -na "Google Chrome" --args --app="http://127.0.0.1:${AGENTFLOW_PORT:-8787}"
 This is the near-term app-like shell for CLITC. It deliberately does not use
 Electron, Tauri, native desktop packaging, deprecated Chrome Apps, or a Chrome
 Extension shell.
+
+## Next Phase Product Workbench
+
+[Phase 1.5 Product Workbench](docs/phase-1-5-product-workbench.md) defines the
+next product layer between durable events and deeper backend state machines:
+readable task output, paginated raw machine details, a right-hand UI/UX reference
+library tab, local reference extraction, TestApp Calendar Scheduler overflow for
+user/weekly limits, local voice I/O with MLX Parakeet and `mlx-swift-dots-tts`, and
+future CLI IDE feature candidates.
 
 ## Beta workflow
 

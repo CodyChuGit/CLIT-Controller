@@ -14,6 +14,10 @@ Cover pure logic and local state transitions:
 
 - Directive parsing.
 - Command policy classification.
+- Task output summarization and pagination helpers.
+- Reference extraction normalization.
+- Overflow scheduling state classification.
+- Voice provider detection and local-only policy checks.
 - Provider adapter command rendering.
 - Redaction.
 - Usage window resets.
@@ -45,6 +49,8 @@ temporary directories. They should simulate:
 - auth failure output
 - large output
 - artifact writes
+- very verbose stdout/stderr
+- repeated budget context blocks
 
 ### API Tests
 
@@ -53,10 +59,14 @@ Use FastAPI test clients:
 - Workspace endpoints.
 - Agent list/check endpoints with mocked provider registry.
 - Task detail endpoint before and after runs.
+- Task detail summary and paginated raw output endpoints or response sections.
 - Queue add/approve/remove/clear/retry/skip endpoints.
 - Chat send/direct endpoints with fake controller decisions.
 - Logs and events endpoints.
 - Approval endpoints.
+- Reference-library browse/search/detail endpoints when introduced.
+- Scheduler overflow handoff/status endpoints when introduced.
+- Voice availability, STT, TTS, and stop endpoints when introduced.
 
 ### Recovery Tests
 
@@ -118,6 +128,12 @@ Keep coverage for current beta behavior:
 | Controller emits invalid directive | Task records parse/validation error and requests user input |
 | Controller says done | Task gets durable final verdict and final event |
 | User cancels run | Process group is terminated, run and queue item become `cancelled` |
+| Task has very large raw output | UI/API exposes readable summary first and paginated raw details |
+| User extracts a local component library | Reference records are created without modifying source files |
+| Provider/user weekly limit is reached | Queue item becomes overflow/scheduled instead of failed |
+| TestApp Scheduler is unavailable | Overflow item stays local with visible retry/reschedule state |
+| User dictates a prompt | Transcript appears for review before sending |
+| User plays a task summary | Local TTS starts and can be stopped without changing task state |
 
 ## Operational Requirements
 
@@ -142,6 +158,9 @@ Track locally:
 - Estimated prompt and output characters.
 - Expensive calls avoided.
 - Local steps completed.
+- Overflow tasks scheduled, resumed, cancelled, and kept local.
+- Reference extraction counts by source and framework.
+- Local STT/TTS availability, failures, and run duration.
 
 ### Health Checks
 
@@ -162,6 +181,11 @@ Defaults:
 - Keep all task markdown files.
 - Keep all run prompt/log files inside task folders.
 - Bound in-memory output tails.
+- Keep full raw task records even when UI defaults to summaries and pagination.
+- Keep reference-library records local to the workspace unless explicitly exported.
+- Keep scheduler handoff records for overflow audit and resume.
+- Do not retain raw voice audio by default; keep only explicit transcript/task
+  records and voice event metadata.
 - Add a cleanup command later for old task logs, but never silently delete task
   artifacts.
 
@@ -185,3 +209,8 @@ Every persisted schema should have:
 - Task folders remain readable and useful without the UI.
 - The final task report explains what the controller decided, what agents ran, what
   changed, what failed or was skipped, and why the task is done or needs the user.
+- Phase 1.5 product workbench checks pass: task summaries are readable, raw output
+  is paginated, reference extraction is local and auditable, and overflow schedule
+  state resumes through normal traffic control.
+- Local voice checks pass when providers are available and degrade cleanly when
+  MLX Parakeet or `mlx-swift-dots-tts` is missing.

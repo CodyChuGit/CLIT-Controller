@@ -68,10 +68,23 @@ Tasks tab:
   Agent Dock. When the run finishes, the live view becomes the durable replay.
 - Budget context, repeated command blocks, approvals, failures, and queue updates
   summarized as human-readable cards instead of raw markdown or log dumps.
+- Completed task output defaults to readable summaries. Raw prompts, stdout,
+  stderr, logs, directives, event payloads, and JSON are paginated drill-down
+  views, not the first reading surface.
 - Task artifacts grouped into compact tabs or panel sections: task files, diffs,
   logs, approvals, routing decisions, changed files, and final report.
 - Continuation controls for retry, skip, reroute, approve, reject, run next step,
   stop run, open log, open task file, and copy command.
+- Overflow work caused by user limits, weekly limits, provider health, or budget
+  policy is visible as scheduled/overflow queue state and resumes through normal
+  CLITC traffic control.
+
+Right-hand UI/UX Reference Tab:
+
+- A dedicated non-provider tab for searchable frontend references, component
+  libraries, style recipes, tokens, and extracted examples.
+- Reference actions queue normal style-swap tasks and diffs; they do not silently
+  rewrite files.
 
 ## Architecture
 
@@ -107,6 +120,12 @@ Future additive interface needs:
   reasons, and required approval state.
 - Structured task exchange summaries: prompt kind, provider, step, budget context,
   commands, raw prompt link, raw output link, elapsed time, result, and artifacts.
+- Paginated raw-detail descriptors for prompts, stdout, stderr, logs, events,
+  directives, JSON, and large diffs.
+- Reference-library descriptors for extracted components, tokens, variants,
+  source/license metadata, and style recipes.
+- Overflow scheduler descriptors for TestApp Calendar Scheduler handoffs and
+  local fallback state.
 
 ## Non-Goals
 
@@ -132,6 +151,12 @@ Future additive interface needs:
   including command output, approval waits, errors, queue changes, and completion.
 - Commands, failures, approvals, and diffs use compact styled rows/cards with raw
   details available behind expanders.
+- Completed task output is readable by default, with paginated machine-readable
+  detail still available.
+- The UI/UX reference tab can queue frontend style-swap work without bypassing
+  task, diff, and approval workflows.
+- Scheduled overflow items are visible in queue/task context and do not appear as
+  ordinary failures.
 - No feature requires VS Code to be installed or opened.
 - Existing backend traffic control, CLI execution, task files, safety policy, and
   approval behavior remain authoritative.

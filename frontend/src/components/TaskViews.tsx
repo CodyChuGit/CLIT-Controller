@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Spinner, Terminal } from "./icons";
+import SmoothStreamingText from "./SmoothStreamingText";
 import StatusBadge from "./StatusBadge";
 import type { Approval, RunInfo } from "../types";
 import {
@@ -157,11 +158,20 @@ export function OutputView({ text }: { text: string }) {
 /** Live, auto-tailing output for an in-flight run — visible progress while a
  *  command/step is still moving (not a final-only snapshot). Tails the last
  *  ~2KB and pins the scroll to the bottom as new chunks arrive. */
-export function LiveOutput({ text, className = "" }: { text: string; className?: string }) {
+export function LiveOutput({
+  text,
+  active = true,
+  className = "",
+}: {
+  text: string;
+  /** Animate while the run is live; finished output reveals instantly. */
+  active?: boolean;
+  className?: string;
+}) {
   const ref = useRef<HTMLPreElement>(null);
   useEffect(() => {
     const el = ref.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el) el.scrollTop = el.scrollHeight; // auto-tail as new chunks arrive
   }, [text]);
   if (!text) return null;
   return (
@@ -169,7 +179,7 @@ export function LiveOutput({ text, className = "" }: { text: string; className?:
       ref={ref}
       className={`max-h-32 overflow-auto whitespace-pre-wrap break-words rounded border border-blue-200 bg-blue-50/50 p-1.5 font-mono text-[10px] leading-relaxed text-neutral-600 dark:border-blue-900 dark:bg-blue-950/30 dark:text-neutral-300 ${className}`}
     >
-      {text.slice(-2000)}
+      <SmoothStreamingText text={text} active={active} mode="mono" maxChars={2000} />
     </pre>
   );
 }

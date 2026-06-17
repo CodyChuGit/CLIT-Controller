@@ -4,6 +4,7 @@ import { Close, FileIcon, Folder, Inbox, Spinner, StopSquare } from "../componen
 import StatusBadge from "../components/StatusBadge";
 import { Markdown } from "../components/Markdown";
 import { ApprovalCard, CommandCard, ContextSummary } from "../components/TaskViews";
+import SmoothStreamingText from "../components/SmoothStreamingText";
 import { Card, EmptyState } from "../components/ui";
 import { useRunStream, useStructuralRevision } from "../stream";
 import { parsePrompt, type BudgetSummary } from "../lib/taskFormat";
@@ -336,7 +337,7 @@ function StepChat({
               </div>
               {liveText && (
                 <pre className="max-h-28 overflow-hidden whitespace-pre-wrap break-words font-mono text-[10px] leading-relaxed text-neutral-500">
-                  {liveText.slice(-1200)}
+                  <SmoothStreamingText text={liveText} active mode="mono" maxChars={1200} />
                 </pre>
               )}
             </div>

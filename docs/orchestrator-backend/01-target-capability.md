@@ -37,6 +37,8 @@ control of risky operations.
 
 - Detect installed providers and their executable paths.
 - Track provider roles: controller, PM, engineer, QA, local tools, optional local LLMs.
+- Track optional local voice providers: MLX Parakeet for STT and
+  `mlx-swift-dots-tts` for TTS.
 - Support configurable command templates and model selections.
 - Keep provider-specific CLI syntax outside traffic-control logic.
 - Expose install and login helpers without storing API keys, passwords, or tokens.
@@ -58,6 +60,10 @@ control of risky operations.
   - `ROUTING_DECISIONS.md`
 - Support fixed pipeline steps and dynamic next-step decisions.
 - Record which artifacts and production files changed after every agent run.
+- Maintain human-readable task summaries beside raw machine-readable artifacts.
+- Keep raw prompt, stdout, stderr, log, event, directive, and JSON records
+  paginated or drill-down friendly so the UI can default to readable output
+  without losing auditability.
 - Represent terminal task outcomes explicitly: `done`, `needs_user`, `failed`,
   `cancelled`, and `abandoned`.
 
@@ -102,6 +108,8 @@ control of risky operations.
 
 - Show current queue, running providers, task events, logs, prompt/output exchanges,
   provider usage, and final verdict.
+- Default task detail rendering should prioritize summaries, decisions, changed
+  files, checks, approvals, and failures over raw CLI output.
 - Add streaming text events for direct chat, controller decisions, run output,
   stderr, command lifecycle, logs, queue/task state updates, approvals, failures,
   cancellation, and completion. Text deltas should be emitted as generated or
@@ -110,6 +118,43 @@ control of risky operations.
 - Make every automatic decision inspectable from task files or structured events.
 - Rebuild completed task replay from the same durable events shown during the live
   run, so live progress and history never diverge.
+
+### UI/UX Reference Library
+
+- Maintain a local reference database under `.agentflow/` for frontend component
+  references, design-system snippets, style recipes, tokens, and extracted
+  examples.
+- Extract references from explicitly selected local component libraries, stories,
+  docs, token files, and examples without overwriting user code.
+- Preserve source, license, framework, dependencies, props/API notes, variants,
+  accessibility notes, and extraction metadata.
+- Surface references in a dedicated right-hand tab that can queue normal
+  task/diff/approval work for style swaps.
+
+### Overflow Scheduling
+
+- Represent provider/user/weekly limit delays as overflow queue state, not task
+  failure.
+- Create durable scheduler handoff records before sending overflow work to TestApp
+  Calendar Scheduler.
+- Store reason, earliest run time, preferred window, provider, step, task ID,
+  queue item ID, resume action, approval requirement, status, and scheduler
+  external ID when available.
+- Resume scheduled work through the normal queue, policy, and approval flow.
+- If TestApp is unavailable, retain overflow work locally and make the state
+  visible in Tasks and status surfaces.
+
+### Local Voice I/O
+
+- Support optional local STT for prompt dictation using MLX Parakeet.
+- Support optional local TTS for concise task/run summaries using
+  `mlx-swift-dots-tts`.
+- Keep push-to-talk as the default input mode.
+- Put transcribed text into editable prompt fields before sending.
+- Route voice-generated text through the same task, queue, policy, and approval
+  rules as typed text.
+- Do not send audio or transcripts to hosted voice services.
+- Do not retain raw microphone audio by default.
 
 ## Non-Goals
 
@@ -129,3 +174,8 @@ control of risky operations.
   all produce useful, durable states rather than silent failures.
 - The frontend can render task, queue, run, log, and usage state from stable API
   responses without reconstructing backend logic.
+- The frontend can render readable task summaries, paginated raw detail,
+  reference-library records, and scheduler overflow state from stable API
+  responses.
+- Optional local voice I/O works when providers are installed and degrades
+  cleanly when MLX Parakeet or `mlx-swift-dots-tts` is unavailable.

@@ -45,6 +45,53 @@ Acceptance criteria:
   log file, and output tail.
 - The task timeline remains complete after restart.
 
+## Phase 1.5: Product Workbench
+
+Goal: make durable task data usable before deeper state-machine work by improving
+task readability, adding a frontend reference-library tab, preserving overflow
+work through scheduling, and adding optional local voice I/O. See
+[Phase 1.5 Product Workbench](../phase-1-5-product-workbench.md).
+
+Tasks:
+
+- Rework the Tasks tab output view so human-readable summaries are the default
+  and raw machine-readable prompt/log/stdout/stderr/event data is paginated
+  behind drill-down controls.
+- Normalize task-output typography with the rest of the IDE: small sans text for
+  summaries and metadata, monospace only for machine identifiers and raw output.
+- Collapse repeated budget context, command blocks, provider boilerplate, and
+  directive payloads into compact cards with raw detail expanders.
+- Add a right-hand UI/UX reference-library tab for frontend style references,
+  design-system snippets, component variants, and style-swap recipes.
+- Add a reference extraction tool that turns local component libraries, tokens,
+  stories, and docs into a searchable local database under `.agentflow/`.
+- Add TestApp Calendar Scheduler handoff records for overflow work when user
+  limits, weekly limits, provider health, or budget policy prevent immediate
+  execution.
+- Keep overflow tasks in CLITC's queue/task model and resume them through normal
+  traffic control when the scheduled window arrives.
+- Add optional local voice I/O adapters: MLX Parakeet for STT and
+  `mlx-swift-dots-tts` for TTS.
+- Add prompt-box dictation and concise summary read-aloud controls without
+  bypassing written review, queue, policy, or approval flows.
+- Capture additional CLI IDE feature candidates for later prioritization:
+  checkpoints, command recipes, environment doctor, quota planner, diff approval
+  workbench, test intelligence, prompt inspector, repro capsules, workspace
+  profiles, and expanded voice handoff.
+
+Acceptance criteria:
+
+- The default task detail view can be understood without reading raw CLI output.
+- Raw machine-readable sections are paginated and still fully accessible.
+- The UI/UX reference tab can browse extracted local component references.
+- Applying a reference creates normal task artifacts and diffs, not silent edits.
+- Overflow work can be scheduled through TestApp Calendar Scheduler or retained
+  locally if the scheduler is unavailable.
+- Scheduled work resumes through the existing queue, approval, and policy flow.
+- No remote scheduling state changes without explicit user approval.
+- Local voice input can create reviewed prompt text, and local TTS can read
+  concise summaries without sending audio to a hosted service.
+
 ## Phase 2: Explicit State Machines
 
 Goal: make invalid transitions impossible.
@@ -250,7 +297,7 @@ Acceptance criteria:
 - Active run output is visible from both the Agent Dock and the selected Tasks tab
   without opening a separate terminal or waiting for the final result.
 - Commands, logs, approvals, diffs, and queue blockers are summarized and styled
-  by default, with raw details available behind expanders.
+  by default, with raw details available behind paginated expanders.
 - Existing backend traffic control, task files, CLI execution, policy, approvals, and
   redaction remain authoritative.
 - No feature requires VS Code to be installed or opened.
@@ -293,15 +340,17 @@ Acceptance criteria:
 ## Recommended Build Order
 
 1. Durable run/event ledger.
-2. Startup recovery.
-3. State transition helpers.
-4. Policy and approval service.
-5. Provider adapters.
-6. Typed decision parser.
-7. SSE event stream.
-8. Context builder.
-9. Final reports and exports.
-10. VS Code-style Agent Dock and Tasks tab.
-11. PWA and Chrome app-mode launcher.
+2. Product workbench: task readability, UI references, scheduler overflow, and
+   local voice I/O.
+3. Startup recovery.
+4. State transition helpers.
+5. Policy and approval service.
+6. Provider adapters.
+7. Typed decision parser.
+8. SSE event stream.
+9. Context builder.
+10. Final reports and exports.
+11. VS Code-style Agent Dock and Tasks tab.
+12. PWA and Chrome app-mode launcher.
 
 This order fixes correctness and recovery before adding richer routing features.

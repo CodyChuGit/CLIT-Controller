@@ -134,6 +134,14 @@ audit, recovery, and continuing work after a run finishes.
 - **Conversation replay:** prompt/output exchanges render as styled transcript
   rows with provider marks, step chips, elapsed time, status, and expandable raw
   prompt/output. Budget context and commands render as summarized cards first.
+- **Readable output first:** the default task detail view is a human review
+  surface, not a raw log viewer. Summaries, changed files, checks, approvals,
+  failures, and decisions come first; raw prompt/stdout/stderr/log/event payloads
+  are paginated behind drill-down controls.
+- **Typography consistency:** task output uses the same density as the rest of the
+  IDE. Avoid oversized body text inside task cards. Use monospace only for
+  commands, paths, provider IDs, task IDs, model names, branches, and raw machine
+  output.
 - **Active task stream:** when a selected task is running, show the same live
   output, queue, approval, error, and completion events as the Agent Dock. Once
   complete, the stream settles into the durable replay view.
@@ -146,6 +154,41 @@ audit, recovery, and continuing work after a run finishes.
 - **Parity boundary:** the Tasks tab may mimic VS Code extension history, diff,
   approval, and session views, but it must not depend on VS Code APIs or copied
   extension UI.
+
+## UI/UX Reference Tab
+
+The right-hand dock should support a dedicated reference-library tab for frontend
+work. It is not a chat provider; it is a local searchable reference database for
+components, design systems, style recipes, tokens, and extracted examples.
+
+- **Frame:** use the same right-dock tab strip and panel-section primitives as
+  the Agent Dock.
+- **Search first:** dense search/filter controls at the top; results below as
+  compact rows with framework, component type, tags, license/source, and modified
+  status.
+- **Preview:** selected references show props/API notes, token/class summaries,
+  variants, accessibility notes, and compact code excerpts. Large code stays
+  paginated or collapsed.
+- **Actions:** add source, extract library, tag reference, create style recipe,
+  apply to task, copy implementation prompt, and queue style-swap task.
+- **Boundary:** references guide generated work. They do not silently import,
+  overwrite, or rewrite user code without a normal task, diff, and approval path.
+
+## Local Voice I/O
+
+Voice controls are optional, local-first controls for dictation and spoken
+summaries. They must not make the IDE feel like a voice dashboard.
+
+- **Controls:** use compact mic, stop, speaker, and volume icon buttons with
+  tooltips. Put dictation next to prompt inputs and read-aloud next to summaries.
+- **States:** idle, listening, transcribing, speaking, failed, and unavailable
+  are shown with small labels or status badges; never color alone.
+- **Review first:** transcribed text appears in the normal prompt field for edit
+  and review before sending.
+- **Local provider marks:** show MLX Parakeet and `mlx-swift-dots-tts` availability
+  as quiet provider/status chips.
+- **No clutter:** no large voice panel, waveform hero, or always-on mic indicator
+  in the first pass.
 
 ## Composition primitives (frontend/src/components/ui.tsx)
 

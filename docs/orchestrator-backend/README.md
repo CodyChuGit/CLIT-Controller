@@ -29,6 +29,13 @@ provider contracts, predictable approvals, and a complete verification matrix.
   practical phases with acceptance criteria.
 - [04 Verification And Operations](./04-verification-and-operations.md) defines the
   tests, recovery checks, safety checks, and production-readiness gates.
+- [Phase 1.5 Product Workbench](../phase-1-5-product-workbench.md) defines the
+  near-term product layer between durable events and state machines: readable
+  task output, a UI/UX reference-library tab, reference extraction, TestApp
+  Calendar Scheduler overflow, local voice I/O, and CLI IDE feature candidates.
+- [Local Voice I/O](../local-voice-io.md) defines the optional local STT/TTS path
+  using MLX Parakeet for speech-to-text and `mlx-swift-dots-tts` for
+  text-to-speech.
 - [Text Streaming Across The Board](../text-streaming-across-the-board.md)
   defines the shared live text contract for chat, runs, tasks, logs, terminals,
   approvals, and replay.
@@ -74,6 +81,18 @@ provider contracts, predictable approvals, and a complete verification matrix.
 - Keep stream rendering separate from stream ownership. The frontend should use a
   small internal smoothing renderer over the shared event store, not install a
   package that opens its own SSE connection or owns chat message state.
+- Prioritize task readability before adding more automation. Human summaries
+  should be the default Tasks tab experience, while raw machine-readable records
+  remain paginated and inspectable.
+- Build the UI/UX reference library as a local workspace asset. Extracted
+  components, tokens, and style recipes should assist frontend tasks without
+  silently importing or rewriting code.
+- Treat TestApp Calendar Scheduler as an overflow handoff for quota/user-limit
+  delays. Scheduled work must return through normal CLITC queue, policy, and
+  approval flows.
+- Keep voice local and explicit. MLX Parakeet STT and `mlx-swift-dots-tts` TTS should
+  be optional adapters for dictation and spoken summaries, not cloud services or
+  hidden automation.
 - Make the near-term app shell a PWA plus Chrome app-mode launcher. The backend
   remains FastAPI, the frontend remains browser-delivered, and no Electron,
   Tauri, Chrome Extension shell, or deprecated Chrome App is introduced.
