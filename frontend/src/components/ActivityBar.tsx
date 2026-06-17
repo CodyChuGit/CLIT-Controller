@@ -1,5 +1,3 @@
-import { BeanMark } from "./icons";
-
 export type PageId =
   | "projects"
   | "agents"
@@ -117,12 +115,14 @@ export default function ActivityBar({ page, onNavigate }: Props) {
       className="flex w-10 shrink-0 flex-col items-center gap-1 border-r border-neutral-200 bg-white py-2 dark:border-neutral-800 dark:bg-neutral-900"
       aria-label="Main navigation"
     >
-      <div
-        className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm"
+      <img
+        src="/icons/bean.svg"
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        className="mb-2 h-8 w-8 rounded-lg shadow-sm"
         title="Command Line Interface Terminal Controller (CLIT Controller IDE)"
-      >
-        <BeanMark className="h-5 w-5" />
-      </div>
+      />
       {MAIN_NAV.map((item) => (
         <RailButton key={item.id} item={item} active={page === item.id} onClick={() => onNavigate(item.id)} />
       ))}

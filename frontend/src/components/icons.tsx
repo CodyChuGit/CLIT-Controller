@@ -151,21 +151,23 @@ export const AntigravityMark = (p: SVGProps<SVGSVGElement>) => (
   </BrandIcon>
 );
 
-/** SF Symbols-style bean mark for the controller channel. */
-export const BeanMark = (p: SVGProps<SVGSVGElement>) => (
+/** Smooth bean mark for compact controller/channel UI. */
+export const BeanMark = ({ className = "h-4 w-4", ...rest }: SVGProps<SVGSVGElement>) => (
   <svg
-    viewBox="0 0 24 24"
+    viewBox="0 0 512 512"
     fill="none"
     stroke="currentColor"
-    strokeWidth="2.15"
     strokeLinecap="round"
     strokeLinejoin="round"
     aria-hidden="true"
-    className={p.className ?? "h-4 w-4"}
-    {...p}
+    className={`block shrink-0 overflow-visible ${className}`}
+    {...rest}
   >
-    <path d="M16.9 3.7c-2.7-1.1-6.2.2-7.9 3.1-.7 1.2-1.7 2.1-3 2.7-2.8 1.3-3.7 4.8-2 7.4 2.2 3.4 7.4 4.4 11.6 2.2 4.6-2.4 6.5-8.3 4.4-12.1-.7-1.4-1.8-2.5-3.1-3.3z" />
-    <path d="M13.9 7.2c1.5.3 2.7 1.3 3.4 2.7" />
+    <path
+      strokeWidth="41.307053"
+      d="M 119.139801 338.127747 C 88.703026 281.602295 109.356552 230.511993 159.359833 206.597382 C 205.014984 184.856842 213.711212 135.940582 269.149628 117.461121 C 334.371307 95.720551 391.983765 138.114655 403.941071 201.162262 C 421.333496 287.037445 362.634003 370.738586 276.75882 394.653198 C 207.189041 414.219696 150.663605 390.305084 119.139801 338.127747"
+    />
+    <path strokeWidth="33.697861" d="M 292 173 C 320.181824 180.457642 342 200.966095 352 228" />
   </svg>
 );
 

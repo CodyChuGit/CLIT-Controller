@@ -49,41 +49,29 @@ exec "$REPO/scripts/app.sh"
 LAUNCH
 chmod +x "$APP/Contents/MacOS/launch"
 
-# --- icon (SVG -> PNG via Quick Look -> .icns) ------------------------------
-ICON_SRC="$(mktemp -d)/icon.svg"
-cat > "$ICON_SRC" <<'SVG'
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <rect width="1024" height="1024" rx="220" fill="#2563eb"/>
-  <g fill="none" stroke="white" stroke-width="64" stroke-linecap="round" stroke-linejoin="round" transform="translate(176 176) scale(28.4)">
-    <path d="M16.9 3.7c-2.7-1.1-6.2.2-7.9 3.1-.7 1.2-1.7 2.1-3 2.7-2.8 1.3-3.7 4.8-2 7.4 2.2 3.4 7.4 4.4 11.6 2.2 4.6-2.4 6.5-8.3 4.4-12.1-.7-1.4-1.8-2.5-3.1-3.3z"/>
-    <path d="M13.9 7.2c1.5.3 2.7 1.3 3.4 2.7"/>
-  </g>
-</svg>
-SVG
+# --- icon (bean SVG -> PNG -> .icns) ----------------------------------------
+# Keep the web and macOS app icons on the same promoted SVG source.
+BASE="$REPO/frontend/public/icons/bean-512.png"
+if command -v "$REPO/.venv/bin/python" >/dev/null 2>&1 && [ -f "$REPO/scripts/make-icons.py" ]; then
+  "$REPO/.venv/bin/python" "$REPO/scripts/make-icons.py" >/dev/null 2>&1 || true
+fi
 
-if command -v qlmanage >/dev/null 2>&1 && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
+if [ -f "$BASE" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
   TMP="$(mktemp -d)"
-  QL_OUT="$TMP/ql"; mkdir -p "$QL_OUT"
-  qlmanage -t -s 1024 -o "$QL_OUT" "$ICON_SRC" >/dev/null 2>&1 || true
-  BASE="$QL_OUT/icon.svg.png"
-  if [ -f "$BASE" ]; then
-    ICONSET="$TMP/icon.iconset"; mkdir -p "$ICONSET"
-    for size in 16 32 64 128 256 512 1024; do
-      sips -z "$size" "$size" "$BASE" --out "$ICONSET/icon_${size}x${size}.png" >/dev/null 2>&1
-    done
-    # @2x retina variants (a size's 2x is the next size up)
-    cp "$ICONSET/icon_32x32.png"   "$ICONSET/icon_16x16@2x.png"
-    cp "$ICONSET/icon_64x64.png"   "$ICONSET/icon_32x32@2x.png"
-    cp "$ICONSET/icon_256x256.png" "$ICONSET/icon_128x128@2x.png"
-    cp "$ICONSET/icon_512x512.png" "$ICONSET/icon_256x256@2x.png"
-    cp "$ICONSET/icon_1024x1024.png" "$ICONSET/icon_512x512@2x.png"
-    rm -f "$ICONSET/icon_64x64.png" "$ICONSET/icon_1024x1024.png"  # not standard iconset names
-    iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/icon.icns" && echo "==> Icon built"
-  else
-    echo "==> warn: Quick Look could not render the icon; bundle will use a generic icon." >&2
-  fi
+  ICONSET="$TMP/icon.iconset"; mkdir -p "$ICONSET"
+  for size in 16 32 64 128 256 512 1024; do
+    sips -z "$size" "$size" "$BASE" --out "$ICONSET/icon_${size}x${size}.png" >/dev/null 2>&1
+  done
+  # @2x retina variants (a size's 2x is the next size up)
+  cp "$ICONSET/icon_32x32.png"   "$ICONSET/icon_16x16@2x.png"
+  cp "$ICONSET/icon_64x64.png"   "$ICONSET/icon_32x32@2x.png"
+  cp "$ICONSET/icon_256x256.png" "$ICONSET/icon_128x128@2x.png"
+  cp "$ICONSET/icon_512x512.png" "$ICONSET/icon_256x256@2x.png"
+  cp "$ICONSET/icon_1024x1024.png" "$ICONSET/icon_512x512@2x.png"
+  rm -f "$ICONSET/icon_64x64.png" "$ICONSET/icon_1024x1024.png"  # not standard iconset names
+  iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/icon.icns" && echo "==> Icon built"
 else
-  echo "==> warn: qlmanage/sips/iconutil unavailable; bundle will use a generic icon." >&2
+  echo "==> warn: bean-512.png / sips / iconutil unavailable; bundle will use a generic icon." >&2
 fi
 
 # Nudge Finder/Launchpad to pick up the new bundle + icon.

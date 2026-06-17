@@ -1,5 +1,9 @@
 # CLIT Controller IDE (beta)
 
+<p align="center">
+  <img src="frontend/public/icons/bean.svg" alt="CLIT Controller IDE bean icon" width="96" height="96">
+</p>
+
 > Vibe with CLIT Controller
 
 **Command Line Interface Traffic Controller (CLIT Controller IDE)** is a local-first traffic control center for CLI coding agents — Codex, Claude Code, and Antigravity — from one clean UI, with Git, the GitHub CLI, and VS Code-style Agent Dock and Tasks tab surfaces.
@@ -105,18 +109,47 @@ Backend alone: `.venv/bin/python -m agentflow`. If you build the frontend once (
 
 ## App-Mode Launch
 
-Planned standalone-window support is documented in
-[PWA And Chrome App-Mode Launcher](docs/pwa-chrome-app-mode.md). The intended
-path is a PWA manifest plus a launcher script that starts the local FastAPI
-backend, waits for health, then opens:
+Standalone-window support is documented in
+[PWA And Chrome App-Mode Launcher](docs/pwa-chrome-app-mode.md). The app icon
+design source is `docs/icon-options/bean-option-01-smooth.svg`; the runtime SVG
+is promoted to `frontend/public/icons/bean.svg`, with generated PWA icons at
+`frontend/public/icons/bean-192.png` and `frontend/public/icons/bean-512.png`.
+The browser favicon uses the SVG directly, Apple touch icons use the 192px PNG,
+and the web manifest keeps 192px/512px PNG entries for PWA compatibility.
+
+Regenerate the PWA PNG icons from the promoted SVG:
+
+```bash
+.venv/bin/python scripts/make-icons.py
+```
+
+Build the macOS Chrome app-mode wrapper with the current icon set:
+
+```bash
+./scripts/create-macos-app-mode.sh
+```
+
+For the alternate local launcher bundle, run:
+
+```bash
+./scripts/make-app.sh
+```
+
+Both wrapper builders create their `.icns` files from the current
+`frontend/public/icons/bean-512.png`. The left activity rail uses the full
+square SVG app icon, while compact controller/chat marks use the same smooth bean
+geometry as a monochrome in-app mark. The service worker cache is versioned so
+icon asset changes clear stale cached `/icons/*` files.
+
+The launcher starts the local FastAPI backend, waits for health, then opens:
 
 ```bash
 open -na "Google Chrome" --args --app="http://127.0.0.1:${AGENTFLOW_PORT:-8787}"
 ```
 
-This is the near-term app-like shell for CLITC. It deliberately does not use
-Electron, Tauri, native desktop packaging, deprecated Chrome Apps, or a Chrome
-Extension shell.
+This is the app-like shell for CLITC. It deliberately does not use Electron,
+Tauri, native desktop packaging, deprecated Chrome Apps, or a Chrome Extension
+shell.
 
 ## Next Phase Product Workbench
 
