@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import ActivityBar, { type PageId } from "./components/ActivityBar";
 import ChatPanel from "./components/ChatPanel";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import StatusBar from "./components/StatusBar";
 import { loadState, saveState } from "./persist";
 import { EventStreamProvider } from "./stream";
@@ -272,7 +273,10 @@ export default function App() {
                 </button>
               </div>
             ) : (
-              <>
+              // Per-view boundary keyed on `page`: a crash in one view shows a
+              // recoverable fallback instead of blanking the IDE, and navigating
+              // to another view resets it (audit P1-08).
+              <ErrorBoundary key={page} label="this view">
                 {page === "projects" && (
                   <ProjectsPage
                     project={project}
@@ -295,17 +299,19 @@ export default function App() {
                 {page === "usage" && <UsagePage />}
                 {page === "logs" && <LogsPage />}
                 {page === "settings" && <SettingsPage />}
-              </>
+              </ErrorBoundary>
             )}
           </main>
 
-          <ChatPanel
-            workspacePath={project?.workspacePath ?? null}
-            project={project}
-            git={git}
-            usage={usage}
-            onNavigate={setPage}
-          />
+          <ErrorBoundary label="the chat panel">
+            <ChatPanel
+              workspacePath={project?.workspacePath ?? null}
+              project={project}
+              git={git}
+              usage={usage}
+              onNavigate={setPage}
+            />
+          </ErrorBoundary>
         </div>
 
         <StatusBar
