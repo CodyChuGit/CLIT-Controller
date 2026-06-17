@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Launch CLIT Controller as a standalone Chrome "app" window — its own window,
-# no tabs/address bar, separate from your everyday browsing. Mirrors vjbooth's
-# kiosk/show scripts.
+# no tabs/address bar, separate from your everyday browsing.
 #
 # Single-port mode: the backend on :8787 serves both the API and the built
 # frontend, so the app is one URL. This script builds the frontend if needed,

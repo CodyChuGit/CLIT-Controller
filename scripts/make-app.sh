@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Build a macOS "CLIT Controller.app" bundle so the app launches from the Dock,
-# Launchpad, or Spotlight with its own icon — like vjbooth. The bundle is a thin
-# launcher: double-clicking it runs ./scripts/app.sh from this repo, which serves
-# the backend and opens the Chrome app window.
+# Launchpad, or Spotlight with its own icon. The bundle is a thin launcher:
+# double-clicking it runs ./scripts/app.sh from this repo, which serves the
+# backend and opens the Chrome app window.
 #
 #   ./scripts/make-app.sh                  # build into ./dist-app/CLIT Controller.app
 #   ./scripts/make-app.sh /Applications    # build and install into /Applications
