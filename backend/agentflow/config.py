@@ -84,6 +84,9 @@ def load_global_config() -> dict:
             templates[pid] = DEFAULT_COMMAND_TEMPLATES[pid]
     cfg["commandTemplates"] = templates
     cfg.setdefault("models", {})  # provider id -> model name ("" = CLI default)
+    # Optional Headroom token-saving proxy (Pillar 1). Off by default; the merged
+    # view with defaults lives in headroom_service.settings().
+    cfg.setdefault("headroom", {})
     return cfg
 
 
@@ -111,8 +114,11 @@ def update_settings(
     routing: Optional[dict] = None,
     command_templates: Optional[dict] = None,
     models: Optional[dict] = None,
+    headroom: Optional[dict] = None,
 ) -> dict:
     cfg = load_global_config()
+    if headroom is not None:
+        cfg["headroom"] = {**(cfg.get("headroom") or {}), **headroom}
     if routing:
         cfg["routing"] = {**cfg["routing"], **routing}
         ws = get_current_workspace()

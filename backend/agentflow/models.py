@@ -77,6 +77,7 @@ class SettingsUpdateRequest(BaseModel):
     routing: Optional[RoutingConfig] = None
     commandTemplates: Optional[dict[str, str]] = None
     models: Optional[dict[str, str]] = None
+    headroom: Optional[dict] = None  # Pillar 1: {enabled, proxyUrl, savingsProfile}
 
 
 class AgentModelRequest(BaseModel):

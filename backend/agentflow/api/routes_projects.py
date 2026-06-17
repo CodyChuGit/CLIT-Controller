@@ -8,7 +8,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from .. import config, git_service, paths, state_store
+from .. import config, git_service, headroom_service, paths, state_store
 from .. import workspace as workspace_service
 from ..models import (
     FileWriteRequest,
@@ -150,6 +150,7 @@ def get_settings():
         "routing": cfg["routing"],
         "commandTemplates": cfg["commandTemplates"],
         "models": cfg["models"],
+        "headroom": headroom_service.status(),
         "workspacePath": str(ws) if ws else None,
         "globalConfigPath": str(paths.global_config_file()),
         "workspaceConfigPath": str(paths.workspace_config_file(ws)) if ws else None,
@@ -163,6 +164,7 @@ def save_settings(body: SettingsUpdateRequest):
         routing=body.routing.model_dump() if body.routing else None,
         command_templates=body.commandTemplates,
         models=body.models,
+        headroom=body.headroom,
     )
-    add_log_entry("system", "settings updated (routing/command templates/models)")
+    add_log_entry("system", "settings updated (routing/command templates/models/headroom)")
     return get_settings()
