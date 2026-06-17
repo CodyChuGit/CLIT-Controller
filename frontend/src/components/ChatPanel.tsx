@@ -12,27 +12,24 @@ import type {
   Usage,
 } from "../types";
 import DragHandle from "./DragHandle";
-import { Markdown, STEP_META, StepChip, withStepChips } from "./Markdown";
-import { ApprovalCard, Disclosure, LiveOutput } from "./TaskViews";
+import { STEP_META, StepChip } from "./Markdown";
+import { ApprovalCard, LiveOutput } from "./TaskViews";
 import CommandPalette, { type PaletteAction } from "./CommandPalette";
 import SmoothStreamingText from "./SmoothStreamingText";
 import Composer, { ComposerChip } from "./Composer";
-import RawDetail from "./RawDetail";
+import { Message, PROVIDER_DOT, ProviderMark } from "./conversation/Message";
 import { EmptyState } from "./ui";
 import { useRunStream, useStructuralRevision } from "../stream";
 import { loadState, saveState } from "../persist";
 import {
-  AntigravityMark,
   BeanMark,
   ChatBubble,
   ChevronDown,
   ChevronRight,
-  ClaudeMark,
   Close,
   Command,
   Folder,
   GitBranch,
-  OpenAIMark,
   Spinner,
   Terminal,
 } from "./icons";
@@ -52,129 +49,8 @@ const HEALTH_DOT: Record<string, string> = {
 
 const OPEN_KEY = "agentflow.chatOpen";
 
-/* ------------------------------------------------------------ provider identity */
-
-const PROVIDER_DOT: Record<string, string> = {
-  codex: "bg-emerald-500",
-  claude: "bg-orange-500",
-  antigravity: "bg-sky-500",
-  shell: "bg-neutral-500",
-};
-
-const PROVIDER_TEXT: Record<string, string> = {
-  codex: "text-emerald-600 dark:text-emerald-500",
-  claude: "text-orange-600 dark:text-orange-500",
-  antigravity: "text-sky-600 dark:text-sky-500",
-};
-
-const PROVIDER_MARK: Record<string, (p: React.SVGProps<SVGSVGElement>) => JSX.Element> = {
-  codex: OpenAIMark,
-  claude: ClaudeMark,
-  antigravity: AntigravityMark,
-};
-
-/** The provider's official mark in its accent color; dot fallback for unknowns. */
-function ProviderMark({ id, className = "h-4 w-4" }: { id: string; className?: string }) {
-  const Mark = PROVIDER_MARK[id];
-  if (!Mark) {
-    return (
-      <span
-        className={`h-2 w-2 rounded-full ${PROVIDER_DOT[id] ?? "bg-neutral-400"}`}
-        aria-hidden="true"
-      />
-    );
-  }
-  return <Mark className={`${className} shrink-0 ${PROVIDER_TEXT[id] ?? ""}`} />;
-}
-
-/* ----------------------------------------------------------- system notices */
-
-function noticeStyle(content: string): { border: string; dot: string } {
-  if (content.startsWith("$")) return { border: "border-l-neutral-400", dot: "bg-neutral-500" };
-  if (/complete —|complete:/.test(content))
-    return { border: "border-l-emerald-500", dot: "bg-emerald-500" };
-  if (/^(Needs|Manual|Didn)/.test(content))
-    return { border: "border-l-amber-500", dot: "bg-amber-500" };
-  if (/^Created/.test(content)) return { border: "border-l-blue-500", dot: "bg-blue-500" };
-  if (/^(Queued|Reviewed|Controller|Orchestrator)/.test(content))
-    return { border: "border-l-violet-500", dot: "bg-violet-500" };
-  return { border: "border-l-neutral-300 dark:border-l-neutral-600", dot: "bg-neutral-400" };
-}
-
-function SystemNotice({ msg }: { msg: ChatMessage }) {
-  const style = noticeStyle(msg.content);
-  const [first, ...rest] = msg.content.split("\n");
-  return (
-    <div
-      className={`rounded-md border border-l-2 border-neutral-200 bg-white px-2.5 py-1.5 dark:border-neutral-800 dark:bg-neutral-900 ${style.border}`}
-      title={msg.time}
-    >
-      <div className="flex items-start gap-1.5">
-        <span
-          className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${style.dot}`}
-          aria-hidden="true"
-        />
-        <span
-          className={`min-w-0 flex-1 text-[11px] leading-snug text-neutral-700 dark:text-neutral-300 ${first.startsWith("$") ? "font-mono" : ""}`}
-        >
-          {withStepChips(first)}
-        </span>
-      </div>
-      {rest.length > 0 &&
-        (rest.join("\n").length > 400 ? (
-          // Long raw tail → the shared paginated viewer (same component the Tasks
-          // page uses), behind an expander so the notice stays compact.
-          <Disclosure label="View raw" className="mt-1 pl-3">
-            <RawDetail text={rest.join("\n")} kind="log" pageSize={50} />
-          </Disclosure>
-        ) : (
-          <pre className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap pl-3 font-mono text-[10px] text-neutral-500 dark:text-neutral-400">
-            {rest.join("\n")}
-          </pre>
-        ))}
-    </div>
-  );
-}
-
-function Bubble({ msg, direct = false }: { msg: ChatMessage; direct?: boolean }) {
-  // In a direct chat every turn is the provider's own line, so even a failed run
-  // belongs in its bubble — attributed, same shape as a reply — not the
-  // controller's system-notice strip (which is what the ORCH channel uses).
-  if (msg.role === "system" && !direct) return <SystemNotice msg={msg} />;
-  const mine = msg.role === "user";
-  const failed = msg.role === "system";
-  return (
-    <div className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
-      {!mine && msg.provider && (
-        <span className="mb-0.5 flex items-center gap-1.5 px-1 text-[10px] text-neutral-400">
-          <ProviderMark id={msg.provider} className="h-3 w-3" />
-          <span className="font-mono">{msg.provider}</span>
-          {failed ? (
-            <span className="text-rose-500">failed</span>
-          ) : (
-            msg.durationMs !== undefined && (
-              <span className="tabular-nums">{(msg.durationMs / 1000).toFixed(1)}s</span>
-            )
-          )}
-        </span>
-      )}
-      <div
-        title={msg.time}
-        className={`max-w-[94%] break-words rounded-lg px-3 py-2 text-xs leading-relaxed ${
-          mine
-            ? "rounded-br-sm bg-accent text-white"
-            : "rounded-bl-sm border border-neutral-200 bg-white text-neutral-800 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
-        }`}
-      >
-        {mine ? (
-          <span className="whitespace-pre-wrap">{msg.content}</span>
-        ) : (
-          <Markdown content={msg.content} />
-        )}
-      </div>
-    </div>
-  );
-}
+/* Conversation message primitives (ProviderMark, SystemNotice, Message) are the
+   shared, canonical renderer in ./conversation/Message — Pillar 4. */
 
 /* ----------------------------------------------------- live agent activity */
 
@@ -821,7 +697,7 @@ export default function ChatPanel({
               />
             )
           ) : (
-            messages.map((m, i) => <Bubble key={`${m.time}-${i}`} msg={m} direct={!isOrch} />)
+            messages.map((m, i) => <Message key={`${m.time}-${i}`} msg={m} direct={!isOrch} />)
           )}
 
           {isOrch && <AgentActivity queue={queue} running={running} />}
