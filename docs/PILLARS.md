@@ -184,11 +184,13 @@ compared — without guessing the meaning of arbitrary prose.
 - ✅ Network input is validated at the boundary (`coerceStreamEvent`).
 - ✅ Structured summaries reference full output by event range
   (`OutputRef`) instead of re-embedding it — canonical history is never discarded.
-- ✅ Native structured controller output: the orchestrator can emit a fenced
-  `agentflow` JSON block of validated decisions; the parsers are structured-first
-  with markdown fallback (`chat_directives.extract_structured_decisions`), so the
-  controller's machine-consumed decisions are validated records, with the legacy
-  markdown form still accepted. Prompts teach the structured form as preferred.
+- ✅ Native structured controller output: the controller emits a deterministic,
+  versioned, sentinel-framed result (`CLITC_RESULT_V1`, see
+  [input-output-rebuild/02-protocols.md](input-output-rebuild/02-protocols.md))
+  with a closed action union, validated before it can act; invalid output mutates no
+  state. It is now the primary protocol (`controller_protocol.py`), with the legacy
+  `agentflow` JSON / markdown directives demoted to a no-silent-downgrade fallback
+  and removed from prompt generation.
 
 ---
 

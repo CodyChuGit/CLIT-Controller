@@ -40,6 +40,7 @@ running it; this index routes you to the right document by task.
 | [API.md](API.md) | HTTP/SSE/WebSocket endpoint inventory and conventions (OpenAPI at `/docs`). |
 | [DATA_MODEL.md](DATA_MODEL.md) | The JSON-ledger persistence model (no database). |
 | [adr/](adr/) | Architecture Decision Records (e.g. the auto-run policy). |
+| [input-output-rebuild/](input-output-rebuild/) | The input/output/streaming/protocol rebuild: three planes, the CLITC_RESULT_V1 controller protocol, typed contracts, migration, verification. |
 
 ## Testing and quality
 
