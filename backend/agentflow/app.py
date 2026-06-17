@@ -5,10 +5,11 @@ from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from . import __version__, config, paths, queue_service, state_store
 from .api import (
@@ -23,8 +24,29 @@ from .api import (
     routes_terminals,
     routes_usage,
 )
+from .origins import LOCAL_ORIGINS, is_allowed_origin, origin_of
 from .process_runner import add_log_entry
 from .terminal_service import TERMINALS, sweep_orphaned_sessions
+
+_MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+class OriginGuardMiddleware(BaseHTTPMiddleware):
+    """Reject state-changing requests carrying a foreign browser Origin/Referer.
+
+    CORS controls whether a browser may *read* a cross-origin response, not whether
+    the request *executes* — a cross-site "simple request" (e.g. text/plain POST)
+    runs server-side regardless. Since this app has no auth and executes commands,
+    that is a CSRF vector (audit P1-09). We mirror the WebSocket origin check: a
+    present-but-foreign Origin (or Referer, when Origin is absent) is refused; a
+    missing one (native clients, tests, same-origin GET nav) is allowed."""
+
+    async def dispatch(self, request: Request, call_next):
+        if request.method in _MUTATING_METHODS:
+            origin = request.headers.get("origin") or origin_of(request.headers.get("referer"))
+            if origin is not None and not is_allowed_origin(origin):
+                return JSONResponse({"detail": "cross-origin request rejected"}, status_code=403)
+        return await call_next(request)
 
 
 @asynccontextmanager
@@ -70,14 +92,12 @@ def create_app() -> FastAPI:
         lifespan=_lifespan,
     )
 
+    # CSRF guard on mutating methods (runs before routes); origins shared with CORS
+    # and the WebSocket check via agentflow.origins (audit P1-09 / P2-10).
+    app.add_middleware(OriginGuardMiddleware)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "http://localhost:8787",
-            "http://127.0.0.1:8787",
-        ],
+        allow_origins=sorted(LOCAL_ORIGINS),
         allow_methods=["*"],
         allow_headers=["*"],
     )

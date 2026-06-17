@@ -34,9 +34,19 @@ def test_append_load_clear_roundtrip(tmp_path):
     assert chat_service.load_chat(ws)["messages"] == []
 
 
-def test_send_with_missing_provider_is_graceful(tmp_path):
+def test_send_with_unknown_provider_is_rejected(tmp_path):
+    # An unknown provider (not in the allow-list) is refused before any launch (P2-11).
     ws = make_workspace(tmp_path)
     result = asyncio.run(chat_service.send(ws, "plan my feature", provider="no-such-binary-xyz"))
+    assert result["status"] == "error"
+    assert "no-such-binary-xyz" in result["message"]
+
+
+def test_send_with_known_but_uninstalled_provider_is_graceful(tmp_path, monkeypatch):
+    # A *known* provider that isn't installed still degrades gracefully.
+    monkeypatch.setattr(chat_service, "resolve_executable", lambda _argv0: None)
+    ws = make_workspace(tmp_path)
+    result = asyncio.run(chat_service.send(ws, "plan my feature", provider="claude"))
     assert result["status"] == "provider_missing"
     messages = chat_service.load_chat(ws)["messages"]
     assert messages[0]["role"] == "user"

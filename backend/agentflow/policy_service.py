@@ -49,6 +49,14 @@ _INTERPRETERS = {"python", "python3", "node", "nodejs", "deno", "ruby", "perl", 
 # Deliberately omits python's -E (ignore-env, not eval) to avoid false positives.
 _EVAL_FLAGS = {"-e", "-c", "-r", "-p", "--eval", "--print"}
 
+# Binaries that run file- or package-defined code (not inline eval, handled above).
+# These are not auto-allowed: an injected directive could otherwise run arbitrary
+# project/package code (e.g. `make`, `node build.js`, `npx pkg`, `awk 'BEGIN{system(...)}'`).
+# They route through the approval flow instead of executing automatically.
+_CODE_RUNNERS = {"make", "gmake", "ninja", "npx", "awk", "gawk", "mawk", "nawk", "sed"}
+# npm-family subcommands that execute arbitrary (often remote) package code.
+_EXEC_SUBCMDS = {"dlx", "x", "exec"}
+
 # Actions that touch shared/remote state — allowed only with explicit approval.
 _APPROVAL_BINARIES = {
     "brew",
@@ -139,6 +147,22 @@ def classify_action(
     ):
         return PolicyResult(DENY, "refusing recursive force-delete on /")
 
+    # `git -c core.pager=<cmd>` (and similar config) runs arbitrary commands via
+    # git's pager/hook machinery — a known denylist-bypass exec vector.
+    if binary == "git" and any(t in ("-c", "--config") or t.startswith("--config=") for t in tokens[1:]):
+        return PolicyResult(DENY, "`git -c/--config` can execute arbitrary code (pager/hooks) — not allowed")
+
+    # tar can shell out via several flags (--checkpoint-action=exec, --to-command,
+    # -I/--use-compress-program, …) — another bypass vector.
+    if binary in ("tar", "gtar", "bsdtar") and any(
+        t in ("-I", "-F")
+        or t.startswith(
+            ("--checkpoint-action", "--to-command", "--use-compress-program", "--rmt-command", "--info-script")
+        )
+        for t in tokens[1:]
+    ):
+        return PolicyResult(DENY, "tar exec hooks (--checkpoint-action/--to-command/-I/…) are not allowed")
+
     # --- deny: workspace confinement ---
     if workspace is not None:
         outside = _outside_workspace(tokens, workspace)
@@ -154,8 +178,16 @@ def classify_action(
         return PolicyResult(REQUIRE_APPROVAL, "GitHub CLI changes remote state — approval required")
     if binary in {"npm", "pnpm", "yarn", "bun"} and sub in _INSTALL_SUBCMDS:
         return PolicyResult(REQUIRE_APPROVAL, f"`{binary} {sub}` modifies dependencies — approval required")
+    if binary in {"npm", "pnpm", "yarn", "bun"} and sub in _EXEC_SUBCMDS:
+        return PolicyResult(REQUIRE_APPROVAL, f"`{binary} {sub}` runs arbitrary package code — approval required")
     if sub in _DEPLOY_SUBCMDS:
         return PolicyResult(REQUIRE_APPROVAL, f"`{binary} {sub}` deploys/publishes — approval required")
+
+    # Interpreters running a script file, and build/code runners (make, npx, awk, …):
+    # inline eval is denied above; any other invocation still executes arbitrary
+    # code, so require explicit approval rather than auto-running it.
+    if binary in _INTERPRETERS or binary in _CODE_RUNNERS:
+        return PolicyResult(REQUIRE_APPROVAL, f"`{binary}` executes code — approval required")
 
     # --- everything else inside the workspace is allowed ---
     return PolicyResult(ALLOW)

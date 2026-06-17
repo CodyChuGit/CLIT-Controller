@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Union
 
-from .redaction import redact
+from .redaction import redact, redact_data
 
 MAX_BUFFER = 4000  # bounded ring buffer of recent events
 
@@ -83,7 +83,9 @@ class EventBus:
                 "redacted": True,
                 "truncated": truncated,
                 "detail": red_detail,
-                "data": data or {},
+                # Structured payloads can carry secrets too (e.g. a command with an
+                # inline token); redact them like detail/text_delta (audit P1-02).
+                "data": redact_data(data) if data else {},
             }
             self._buf.append(event)
         return event

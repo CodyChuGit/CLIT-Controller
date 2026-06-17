@@ -39,3 +39,20 @@ def redact(text: str | None) -> str:
     for pattern in PATTERNS:
         text = pattern.sub(REPLACEMENT, text)
     return text
+
+
+def redact_data(value):
+    """Deep-redact secret-looking substrings in a JSON-ish structure.
+
+    Strings pass through ``redact``; dicts/lists are walked recursively; everything
+    else is returned unchanged. Used to scrub structured event/approval payloads
+    (``data``, ``action``) before they are persisted or broadcast — the readable
+    ``detail``/``text_delta`` fields were already redacted, but the structured
+    payload was not (audit P1-02)."""
+    if isinstance(value, str):
+        return redact(value)
+    if isinstance(value, dict):
+        return {k: redact_data(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [redact_data(v) for v in value]
+    return value

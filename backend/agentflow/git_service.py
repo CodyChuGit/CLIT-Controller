@@ -125,6 +125,11 @@ async def file_diff(workspace: Path, rel_path: str, staged: bool) -> dict:
     if code == 0 and not out.strip():
         # Probably untracked — synthesize an all-added view.
         target = (workspace / rel_path).resolve()
+        # Mirror the workspace read guard: never surface .env contents via the
+        # untracked-file synthesis path (audit P2-22). redact() below is
+        # defense-in-depth, not the primary control.
+        if target.name.startswith(".env") and target.name != ".env.example":
+            return {"path": rel_path, "staged": staged, "diff": "(.env files are not shown)", "truncated": False}
         if target.is_relative_to(workspace.resolve()) and target.is_file():
             try:
                 raw = target.read_bytes()[:FULL_DIFF_LIMIT]

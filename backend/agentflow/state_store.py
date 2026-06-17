@@ -23,6 +23,7 @@ from typing import Optional
 
 from . import config, event_bus, paths
 from .process_runner import now_iso
+from .redaction import redact, redact_data
 
 SCHEMA_VERSION = 1
 MAX_EVENTS = 2000  # bounded timeline; oldest pruned
@@ -86,6 +87,9 @@ def append_event(
     """Append one durable timeline event and return it (with a monotonic id/cursor)."""
     doc = _load_doc(events_file(workspace), "events", [])
     doc["cursor"] = int(doc.get("cursor", 0)) + 1
+    # Redact before persisting: the durable timeline must not store secrets, and a
+    # command/action carried in `data` could embed one (audit P1-02). The mirrored
+    # event-bus publish below redacts its own copy independently.
     event = {
         "id": doc["cursor"],
         "time": now_iso(),
@@ -93,8 +97,8 @@ def append_event(
         "taskId": task_id,
         "step": step,
         "provider": provider,
-        "detail": detail,
-        "data": data or {},
+        "detail": redact(detail) if detail else detail,
+        "data": redact_data(data) if data else {},
     }
     events = doc["events"]
     events.append(event)
@@ -233,7 +237,10 @@ def list_approvals(workspace: Path, *, pending_only: bool = False) -> list[dict]
     approvals = list(_load_doc(approvals_file(workspace), "approvals", {})["approvals"].values())
     if pending_only:
         approvals = [a for a in approvals if a["status"] == "pending"]
-    return sorted(approvals, key=lambda a: a["createdAt"])
+    approvals = sorted(approvals, key=lambda a: a["createdAt"])
+    # Redact for display only; the on-disk record keeps the raw action so an
+    # approved command can still be replayed verbatim on approve (audit P1-02).
+    return [{**a, "action": redact(a.get("action", "")), "reason": redact(a.get("reason", ""))} for a in approvals]
 
 
 # --------------------------------------------------------------------- recovery

@@ -318,6 +318,11 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
 
     routing = config.get_workspace_routing(workspace)
     provider = provider or routing.get("orchestrator", "antigravity")
+    # Validate before anything reaches a command template / subprocess launch: an
+    # unknown provider would otherwise fall through to a fallback template and be
+    # executed as a binary (audit P2-11). Mirrors send_direct.
+    if provider not in AGENT_PROVIDER_IDS:
+        return {"status": "error", "message": f"unknown provider: {provider}"}
     usage = usage_service.ensure_usage(workspace)
 
     busy = _provider_busy(provider)
