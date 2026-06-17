@@ -22,7 +22,7 @@ Instead of bouncing between chats, terminals, folders, diffs, and task notes, yo
 | **Antigravity** | Controller / QA | Broad checks, second opinions, and lower-cost verification. |
 | **Codex** | Product partner | Specs, task plans, markdown handoffs, and final review. |
 | **Claude Code** | Implementation assistant | Code changes, bug fixes, and focused build work. |
-| **Local tools** | Workspace helper | File scanning, git status, diffs, logs, usage tracking, and task folders. |
+| **Local tools** | Workspace helper | STT, TTS, File scanning, git status, diffs, logs, usage tracking, and task folders. |
 
 ![CLITC Files](docs/assets/dark_mode_files.png)
 *Workspace view with project files, active tasks, file changes, and the task queue.*
