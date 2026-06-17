@@ -127,6 +127,11 @@ library tab, local reference extraction, TestApp Calendar Scheduler overflow for
 user/weekly limits, local voice I/O with MLX Parakeet and `mlx-swift-dots-tts`, and
 future CLI IDE feature candidates.
 
+[Task And Controller I/O Surface](docs/task-controller-io-surface.md) defines how
+the right-hand controller tab and Tasks page should share one input/output
+language: compact live cards in the dock, detailed review cards in Tasks, and
+paginated raw machine-readable details.
+
 ## Beta workflow
 
 1. **Explorer** → enter a workspace folder path and open it. The backend creates `<workspace>/.agentflow/` (config, usage.json, tasks/). The explorer is laid out like an IDE: side panel (workspace, source control, files), tabbed read-only editor with line numbers, a collapsible Output/Logs panel, and a status bar (backend, workspace, branch, traffic control mode). The **Source Control** section works like VS Code's: live per-file status (M/A/D/U badges), click a file to open its color-coded diff in a tab, stage/unstage per file or Stage All, and commit with a message — staging and committing only ever happen when you click them. Local folder paths are resolved by the Python backend — browsers can't pick arbitrary folders.

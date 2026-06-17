@@ -15,6 +15,7 @@ Cover pure logic and local state transitions:
 - Directive parsing.
 - Command policy classification.
 - Task output summarization and pagination helpers.
+- Task/controller display projection helpers.
 - Reference extraction normalization.
 - Overflow scheduling state classification.
 - Voice provider detection and local-only policy checks.
@@ -60,6 +61,8 @@ Use FastAPI test clients:
 - Agent list/check endpoints with mocked provider registry.
 - Task detail endpoint before and after runs.
 - Task detail summary and paginated raw output endpoints or response sections.
+- Task/controller display projections for compact dock cards and detailed task
+  cards.
 - Queue add/approve/remove/clear/retry/skip endpoints.
 - Chat send/direct endpoints with fake controller decisions.
 - Logs and events endpoints.
@@ -129,6 +132,7 @@ Keep coverage for current beta behavior:
 | Controller says done | Task gets durable final verdict and final event |
 | User cancels run | Process group is terminated, run and queue item become `cancelled` |
 | Task has very large raw output | UI/API exposes readable summary first and paginated raw details |
+| Controller and Tasks show same run | Dock renders compact card and Tasks renders detailed card from same projection |
 | User extracts a local component library | Reference records are created without modifying source files |
 | Provider/user weekly limit is reached | Queue item becomes overflow/scheduled instead of failed |
 | TestApp Scheduler is unavailable | Overflow item stays local with visible retry/reschedule state |
@@ -212,5 +216,7 @@ Every persisted schema should have:
 - Phase 1.5 product workbench checks pass: task summaries are readable, raw output
   is paginated, reference extraction is local and auditable, and overflow schedule
   state resumes through normal traffic control.
+- Task/controller I/O checks pass: action data, human summaries, and display data
+  stay separate, and raw agent prose is not required for basic UI state.
 - Local voice checks pass when providers are available and degrade cleanly when
   MLX Parakeet or `mlx-swift-dots-tts` is missing.

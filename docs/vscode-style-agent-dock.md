@@ -25,6 +25,10 @@ workbench. The Tasks tab should evolve the durable task folder and queue views
 into the review, history, approval, diff, retry, and final-report surface. Both
 are native CLITC product surfaces, not wrappers around VS Code.
 
+The two surfaces should share the same task/controller I/O model. The dock is
+compact and live; the Tasks tab is detailed and auditable. See
+[Task And Controller I/O Surface](./task-controller-io-surface.md).
+
 Live output is part of the product decision, not a follow-up nice-to-have. During
 an active controller, Codex, Claude Code, or Antigravity run, CLITC should show
 text as it is generated or received in both the Agent Dock and the selected Tasks
@@ -39,6 +43,9 @@ Right-hand Agent Dock:
   existing provider marks and unread/running indicators.
 - A compact command row with provider picker, mode selector, prompt input, send,
   stop, clear, and command palette actions.
+- Input composer uses the same model as task continuation input: traffic-control
+  context, provider/step chips, budget/health state, attachments/references, and
+  icon-first actions.
 - Chat panes that render user prompts, agent replies, task directives, command
   results, and failures as styled rows instead of raw text dumps.
 - Active run streams that type out transcript deltas, terminal output chunks, tool
@@ -62,6 +69,9 @@ Right-hand Agent Dock:
 Tasks tab:
 
 - Task list, queue state, and active runs presented as a dense IDE work queue.
+- Task continuation and retry/reroute inputs match the controller composer, but
+  expose more task-specific detail such as selected step, provider, policy state,
+  references, and expected action.
 - Per-task conversation replay with styled prompt/output exchanges, provider
   marks, step chips, status, elapsed time, and expandable raw details.
 - Live output for the selected active task, using the same event stream as the

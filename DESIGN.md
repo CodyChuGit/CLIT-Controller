@@ -87,6 +87,9 @@ The right-hand dock should feel like VS Code agent plugin panels while staying
 native to CLITC. It must use the existing app shell, panel sections, tab strip,
 icon buttons, status badges, markdown renderer, terminal stack, and task views.
 
+The Agent Dock and Tasks tab share one input/output language. The dock is the
+compact live density; Tasks is the detailed review density.
+
 - **Dock frame:** resizable right panel with a hairline left border, no outer margin,
   no floating cards, and the same collapsed icon rail behavior as the current chat
   dock.
@@ -96,6 +99,9 @@ icon buttons, status badges, markdown renderer, terminal stack, and task views.
 - **Command row:** compact input plus icon buttons for send, stop, clear, command
   palette, provider/model controls, and terminal drawer. Use icons with tooltips;
   reserve text buttons for destructive or approval actions.
+- **Composer context:** prompt inputs show traffic-control mode, provider/step
+  context, budget/health state, attachments/references, and voice/reference
+  affordances as compact chips or icon buttons.
 - **Transcript:** user prompts, agent replies, system notices, command results,
   failures, task directives, and queue updates render as styled rows. Raw prompts,
   raw logs, and long outputs live behind expanders.
@@ -131,6 +137,9 @@ audit, recovery, and continuing work after a run finishes.
 - **Task workspace:** split list/detail layout with a dense task queue on the
   left and a task detail surface on the right. Preserve the existing sticky
   header and flow-board affordances.
+- **Input parity:** task continuation, retry, reroute, and approval inputs use
+  the same composer language as the controller tab, but with more explicit task,
+  step, provider, policy, reference, and expected-action context.
 - **Conversation replay:** prompt/output exchanges render as styled transcript
   rows with provider marks, step chips, elapsed time, status, and expandable raw
   prompt/output. Budget context and commands render as summarized cards first.
@@ -154,6 +163,23 @@ audit, recovery, and continuing work after a run finishes.
 - **Parity boundary:** the Tasks tab may mimic VS Code extension history, diff,
   approval, and session views, but it must not depend on VS Code APIs or copied
   extension UI.
+
+## Task/Controller I/O Cards
+
+Both the Agent Dock and Tasks tab should render structured cards rather than raw
+agent prose when state is available.
+
+- **Compact vs detailed:** the dock uses compact cards for live status and next
+  action; Tasks expands the same cards into detailed panels with audit links.
+- **Card set:** task created, task brief, state transition, queue item, run
+  started, run output, command result, approval required/resolved, diff summary,
+  artifacts changed, QA status, failure, scheduled overflow, final summary, and
+  needs user.
+- **Structured channels:** action data, human summary, and display data stay
+  separate. Raw JSON/action data is paginated detail, not display copy.
+- **State visibility:** show current state, previous state, allowed next actions,
+  retry count, failure policy, validation status, generated artifacts, and run
+  duration when available.
 
 ## UI/UX Reference Tab
 

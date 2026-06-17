@@ -26,9 +26,17 @@ limits are reached.
 The current Tasks tab still exposes too much raw output. It should become a
 review surface first and a raw artifact browser second.
 
+Use [Task And Controller I/O Surface](./task-controller-io-surface.md) as the
+source of truth for shared styling between the right-hand controller tab and the
+Tasks page. The controller tab is the compact live surface; the Tasks page is the
+more detailed review surface.
+
 Requirements:
 
 - Default view shows human-readable summaries, not raw markdown or raw CLI logs.
+- Task input and continuation controls match the right-hand controller composer:
+  compact prompt area, traffic-control context, provider/step chips, budget/health
+  state, attachments/references, and icon-first actions.
 - Font sizing matches the rest of the IDE: `text-xs` or `text-[13px]` for body
   rows, `text-[10px]` to `text-[11px]` for metadata, and monospace only for
   commands, paths, task IDs, provider IDs, model names, branches, and raw output.
@@ -60,6 +68,8 @@ Requirements:
   summarized replay view.
 - Raw detail remains available for audit and copying, but it is never the first
   thing the user has to read.
+- Controller/action data, human summaries, and display data stay separate so the
+  UI renders structured state instead of parsing raw prose.
 
 Suggested task-detail layout:
 
@@ -77,6 +87,8 @@ Acceptance criteria:
 - Raw prompt/log/stdout/stderr sections are paginated and expandable.
 - Font sizes match the rest of the IDE.
 - Repeated budget context no longer dominates the output view.
+- The Tasks page and right-hand controller tab look like two densities of the
+  same I/O system.
 - Users can still reach every original artifact and raw machine-readable record.
 
 ## UI/UX Reference Library Tab

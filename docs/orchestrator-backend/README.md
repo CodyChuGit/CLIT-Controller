@@ -33,6 +33,10 @@ provider contracts, predictable approvals, and a complete verification matrix.
   near-term product layer between durable events and state machines: readable
   task output, a UI/UX reference-library tab, reference extraction, TestApp
   Calendar Scheduler overflow, local voice I/O, and CLI IDE feature candidates.
+- [Task And Controller I/O Surface](../task-controller-io-surface.md) defines the
+  shared input/output display model for the right-hand controller tab and Tasks
+  page, including compact controller cards, detailed task cards, and paginated
+  raw machine detail.
 - [Local Voice I/O](../local-voice-io.md) defines the optional local STT/TTS path
   using MLX Parakeet for speech-to-text and `mlx-swift-dots-tts` for
   text-to-speech.
@@ -84,6 +88,10 @@ provider contracts, predictable approvals, and a complete verification matrix.
 - Prioritize task readability before adding more automation. Human summaries
   should be the default Tasks tab experience, while raw machine-readable records
   remain paginated and inspectable.
+- Keep controller and task I/O visually unified. The right-hand controller tab is
+  the compact live view; the Tasks page is the detailed review/audit view.
+  Both should render structured display data rather than raw agent prose by
+  default.
 - Build the UI/UX reference library as a local workspace asset. Extracted
   components, tokens, and style recipes should assist frontend tasks without
   silently importing or rewriting code.

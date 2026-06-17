@@ -110,6 +110,9 @@ control of risky operations.
   provider usage, and final verdict.
 - Default task detail rendering should prioritize summaries, decisions, changed
   files, checks, approvals, and failures over raw CLI output.
+- Expose task/controller display projections as structured action data, human
+  summaries, and display data so the right-hand controller tab and Tasks page can
+  render the same states at different detail levels.
 - Add streaming text events for direct chat, controller decisions, run output,
   stderr, command lifecycle, logs, queue/task state updates, approvals, failures,
   cancellation, and completion. Text deltas should be emitted as generated or
@@ -177,5 +180,7 @@ control of risky operations.
 - The frontend can render readable task summaries, paginated raw detail,
   reference-library records, and scheduler overflow state from stable API
   responses.
+- The frontend can render compact controller cards and detailed task cards from
+  the same structured display model without parsing raw agent prose.
 - Optional local voice I/O works when providers are installed and degrades
   cleanly when MLX Parakeet or `mlx-swift-dots-tts` is unavailable.

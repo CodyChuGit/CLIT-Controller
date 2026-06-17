@@ -304,6 +304,22 @@ Rules:
 - If a response contains no actionable decision during an active consult, mark the
   task `needs_user` with the reasoning tail.
 
+## Display Projection Contract
+
+Controller and task UI should be driven by structured projections rather than raw
+agent prose. Each meaningful run, queue item, approval, failure, or task event
+should be projectable into three channels:
+
+- `actionData`: strict structured data for backend decisions and UI actions.
+- `humanSummary`: concise user-facing summary, ideally five bullets or fewer.
+- `displayData`: typed UI model for cards, badges, progress, severity, primary
+  action, related artifacts, and raw-detail links.
+
+The right-hand controller tab and Tasks page should consume the same projection.
+The controller tab renders compact live cards; the Tasks page renders detailed
+cards plus paginated raw detail. Raw JSON, directives, stdout, stderr, logs, and
+events remain available for audit, but are not the default display layer.
+
 ## Policy Contract
 
 Policy should classify a command or backend action before it reaches execution.
