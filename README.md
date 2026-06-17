@@ -13,7 +13,7 @@
 
 ## 🫘 What It Is
 
-**CLIT Controller IDE** is a visual control room for designers who use AI coding assistants to bring interface ideas to life.
+**Command Line Interface Traffic Controller** is a visual control room for designers who use AI coding assistants to bring interface ideas to life.
 
 Instead of bouncing between chats, terminals, folders, diffs, and task notes, you get one place to describe the work, route it to the right assistant, watch progress, and review the result before moving forward.
 
