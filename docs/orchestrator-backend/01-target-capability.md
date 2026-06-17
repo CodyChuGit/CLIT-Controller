@@ -5,6 +5,11 @@ Command Line Interface Traffic Controller (CLIT Controller IDE) route, execute,
 verify, recover, and report the task without manually juggling CLIs or losing
 control of risky operations.
 
+Live generated output is part of that final target. The completed backend must
+implement [Live Output Everywhere](../live-output-everywhere.md): generated text,
+command output, status changes, approvals, logs, and task replay all flow from
+the same durable event stream.
+
 ## End-To-End User Flow
 
 1. The user selects a workspace.
@@ -14,8 +19,9 @@ control of risky operations.
 4. The controller either answers directly, creates a task, queues agent steps, or
    runs a safe local command.
 5. The dispatcher executes eligible work in order, with one active run per provider.
-6. Each run writes prompt, output, logs, artifacts, state transitions, usage, and a
-   human-readable timeline event.
+6. Each run writes prompt, output, logs, artifacts, state transitions, usage, and
+   human-readable timeline events while also emitting redacted live output as it
+   is generated or received.
 7. After each controlled step, the controller receives the actual task state and
    decides the next action.
 8. The loop ends with a durable `done`, `needs_user`, `failed`, or `cancelled` verdict.
@@ -108,12 +114,15 @@ control of risky operations.
 
 - Show current queue, running providers, task events, logs, prompt/output exchanges,
   provider usage, and final verdict.
+- Use [Live Output Everywhere](../live-output-everywhere.md) as the final
+  implementation contract for active generated content across chat, tasks, logs,
+  approvals, queues, and reviews.
 - Default task detail rendering should prioritize summaries, decisions, changed
   files, checks, approvals, and failures over raw CLI output.
 - Expose task/controller display projections as structured action data, human
   summaries, and display data so the right-hand controller tab and Tasks page can
   render the same states at different detail levels.
-- Add streaming text events for direct chat, controller decisions, run output,
+- Emit streaming text events for direct chat, controller decisions, run output,
   stderr, command lifecycle, logs, queue/task state updates, approvals, failures,
   cancellation, and completion. Text deltas should be emitted as generated or
   received so users can review partial output before the run finishes.
@@ -182,5 +191,7 @@ control of risky operations.
   responses.
 - The frontend can render compact controller cards and detailed task cards from
   the same structured display model without parsing raw agent prose.
+- The frontend can render Live Output Everywhere from one shared event stream,
+  with polling used only as a compatibility fallback.
 - Optional local voice I/O works when providers are installed and degrades
   cleanly when MLX Parakeet or `mlx-swift-dots-tts` is unavailable.

@@ -12,6 +12,11 @@ The product path is:
 This gives CLITC the independent-window feel of apps like VJbooth while keeping
 the current web + local backend architecture.
 
+The app-mode shell still uses the final
+[Live Output Everywhere](./live-output-everywhere.md) implementation for active
+assistant progress. It must not cache, replace, or downgrade live generated text
+to completed-only snapshots.
+
 ## Product Decision
 
 CLITC should feel launchable as a local app, but remain a local-first web app

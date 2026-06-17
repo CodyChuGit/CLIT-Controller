@@ -3,6 +3,11 @@
 This roadmap keeps the current architecture recognizable while adding the missing
 pieces needed for a fully functional controller backend.
 
+Live generated output is part of the final target. Phase 6 implements
+[Live Output Everywhere](../live-output-everywhere.md), and later phases should
+build on that shared event stream rather than reintroducing page-local polling or
+completed-only output.
+
 ## Phase 0: Baseline And Invariants
 
 Goal: document and lock down current behavior before refactoring.
@@ -181,10 +186,11 @@ Acceptance criteria:
 - Invalid step names, missing task refs, and denied commands produce useful events.
 - A consult that gives no actionable decision marks the task `needs_user`.
 
-## Phase 6: Streaming Observability
+## Phase 6: Live Output Everywhere
 
 Goal: remove stale polling behavior and stream active text across the product
-while preserving fallback endpoints.
+while preserving fallback endpoints. This phase implements the product package
+defined in [Live Output Everywhere](../live-output-everywhere.md).
 
 Tasks:
 
@@ -210,7 +216,7 @@ Tasks:
 Acceptance criteria:
 
 - Provider chat, queued runs, logs, task detail, queue state, approvals, and status
-  update live without 2.5-3 second polling delay.
+  update live from the shared event stream without polling-era delay.
 - Users can review partial generated text and command output before the active run
   finishes.
 - Reconnecting clients can resume from a cursor.

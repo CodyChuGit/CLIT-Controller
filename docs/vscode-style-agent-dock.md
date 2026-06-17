@@ -32,8 +32,9 @@ compact and live; the Tasks tab is detailed and auditable. See
 Live output is part of the product decision, not a follow-up nice-to-have. During
 an active controller, Codex, Claude Code, or Antigravity run, CLITC should show
 text as it is generated or received in both the Agent Dock and the selected Tasks
-tab detail without making the user open a separate terminal or wait for a final
-snapshot.
+tab detail without making the user open a separate terminal or wait for
+completion. See [Live Output Everywhere](./live-output-everywhere.md) for the
+product package that defines the cross-app experience.
 
 ## Target UX
 

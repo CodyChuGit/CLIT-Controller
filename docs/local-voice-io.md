@@ -11,6 +11,10 @@ This feature is a local convenience layer over the existing controller, task,
 queue, approval, and event systems. It should never become a hidden automation
 path.
 
+Voice status, transcripts, and spoken-summary events follow the final
+[Live Output Everywhere](./live-output-everywhere.md) event model. Voice must
+not introduce a separate progress flow or bypass live task output.
+
 ## Product Decision
 
 Voice is an optional local interface for:

@@ -65,7 +65,7 @@ Start the app:
 Open the local app:
 
 ```text
-http://localhost:5173
+http://localhost:5180
 ```
 
 The install script creates a local Python environment, installs the app backend, and installs the frontend packages. If an assistant is missing, the app shows setup guidance in the Agents view.
@@ -82,7 +82,7 @@ You can copy and paste the following prompt into your coding CLI (e.g., Claude C
 
 To run the app in its own standalone window like a native app:
 
-1. Open `http://localhost:5173` in Google Chrome.
+1. Open `http://localhost:5180` in Google Chrome.
 2. Click the **Install** icon (a monitor with a down arrow) on the far right side of the address bar.
 3. The app will install and open in its own window, and you can pin it to your Dock or taskbar.
 
@@ -117,7 +117,7 @@ Each assistant keeps its own official login. CLIT Controller does not ask for or
 
 - **Richer designer task briefs**: clearer intake for goals, references, constraints, acceptance notes, and visual QA.
 - **UI/UX reference library**: collect reusable style references and local design examples for faster frontend iteration.
-- **Live output everywhere**: smoother real-time assistant progress across tasks, logs, approvals, and reviews.
+- **[Live output everywhere](docs/live-output-everywhere.md)**: generated content appears as soon as it is produced, with smoother real-time assistant progress across tasks, logs, approvals, and reviews.
 - **App-mode launcher**: a more polished standalone desktop-style launch experience.
 - **Local voice I/O**: optional dictation and spoken summaries for hands-light task review.
 - **More review intelligence**: better summaries of what changed, what still needs attention, and where design intent may have drifted.

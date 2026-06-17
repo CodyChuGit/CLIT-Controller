@@ -6,6 +6,11 @@ tab is the compact live surface. The Tasks page is the detailed review and audit
 surface. They should share the same structure, typography, states, and display
 model.
 
+This surface model assumes
+[Live Output Everywhere](./live-output-everywhere.md) as the final active-output
+implementation. Live text appears as it is generated or received, and completed
+task review is rebuilt from the same durable events.
+
 This direction follows the deterministic workflow strategy in the attached
 Gemini scheduler spec: the controller produces structured state, summaries, and
 display models; the frontend renders those objects. The UI should not treat raw

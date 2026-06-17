@@ -5,6 +5,9 @@ generated text with a smooth CLI-like type-out, but the renderer should sit on
 top of CLITC's shared event stream. It should not replace the workspace event
 bus, open duplicate SSE connections, or own chat/task state.
 
+This decision supports the final
+[Live Output Everywhere](./live-output-everywhere.md) implementation.
+
 ## Decision
 
 Use a small internal `SmoothStreamingText` renderer instead of installing

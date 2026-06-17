@@ -13,7 +13,7 @@ echo "  Command Line Interface Terminal Controller"
 echo "  CLIT Controller IDE"
 echo "  Vibe with CLIT Controller"
 echo "  Backend  → http://localhost:8787   (API + built frontend, if present)"
-echo "  Frontend → http://localhost:5173   (dev server, hot reload)"
+echo "  Frontend → http://localhost:5180   (dev server, hot reload)"
 echo ""
 
 .venv/bin/python -m agentflow &

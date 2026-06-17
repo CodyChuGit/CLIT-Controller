@@ -45,11 +45,8 @@ exec "$REPO/scripts/app-mode.sh"
 LAUNCH
 chmod +x "$APP/Contents/MacOS/launch"
 
-# Use the promoted bean SVG source to refresh PNGs before building the .icns.
+# Use the bean SVG source to refresh PNGs before building the .icns.
 ICON_PNG="$REPO/frontend/public/icons/bean-512.png"
-if command -v "$REPO/.venv/bin/python" >/dev/null 2>&1 && [ -f "$REPO/scripts/make-icons.py" ]; then
-  "$REPO/.venv/bin/python" "$REPO/scripts/make-icons.py" >/dev/null 2>&1 || true
-fi
 
 if [ -f "$ICON_PNG" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
   TMP="$(mktemp -d)"; ICONSET="$TMP/icon.iconset"; mkdir -p "$ICONSET"

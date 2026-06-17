@@ -65,7 +65,7 @@ Use FastAPI test clients:
   cards.
 - Queue add/approve/remove/clear/retry/skip endpoints.
 - Chat send/direct endpoints with fake controller decisions.
-- Logs and events endpoints.
+- Logs, SSE event stream, and cursor fallback endpoints.
 - Approval endpoints.
 - Reference-library browse/search/detail endpoints when introduced.
 - Scheduler overflow handoff/status endpoints when introduced.
@@ -107,7 +107,7 @@ Policy tests should verify:
 
 ### Regression Tests For Existing Behavior
 
-Keep coverage for current beta behavior:
+Keep compatibility coverage for existing directive and task behavior:
 
 - `agentflow-task` creates markdown handoff files.
 - `agentflow-queue` queues valid step IDs and rejects invalid ones.
@@ -133,6 +133,9 @@ Keep coverage for current beta behavior:
 | User cancels run | Process group is terminated, run and queue item become `cancelled` |
 | Task has very large raw output | UI/API exposes readable summary first and paginated raw details |
 | Controller and Tasks show same run | Dock renders compact card and Tasks renders detailed card from same projection |
+| Provider emits partial output | Agent Dock, Tasks, Logs, approvals, queue/status surfaces update from the shared event stream before completion |
+| User refreshes during active output | Client resumes from cursor without duplicating text |
+| Provider buffers output until exit | Status, queue, heartbeat, and lifecycle events still stream before final text appears |
 | User extracts a local component library | Reference records are created without modifying source files |
 | Provider/user weekly limit is reached | Queue item becomes overflow/scheduled instead of failed |
 | TestApp Scheduler is unavailable | Overflow item stays local with visible retry/reschedule state |
@@ -204,8 +207,8 @@ Every persisted schema should have:
 
 ## Definition Of Done For The Full Backend
 
-- All roadmap phases through policy, typed decisions, recovery, and streaming events
-  are implemented.
+- All roadmap phases through policy, typed decisions, recovery, and
+  [Live Output Everywhere](../live-output-everywhere.md) are implemented.
 - The acceptance workflow matrix passes with fake providers.
 - Restart recovery tests pass.
 - Safety tests prove denied commands do not execute.
@@ -218,5 +221,8 @@ Every persisted schema should have:
   state resumes through normal traffic control.
 - Task/controller I/O checks pass: action data, human summaries, and display data
   stay separate, and raw agent prose is not required for basic UI state.
+- Live output checks pass: generated text appears as it is generated or received,
+  completed replay uses the same durable events, and polling remains only a
+  compatibility fallback.
 - Local voice checks pass when providers are available and degrade cleanly when
   MLX Parakeet or `mlx-swift-dots-tts` is missing.

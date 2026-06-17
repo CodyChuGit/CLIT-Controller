@@ -52,9 +52,6 @@ chmod +x "$APP/Contents/MacOS/launch"
 # --- icon (bean SVG -> PNG -> .icns) ----------------------------------------
 # Keep the web and macOS app icons on the same promoted SVG source.
 BASE="$REPO/frontend/public/icons/bean-512.png"
-if command -v "$REPO/.venv/bin/python" >/dev/null 2>&1 && [ -f "$REPO/scripts/make-icons.py" ]; then
-  "$REPO/.venv/bin/python" "$REPO/scripts/make-icons.py" >/dev/null 2>&1 || true
-fi
 
 if [ -f "$BASE" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
   TMP="$(mktemp -d)"

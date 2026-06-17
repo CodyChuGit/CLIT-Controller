@@ -208,7 +208,8 @@ Every state change should append an event:
 - `usage.recorded`
 
 Events are the basis for streaming updates and for rebuilding projections after
-restart.
+restart. They are the implementation substrate for
+[Live Output Everywhere](../live-output-everywhere.md).
 
 Text-bearing events should include stable ordering and routing fields:
 
@@ -277,8 +278,8 @@ and `mlx-swift-dots-tts` for TTS.
 
 ## Controller Decision Contract
 
-The current fenced-block directives are workable for beta. Full functionality should
-parse them into a typed decision list before mutating state.
+Fenced-block directives remain supported as an input format, but final
+functionality parses them into a typed decision list before mutating state.
 
 Decision types:
 
@@ -375,7 +376,7 @@ Important existing frontend consumers:
 - `GET /api/chat`
 - `POST /api/chat/send`
 
-Add:
+Final implementation exposes:
 
 - `GET /api/events?cursor=<id>` for polling fallback.
 - `GET /api/events/stream` for SSE.

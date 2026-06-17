@@ -6,6 +6,11 @@ backend refactors: task output becomes readable, frontend styling gets a
 reference database, and overflow work can be scheduled instead of abandoned when
 limits are reached.
 
+All task output work in this package assumes
+[Live Output Everywhere](./live-output-everywhere.md) as the final active-run
+experience: live generated text streams immediately, then settles into readable
+task replay from the same durable events.
+
 ## Goals
 
 - Make task output human-readable by default.
@@ -23,8 +28,8 @@ limits are reached.
 
 ## Task Output View Rework
 
-The current Tasks tab still exposes too much raw output. It should become a
-review surface first and a raw artifact browser second.
+The Tasks tab is the detailed review surface first and a raw artifact browser
+second.
 
 Use [Task And Controller I/O Surface](./task-controller-io-surface.md) as the
 source of truth for shared styling between the right-hand controller tab and the
@@ -64,7 +69,7 @@ Requirements:
   - long diffs
 - Pagination should use stable slices with page size controls, not giant
   scrollback panes.
-- Active runs still stream progressive text, but completed runs settle into the
+- Active runs stream progressive text, and completed runs settle into the
   summarized replay view.
 - Raw detail remains available for audit and copying, but it is never the first
   thing the user has to read.
@@ -137,7 +142,7 @@ Reference database should support:
 ## Reference Extraction Tool
 
 Build a local extraction tool that turns component libraries into a searchable
-reference database for future frontend work.
+reference database for frontend work.
 
 Inputs:
 
@@ -146,7 +151,7 @@ Inputs:
 - Storybook stories when present
 - shadcn-style component registries when present
 - local markdown docs and examples
-- explicitly approved external sources in a future pass
+- explicitly approved external sources
 
 Outputs:
 

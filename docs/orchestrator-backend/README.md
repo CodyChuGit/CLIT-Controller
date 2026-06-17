@@ -1,23 +1,24 @@
 # Controller Backend Strategy
 
-This docs set defines the path from the current beta backend to a fully functional
-controller backend for Command Line Interface Traffic Controller (CLIT Controller IDE).
+This docs set defines the final controller backend target for Command Line
+Interface Traffic Controller (CLIT Controller IDE).
 
-The current codebase already has the important primitives:
+The implementation builds on these existing primitives:
 
 - FastAPI routes for projects, agents, chat, tasks, queue, usage, logs, and preview.
 - File-backed workspaces under `<workspace>/.agentflow/`.
 - Markdown task handoff files from `00_USER_GOAL.md` through `07_CODEX_FINAL_REVIEW.md`.
 - A background queue dispatcher that runs one item per provider at a time.
 - CLI subprocess execution, cancellation, redacted logs, provider probes, and usage tracking.
-- A native React chat dock and PTY-backed Terminals page that can evolve into a
-  VS Code-style Agent Dock without replacing backend traffic control.
+- A native React chat dock and PTY-backed Terminals page that form the base for
+  the live Agent Dock, Tasks, logs, and terminal surfaces.
 - Directive-based traffic control through `agentflow-task`, `agentflow-queue`,
   `agentflow-run`, `agentflow-done`, and `agentflow-needs-user` blocks.
 
-The missing backend work is not a new product concept. It is hardening the beta into
-a durable traffic-control system with explicit state, resumable execution, stronger
-provider contracts, predictable approvals, and a complete verification matrix.
+The final target is not a separate product concept. It is a durable
+traffic-control system with explicit state, resumable execution, live generated
+text everywhere, stronger provider contracts, predictable approvals, and a
+complete verification matrix.
 
 ## Documents
 
@@ -30,7 +31,7 @@ provider contracts, predictable approvals, and a complete verification matrix.
 - [04 Verification And Operations](./04-verification-and-operations.md) defines the
   tests, recovery checks, safety checks, and production-readiness gates.
 - [Phase 1.5 Product Workbench](../phase-1-5-product-workbench.md) defines the
-  near-term product layer between durable events and state machines: readable
+  product workbench layer around durable events and state machines: readable
   task output, a UI/UX reference-library tab, reference extraction, TestApp
   Calendar Scheduler overflow, local voice I/O, and CLI IDE feature candidates.
 - [Task And Controller I/O Surface](../task-controller-io-surface.md) defines the
@@ -40,6 +41,9 @@ provider contracts, predictable approvals, and a complete verification matrix.
 - [Local Voice I/O](../local-voice-io.md) defines the optional local STT/TTS path
   using MLX Parakeet for speech-to-text and `mlx-swift-dots-tts` for
   text-to-speech.
+- [Live Output Everywhere](../live-output-everywhere.md) packages the product
+  story, surface expectations, rollout plan, and acceptance criteria for the
+  native LLM-chat-style live output experience across the app.
 - [Text Streaming Across The Board](../text-streaming-across-the-board.md)
   defines the shared live text contract for chat, runs, tasks, logs, terminals,
   approvals, and replay.
@@ -119,4 +123,4 @@ provider contracts, predictable approvals, and a complete verification matrix.
 | Usage | `backend/agentflow/usage_service.py` | Approximate usage, live best-effort provider usage |
 | Workspace | `backend/agentflow/config.py`, `paths.py`, `workspace.py` | Local config and `.agentflow/` layout |
 | Frontend contract | `frontend/src/api.ts`, `frontend/src/types.ts` | Existing API shapes the backend must preserve or version |
-| Dock and task primitives | `frontend/src/components/ChatPanel.tsx`, `frontend/src/pages/TasksPage.tsx`, `frontend/src/pages/TerminalsPage.tsx` | Current chat, task, and terminal surfaces that form the basis for the future native Agent Dock and Tasks tab |
+| Dock and task primitives | `frontend/src/components/ChatPanel.tsx`, `frontend/src/pages/TasksPage.tsx`, `frontend/src/pages/TerminalsPage.tsx` | Current chat, task, and terminal surfaces that form the basis for the native live Agent Dock and Tasks tab |
