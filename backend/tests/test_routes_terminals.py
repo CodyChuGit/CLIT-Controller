@@ -24,9 +24,7 @@ def test_ws_rejects_foreign_origin():
     """A page on another origin must not be able to open a shell socket (CSWSH)."""
     client = _client()
     with pytest.raises(WebSocketDisconnect) as exc:
-        with client.websocket_connect(
-            "/api/terminals/claude/ws", headers={"origin": "http://evil.example"}
-        ):
+        with client.websocket_connect("/api/terminals/claude/ws", headers={"origin": "http://evil.example"}):
             pass
     assert exc.value.code == 4403
 
@@ -37,9 +35,7 @@ def test_ws_allows_app_origin_handshake():
     # No workspace is selected in the hermetic test env, so after the handshake the
     # server sends the "No workspace" notice and closes normally — proving the
     # Origin check did NOT reject this origin with 4403.
-    with client.websocket_connect(
-        "/api/terminals/claude/ws", headers={"origin": "http://localhost:5180"}
-    ) as ws:
+    with client.websocket_connect("/api/terminals/claude/ws", headers={"origin": "http://localhost:5180"}) as ws:
         msg = ws.receive_bytes()
         assert b"No workspace" in msg
 

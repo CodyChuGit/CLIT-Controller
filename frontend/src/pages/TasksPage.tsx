@@ -93,7 +93,11 @@ export default function TasksPage() {
     void loadTasks().then((list) => {
       if (list.length > 0) {
         const remembered = loadState<string | null>("lastTask", null);
-        setSelectedId((cur) => cur ?? (remembered && list.some((task) => task.id === remembered) ? remembered : list[0].id));
+        setSelectedId(
+          (cur) =>
+            cur ??
+            (remembered && list.some((task) => task.id === remembered) ? remembered : list[0].id),
+        );
       }
     });
   }, [loadTasks]);
@@ -168,7 +172,11 @@ export default function TasksPage() {
 
   const stopAll = async () => {
     const res = await api.stop();
-    setNotice(res.stopped.length > 0 ? `Stopped ${res.stopped.length} process(es).` : "Nothing was running.");
+    setNotice(
+      res.stopped.length > 0
+        ? `Stopped ${res.stopped.length} process(es).`
+        : "Nothing was running.",
+    );
     if (selectedId) await loadDetail(selectedId);
   };
 
@@ -216,7 +224,10 @@ export default function TasksPage() {
   const openDiff = async (path: string) => {
     try {
       const d = await api.gitFileDiff(path, false);
-      setDiffFile({ name: path, diff: d.diff?.trim() ? d.diff : "(no diff - file may be unchanged)" });
+      setDiffFile({
+        name: path,
+        diff: d.diff?.trim() ? d.diff : "(no diff - file may be unchanged)",
+      });
       setTaskFile(null);
       fileViewerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     } catch (e) {
@@ -270,7 +281,12 @@ export default function TasksPage() {
                 <button className="btn-secondary" onClick={runFull}>
                   Run all
                 </button>
-                <button className="btn-danger px-2" onClick={stopAll} title="Stop running processes" aria-label="Stop">
+                <button
+                  className="btn-danger px-2"
+                  onClick={stopAll}
+                  title="Stop running processes"
+                  aria-label="Stop"
+                >
                   <StopSquare className="h-3.5 w-3.5" />
                 </button>
                 <button
@@ -294,14 +310,20 @@ export default function TasksPage() {
           )}
         </header>
 
-        {error && <div className="card border-rose-200 p-4 text-sm text-rose-600 dark:border-rose-900">{error}</div>}
+        {error && (
+          <div className="card border-rose-200 p-4 text-sm text-rose-600 dark:border-rose-900">
+            {error}
+          </div>
+        )}
         {notice && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
             {notice}
           </div>
         )}
 
-        {tasks.length === 0 && !error && <EmptyState icon={<Inbox />} message="No tasks yet - ask the controller." />}
+        {tasks.length === 0 && !error && (
+          <EmptyState icon={<Inbox />} message="No tasks yet - ask the controller." />
+        )}
 
         {detail && (
           <>
@@ -309,13 +331,17 @@ export default function TasksPage() {
               detail={detail}
               queue={queue}
               onSelect={(step) =>
-                document.getElementById(`step-${step}`)?.scrollIntoView({ behavior: "smooth", block: "center" })
+                document
+                  .getElementById(`step-${step}`)
+                  ?.scrollIntoView({ behavior: "smooth", block: "center" })
               }
             />
 
             <StateCard detail={detail} queue={queue} approvals={approvals} />
 
-            {finalCard && <TimelineCard card={finalCard} density="detailed" onOpenArtifact={openFile} />}
+            {finalCard && (
+              <TimelineCard card={finalCard} density="detailed" onOpenArtifact={openFile} />
+            )}
 
             {queue && (
               <QueueStrip
@@ -327,7 +353,8 @@ export default function TasksPage() {
               />
             )}
 
-            {approvals.filter((approval) => !approval.taskId || approval.taskId === detail.task.id).length > 0 && (
+            {approvals.filter((approval) => !approval.taskId || approval.taskId === detail.task.id)
+              .length > 0 && (
               <div className="space-y-2">
                 {approvals
                   .filter((approval) => !approval.taskId || approval.taskId === detail.task.id)
@@ -360,7 +387,9 @@ export default function TasksPage() {
               />
             </Card>
 
-            {budgetContext && <ContextSummary budget={budgetContext.budget} repeated={budgetContext.repeated} />}
+            {budgetContext && (
+              <ContextSummary budget={budgetContext.budget} repeated={budgetContext.repeated} />
+            )}
 
             <div className="grid gap-3 md:grid-cols-2">
               {STEP_ORDER.map((step, i) => (
@@ -434,11 +463,16 @@ export default function TasksPage() {
                 <Card
                   title={
                     <span className="flex min-w-0 items-center gap-1.5 font-mono text-[11px] text-neutral-500">
-                      <FileIcon className="h-3 w-3 shrink-0" /> <span className="truncate">{taskFile.name}</span>
+                      <FileIcon className="h-3 w-3 shrink-0" />{" "}
+                      <span className="truncate">{taskFile.name}</span>
                     </span>
                   }
                   actions={
-                    <button onClick={() => setTaskFile(null)} aria-label="Close file viewer" className="icon-btn">
+                    <button
+                      onClick={() => setTaskFile(null)}
+                      aria-label="Close file viewer"
+                      className="icon-btn"
+                    >
                       <Close className="h-3 w-3" />
                     </button>
                   }
@@ -459,17 +493,28 @@ export default function TasksPage() {
                 <Card
                   title={
                     <span className="flex min-w-0 items-center gap-1.5 font-mono text-[11px] text-neutral-500">
-                      <FileIcon className="h-3 w-3 shrink-0" /> <span className="truncate">{diffFile.name}</span>
+                      <FileIcon className="h-3 w-3 shrink-0" />{" "}
+                      <span className="truncate">{diffFile.name}</span>
                       <span className="text-neutral-400">- diff</span>
                     </span>
                   }
                   actions={
-                    <button onClick={() => setDiffFile(null)} aria-label="Close diff viewer" className="icon-btn">
+                    <button
+                      onClick={() => setDiffFile(null)}
+                      aria-label="Close diff viewer"
+                      className="icon-btn"
+                    >
                       <Close className="h-3 w-3" />
                     </button>
                   }
                 >
-                  <RawDetail text={diffFile.diff} label={`${diffFile.name} diff`} kind="diff" pageSize={100} className="border-0" />
+                  <RawDetail
+                    text={diffFile.diff}
+                    label={`${diffFile.name} diff`}
+                    kind="diff"
+                    pageSize={100}
+                    className="border-0"
+                  />
                 </Card>
               </div>
             )}

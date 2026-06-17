@@ -77,7 +77,9 @@ export default function CodeReader({ file, draft, onDraftChange, onSave }: Edito
       <div className="flex h-full flex-col items-center justify-center gap-2 bg-white text-center dark:bg-neutral-900">
         <FileIcon className="h-7 w-7 text-neutral-300 dark:text-neutral-600" />
         <p className="text-sm text-neutral-500">Open a file from the Explorer to read it.</p>
-        <p className="text-xs text-neutral-400">Files open as tabs. Click Edit to make changes and save.</p>
+        <p className="text-xs text-neutral-400">
+          Files open as tabs. Click Edit to make changes and save.
+        </p>
       </div>
     );
   }
@@ -93,7 +95,15 @@ export default function CodeReader({ file, draft, onDraftChange, onSave }: Edito
     );
   }
 
-  return <FileView key={file.path} file={file} draft={draft} onDraftChange={onDraftChange} onSave={onSave} />;
+  return (
+    <FileView
+      key={file.path}
+      file={file}
+      draft={draft}
+      onDraftChange={onDraftChange}
+      onSave={onSave}
+    />
+  );
 }
 
 function FileView({
@@ -161,7 +171,11 @@ function FileView({
               <button className="btn-secondary btn-xs" onClick={() => setEditing(false)}>
                 Done
               </button>
-              <button className="btn-primary btn-xs" onClick={() => void save()} disabled={!dirty || saving}>
+              <button
+                className="btn-primary btn-xs"
+                onClick={() => void save()}
+                disabled={!dirty || saving}
+              >
                 {saving && <Spinner className="h-3 w-3" />}
                 {saving ? "Saving…" : "Save"}
               </button>
@@ -173,7 +187,10 @@ function FileView({
           ))}
       </Breadcrumb>
       {saveError && (
-        <p className="shrink-0 border-b border-rose-200 bg-rose-50 px-4 py-1.5 text-[11px] text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300" role="alert">
+        <p
+          className="shrink-0 border-b border-rose-200 bg-rose-50 px-4 py-1.5 text-[11px] text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300"
+          role="alert"
+        >
           {saveError}
         </p>
       )}
@@ -204,7 +221,9 @@ function FileView({
                 <code dangerouslySetInnerHTML={{ __html: highlighted }} />
               </pre>
             ) : (
-              <pre className="flex-1 whitespace-pre px-4 py-3 text-neutral-800 dark:text-neutral-200">{value}</pre>
+              <pre className="flex-1 whitespace-pre px-4 py-3 text-neutral-800 dark:text-neutral-200">
+                {value}
+              </pre>
             )}
           </div>
         </div>
@@ -296,7 +315,10 @@ function diffLineClass(line: string): string {
 function Breadcrumb({ file, children }: { file: EditorFile; children?: ReactNode }) {
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-neutral-200 px-4 py-1.5 dark:border-neutral-800">
-      <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400" title={file.path}>
+      <span
+        className="min-w-0 flex-1 truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400"
+        title={file.path}
+      >
         {file.path.split("/").join(" › ")}
       </span>
       <span className="shrink-0 text-[11px] tabular-nums text-neutral-400">

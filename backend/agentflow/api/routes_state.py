@@ -97,8 +97,11 @@ async def approve(approval_id: str):
     # Execute the now-authorized command (hard denials still apply inside).
     if approval.get("kind") == "command":
         await chat_service.execute_run_directive(
-            ws, approval["action"], approval.get("provider") or "orchestrator",
-            task_id=approval.get("taskId"), approved=True,
+            ws,
+            approval["action"],
+            approval.get("provider") or "orchestrator",
+            task_id=approval.get("taskId"),
+            approved=True,
         )
     return {"status": "approved", "approval": resolved}
 

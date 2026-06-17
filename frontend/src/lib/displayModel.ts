@@ -92,14 +92,26 @@ export interface CardModel {
 /** One place that maps a card type to its dot/accent — both surfaces share it so
  *  a TASK_CREATED looks the same compact (dock) and detailed (Tasks). */
 export const CARD_STYLE: Record<CardType, { label: string; dot: string; accent: string }> = {
-  TASK_CREATED: { label: "Task created", dot: "bg-neutral-400", accent: "border-l-neutral-300 dark:border-l-neutral-600" },
+  TASK_CREATED: {
+    label: "Task created",
+    dot: "bg-neutral-400",
+    accent: "border-l-neutral-300 dark:border-l-neutral-600",
+  },
   TASK_BRIEF: { label: "Task brief", dot: "bg-blue-500", accent: "border-l-blue-400" },
   STATE_TRANSITION: { label: "State", dot: "bg-violet-500", accent: "border-l-violet-400" },
-  QUEUE_ITEM: { label: "Queued", dot: "bg-neutral-400", accent: "border-l-neutral-300 dark:border-l-neutral-600" },
+  QUEUE_ITEM: {
+    label: "Queued",
+    dot: "bg-neutral-400",
+    accent: "border-l-neutral-300 dark:border-l-neutral-600",
+  },
   RUN_STARTED: { label: "Run started", dot: "bg-blue-500", accent: "border-l-blue-400" },
   RUN_OUTPUT: { label: "Output", dot: "bg-blue-500", accent: "border-l-blue-400" },
   COMMAND_RESULT: { label: "Command", dot: "bg-emerald-500", accent: "border-l-emerald-400" },
-  APPROVAL_REQUIRED: { label: "Approval required", dot: "bg-amber-500", accent: "border-l-amber-400" },
+  APPROVAL_REQUIRED: {
+    label: "Approval required",
+    dot: "bg-amber-500",
+    accent: "border-l-amber-400",
+  },
   APPROVAL_RESOLVED: { label: "Approval", dot: "bg-emerald-500", accent: "border-l-emerald-400" },
   DIFF_SUMMARY: { label: "Diff", dot: "bg-violet-500", accent: "border-l-violet-400" },
   ARTIFACTS_CHANGED: { label: "Artifacts", dot: "bg-violet-500", accent: "border-l-violet-400" },
@@ -140,7 +152,10 @@ const TASK_EVENT_MAP: Record<string, { type: CardType; severity: Severity }> = {
 /** Project one durable task event into a CardModel. Structured fields drive the
  *  card; `detail` is the concise human line — raw prose is never re-parsed here. */
 export function cardFromTaskEvent(e: TaskEvent, index: number): CardModel {
-  const mapped = TASK_EVENT_MAP[e.type] ?? { type: "STATE_TRANSITION" as CardType, severity: "info" as Severity };
+  const mapped = TASK_EVENT_MAP[e.type] ?? {
+    type: "STATE_TRANSITION" as CardType,
+    severity: "info" as Severity,
+  };
   // A finished step that didn't succeed is a FAILURE regardless of the base map.
   let { type, severity } = mapped;
   if (e.type === "step_finished" && e.status && e.status !== "succeeded") {
@@ -150,7 +165,11 @@ export function cardFromTaskEvent(e: TaskEvent, index: number): CardModel {
   return {
     id: `${e.time}-${index}`,
     type,
-    action: { provider: e.provider ?? undefined, step: e.step ?? undefined, stateTo: e.status ?? undefined },
+    action: {
+      provider: e.provider ?? undefined,
+      step: e.step ?? undefined,
+      stateTo: e.status ?? undefined,
+    },
     display: {
       cardType: type,
       title: CARD_STYLE[type].label,
@@ -195,7 +214,11 @@ export function cardFromStreamEvent(e: StreamEvent): CardModel | null {
   if (!mapped) return null;
   const status = typeof e.data?.status === "string" ? (e.data.status as string) : undefined;
   let { type, severity } = mapped;
-  if ((e.type === "run.finished" || e.type === "command.finished") && status && status !== "succeeded") {
+  if (
+    (e.type === "run.finished" || e.type === "command.finished") &&
+    status &&
+    status !== "succeeded"
+  ) {
     type = "FAILURE";
     severity = "error";
   }

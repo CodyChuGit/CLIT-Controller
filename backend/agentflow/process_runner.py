@@ -59,14 +59,14 @@ class RunRecord:
     stderr_parts: list[str] = field(default_factory=list)
     truncated: bool = False
     log_file: Optional[str] = None
-    pid: Optional[int] = None           # OS pid, for restart liveness checks
-    prompt_file: Optional[str] = None   # durable prompt artifact, for the run ledger
+    pid: Optional[int] = None  # OS pid, for restart liveness checks
+    prompt_file: Optional[str] = None  # durable prompt artifact, for the run ledger
     failure_kind: Optional[str] = None  # set on terminal non-success (see state_store)
     # Live-streaming context (only set for runs that should emit events).
     workspace: Optional[str] = None
     queue_item_id: Optional[str] = None
-    stream_kind: str = "run"            # run | command | chat | controller
-    seq: int = 0                        # per-run monotonic sequence for ordering
+    stream_kind: str = "run"  # run | command | chat | controller
+    seq: int = 0  # per-run monotonic sequence for ordering
     _start_monotonic: float = field(default_factory=time.monotonic)
 
     def next_seq(self) -> int:
@@ -214,23 +214,39 @@ class ProcessRunner:
             return "controller.delta"
         return "run.stderr" if channel == "stderr" else "run.output"
 
-    def _emit(self, record: RunRecord, type_: str, *, channel: Optional[str] = None,
-              text_delta: Optional[str] = None, data: Optional[dict] = None) -> None:
+    def _emit(
+        self,
+        record: RunRecord,
+        type_: str,
+        *,
+        channel: Optional[str] = None,
+        text_delta: Optional[str] = None,
+        data: Optional[dict] = None,
+    ) -> None:
         """Emit one live event for a streaming run (no-op for non-streaming runs)."""
         if not record.workspace:
             return
         event_bus.BUS.publish(
-            record.workspace, type_,
-            provider=record.provider, task_id=record.task_id, run_id=record.id,
-            queue_item_id=record.queue_item_id, step=record.step,
-            sequence=record.next_seq(), channel=channel,
-            text_delta=text_delta, truncated=record.truncated, data=data,
+            record.workspace,
+            type_,
+            provider=record.provider,
+            task_id=record.task_id,
+            run_id=record.id,
+            queue_item_id=record.queue_item_id,
+            step=record.step,
+            sequence=record.next_seq(),
+            channel=channel,
+            text_delta=text_delta,
+            truncated=record.truncated,
+            data=data,
         )
 
     def _emit_terminal(self, record: RunRecord) -> None:
         data = {
-            "status": record.status, "exitCode": record.exit_code,
-            "failureKind": record.failure_kind, "durationMs": record.duration_ms,
+            "status": record.status,
+            "exitCode": record.exit_code,
+            "failureKind": record.failure_kind,
+            "durationMs": record.duration_ms,
         }
         if record.stream_kind in ("chat", "controller"):
             self._emit(record, "chat.finished", data=data)
@@ -246,11 +262,13 @@ class ProcessRunner:
             await asyncio.sleep(HEARTBEAT_SECONDS)
             if record.status != "running":
                 break
-            self._emit(record, "run.heartbeat",
-                       data={"elapsedMs": int((time.monotonic() - record._start_monotonic) * 1000)})
+            self._emit(
+                record, "run.heartbeat", data={"elapsedMs": int((time.monotonic() - record._start_monotonic) * 1000)}
+            )
 
-    async def _read_stream(self, stream: asyncio.StreamReader, parts: list[str],
-                           record: RunRecord, channel: str = "stdout") -> None:
+    async def _read_stream(
+        self, stream: asyncio.StreamReader, parts: list[str], record: RunRecord, channel: str = "stdout"
+    ) -> None:
         captured = 0
         carry = ""  # held tail (unredacted) so a secret is never split across deltas
         streaming = bool(record.workspace)
@@ -350,9 +368,15 @@ class ProcessRunner:
         lifecycle) to the event bus. Quick probes/git omit it and stay silent.
         """
         record = self._new_record(
-            argv, cwd, task_id=task_id, step=step, provider=provider, log_file=log_file,
+            argv,
+            cwd,
+            task_id=task_id,
+            step=step,
+            provider=provider,
+            log_file=log_file,
             workspace=str(workspace) if workspace else None,
-            queue_item_id=queue_item_id, stream_kind=stream_kind,
+            queue_item_id=queue_item_id,
+            stream_kind=stream_kind,
         )
         # Children must not inherit OUR port assignment: dev servers honor PORT and
         # would bind on top of the CLITC backend, hijacking localhost:8787.
@@ -386,8 +410,7 @@ class ProcessRunner:
             if stream_kind == "command":
                 self._emit(record, "command.started", data={"command": record.command_preview()})
             elif stream_kind in ("chat", "controller"):
-                self._emit(record, "run.started",
-                           data={"command": record.command_preview(), "streamKind": stream_kind})
+                self._emit(record, "run.started", data={"command": record.command_preview(), "streamKind": stream_kind})
             asyncio.create_task(self._heartbeat(record))
 
         async def _consume() -> None:

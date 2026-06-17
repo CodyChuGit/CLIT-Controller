@@ -113,7 +113,11 @@ export default function ProjectsPage({
               aria-label="Workspace folder path"
             />
             <div className="flex gap-2">
-              <button className="btn-primary flex-1 justify-center" onClick={save} disabled={saving || !pathInput.trim()}>
+              <button
+                className="btn-primary flex-1 justify-center"
+                onClick={save}
+                disabled={saving || !pathInput.trim()}
+              >
                 {saving ? "Saving…" : hasWorkspace ? "Switch" : "Open"}
               </button>
               {hasWorkspace && (
@@ -141,9 +145,7 @@ export default function ProjectsPage({
         {hasWorkspace && (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-center justify-between px-3 py-1.5">
-              <span className="section-title">
-                Files{tree ? ` (${tree.fileCount})` : ""}
-              </span>
+              <span className="section-title">Files{tree ? ` (${tree.fileCount})` : ""}</span>
               <IconButton label="Refresh file tree" onClick={() => void refreshTree()}>
                 <Refresh className="h-3.5 w-3.5" />
               </IconButton>
@@ -207,19 +209,27 @@ export default function ProjectsPage({
                       : "hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
                   }`}
                 >
-                  {active && <span className="absolute inset-x-0 top-0 h-0.5 bg-accent" aria-hidden="true" />}
+                  {active && (
+                    <span className="absolute inset-x-0 top-0 h-0.5 bg-accent" aria-hidden="true" />
+                  )}
                   <button
                     role="tab"
                     aria-selected={active}
                     title={f.path}
                     onClick={() => onActivateFile(f.path)}
                     className={`focusable flex cursor-pointer items-center gap-1.5 py-1.5 pl-2.5 pr-1 font-mono text-[11px] ${
-                      active ? "text-neutral-800 dark:text-neutral-100" : "text-neutral-500 dark:text-neutral-400"
+                      active
+                        ? "text-neutral-800 dark:text-neutral-100"
+                        : "text-neutral-500 dark:text-neutral-400"
                     }`}
                   >
                     <FileTypeIcon name={name} className="shrink-0" />
                     {name}
-                    {dirty && <span className="text-amber-500" title="Unsaved changes" aria-label="unsaved">•</span>}
+                    {dirty && (
+                      <span className="text-amber-500" title="Unsaved changes" aria-label="unsaved">
+                        •
+                      </span>
+                    )}
                     {f.error && <span className="text-rose-500">!</span>}
                   </button>
                   <IconButton label={`Close ${name}`} onClick={close}>
@@ -266,12 +276,7 @@ function IconButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      className="icon-btn mx-1"
-    >
+    <button onClick={onClick} title={label} aria-label={label} className="icon-btn mx-1">
       {children}
     </button>
   );
@@ -376,17 +381,18 @@ function OutputPanel() {
             <IconButton label="Refresh logs" onClick={() => void load()}>
               <Refresh className="h-3.5 w-3.5" />
             </IconButton>
-            <IconButton
-              label="Clear log view"
-              onClick={() => void api.clearLogView().then(load)}
-            >
+            <IconButton label="Clear log view" onClick={() => void api.clearLogView().then(load)}>
               <Close className="h-3.5 w-3.5" />
             </IconButton>
           </>
         )}
       </div>
       {open && (
-        <div ref={bodyRef} style={{ height }} className="overflow-auto border-t border-neutral-100 px-3 dark:border-neutral-800">
+        <div
+          ref={bodyRef}
+          style={{ height }}
+          className="overflow-auto border-t border-neutral-100 px-3 dark:border-neutral-800"
+        >
           <LogConsole entries={data?.entries ?? []} running={data?.running ?? []} />
         </div>
       )}

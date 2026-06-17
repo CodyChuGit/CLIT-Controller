@@ -36,7 +36,13 @@ const NAME_BADGES: Record<string, { label: string; cls: string }> = {
   Makefile: { label: "MK", cls: "bg-stone-600 text-white" },
 };
 
-export default function FileTypeIcon({ name, className = "" }: { name: string; className?: string }) {
+export default function FileTypeIcon({
+  name,
+  className = "",
+}: {
+  name: string;
+  className?: string;
+}) {
   const badge = NAME_BADGES[name] ?? EXT_BADGES[name.split(".").pop()?.toLowerCase() ?? ""];
   if (!badge) {
     return <FileIcon className={`h-3.5 w-3.5 shrink-0 text-neutral-400 ${className}`} />;

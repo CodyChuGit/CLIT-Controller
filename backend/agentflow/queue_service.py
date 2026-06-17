@@ -102,13 +102,19 @@ def add_steps(workspace: Path, task_id: str, steps: list[str], source: str = "or
         _save(workspace, data)
         labels = ", ".join(f"{i['label']}→{i['provider']}" for i in added)
         task_service._add_event(
-            workspace, task_id, "queued",
+            workspace,
+            task_id,
+            "queued",
             f"{source} queued {len(added)} step(s): {labels} — the system will cue each agent in order",
         )
         for i in added:
             state_store.append_event(
-                workspace, "queue.enqueued", f"queued {i['label']} → {i['provider']}",
-                task_id=task_id, step=i["step"], provider=i["provider"],
+                workspace,
+                "queue.enqueued",
+                f"queued {i['label']} → {i['provider']}",
+                task_id=task_id,
+                step=i["step"],
+                provider=i["provider"],
                 data={"itemId": i["id"], "source": source},
             )
         add_log_entry("queue", f"queued {len(added)} step(s) for {task_id}: {labels}", task_id=task_id)
@@ -166,14 +172,19 @@ def _apply_status(workspace: Path, item: dict[str, Any], fields: dict[str, Any])
         return
     if not transitions.is_valid("queue", frm, to):
         add_log_entry(
-            "queue", f"invalid queue transition {frm}→{to} for {item.get('id')}",
-            task_id=item.get("taskId"), step=item.get("step"), status="error",
+            "queue",
+            f"invalid queue transition {frm}→{to} for {item.get('id')}",
+            task_id=item.get("taskId"),
+            step=item.get("step"),
+            status="error",
         )
     state_store.append_event(
-        workspace, _QUEUE_EVENT_TYPE.get(to, "queue.status_changed"),
-        f"{item.get('label', item.get('step'))} → {to}"
-        + (f": {fields.get('note')}" if fields.get("note") else ""),
-        task_id=item.get("taskId"), step=item.get("step"), provider=item.get("provider"),
+        workspace,
+        _QUEUE_EVENT_TYPE.get(to, "queue.status_changed"),
+        f"{item.get('label', item.get('step'))} → {to}" + (f": {fields.get('note')}" if fields.get("note") else ""),
+        task_id=item.get("taskId"),
+        step=item.get("step"),
+        provider=item.get("provider"),
         data={"itemId": item.get("id"), "from": frm, "to": to},
     )
 
@@ -210,7 +221,11 @@ def _finalize_running(workspace: Path) -> None:
             continue
         record = RUNNER.runs.get(item.get("runId") or "")
         if record is None:
-            fields: dict[str, Any] = {"status": "failed", "note": "run record lost (backend restarted)", "finishedAt": now_iso()}
+            fields: dict[str, Any] = {
+                "status": "failed",
+                "note": "run record lost (backend restarted)",
+                "finishedAt": now_iso(),
+            }
             _apply_status(workspace, item, fields)
             item.update(fields)
             failed_tasks.add(item["taskId"])
@@ -245,7 +260,9 @@ def _finalize_running(workspace: Path) -> None:
         for tid in failed_tasks:
             try:
                 task_service._add_event(
-                    workspace, tid, "blocked",
+                    workspace,
+                    tid,
+                    "blocked",
                     "queue paused for this task — an earlier step did not succeed (approve items to continue)",
                 )
             except FileNotFoundError:
@@ -315,7 +332,11 @@ async def dispatch_item(workspace: Path, item_id: str, confirm: bool = False, so
         return {"status": "already_running"}
 
     result = await task_service.run_step(
-        workspace, item["taskId"], item["step"], confirm=confirm, source=source,
+        workspace,
+        item["taskId"],
+        item["step"],
+        confirm=confirm,
+        source=source,
         provider_override=item.get("providerOverride"),
     )
 
@@ -328,7 +349,9 @@ async def dispatch_item(workspace: Path, item_id: str, confirm: bool = False, so
     elif result["status"] == "provider_missing":
         _set_item(workspace, item_id, status="skipped", note=result.get("message"), finishedAt=now_iso())
     else:
-        _set_item(workspace, item_id, status="failed", note=result.get("message", result["status"]), finishedAt=now_iso())
+        _set_item(
+            workspace, item_id, status="failed", note=result.get("message", result["status"]), finishedAt=now_iso()
+        )
     return result
 
 
@@ -440,7 +463,9 @@ async def _process_consults(workspace: Path, manual: bool) -> None:
         for c in dropped:
             try:
                 task_service._add_event(
-                    workspace, c["taskId"], "needs_user",
+                    workspace,
+                    c["taskId"],
+                    "needs_user",
                     "controller consult skipped (Manual Approval mode) — queue the next step yourself",
                 )
             except FileNotFoundError:

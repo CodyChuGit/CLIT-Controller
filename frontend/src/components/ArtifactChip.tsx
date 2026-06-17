@@ -4,7 +4,13 @@ const SPECIAL_ARTIFACTS: Record<string, string> = {
   "@folder": "task folder",
 };
 
-export default function ArtifactChip({ name, onOpen }: { name: string; onOpen?: (name: string) => void }) {
+export default function ArtifactChip({
+  name,
+  onOpen,
+}: {
+  name: string;
+  onOpen?: (name: string) => void;
+}) {
   const special = SPECIAL_ARTIFACTS[name];
   if (special) {
     return (
@@ -19,7 +25,9 @@ export default function ArtifactChip({ name, onOpen }: { name: string; onOpen?: 
       disabled={!onOpen}
       title={onOpen ? `Open ${name}` : name}
       className={`focusable rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 font-mono text-[10px] text-emerald-700 transition-colors dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 ${
-        onOpen ? "cursor-pointer hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-300" : ""
+        onOpen
+          ? "cursor-pointer hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-300"
+          : ""
       }`}
     >
       {name.replace(".md", "")}

@@ -56,7 +56,9 @@ export default function TaskFlowChart({
             {i > 0 && (
               <div
                 className={`mt-3.5 h-px min-w-4 flex-1 ${
-                  involved ? "bg-neutral-300 dark:bg-neutral-600" : "bg-neutral-200 dark:bg-neutral-800"
+                  involved
+                    ? "bg-neutral-300 dark:bg-neutral-600"
+                    : "bg-neutral-200 dark:bg-neutral-800"
                 }`}
                 aria-hidden="true"
               />
@@ -93,7 +95,9 @@ export default function TaskFlowChart({
               </span>
               <span
                 className={`text-[10px] font-medium leading-none ${
-                  involved ? "text-neutral-800 dark:text-neutral-200" : "text-neutral-300 dark:text-neutral-700"
+                  involved
+                    ? "text-neutral-800 dark:text-neutral-200"
+                    : "text-neutral-300 dark:text-neutral-700"
                 }`}
               >
                 {SHORT_LABELS[step]}

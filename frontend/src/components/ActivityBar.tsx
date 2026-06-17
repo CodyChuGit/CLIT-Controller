@@ -18,9 +18,7 @@ const MAIN_NAV: NavItem[] = [
   {
     id: "projects",
     label: "Explorer",
-    icon: (
-      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
-    ),
+    icon: <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />,
   },
   {
     id: "agents",
@@ -68,7 +66,15 @@ const SETTINGS_NAV: NavItem = {
   ),
 };
 
-function RailButton({ item, active, onClick }: { item: NavItem; active: boolean; onClick: () => void }) {
+function RailButton({
+  item,
+  active,
+  onClick,
+}: {
+  item: NavItem;
+  active: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       onClick={onClick}
@@ -124,10 +130,19 @@ export default function ActivityBar({ page, onNavigate }: Props) {
         title="Command Line Interface Terminal Controller (CLIT Controller IDE)"
       />
       {MAIN_NAV.map((item) => (
-        <RailButton key={item.id} item={item} active={page === item.id} onClick={() => onNavigate(item.id)} />
+        <RailButton
+          key={item.id}
+          item={item}
+          active={page === item.id}
+          onClick={() => onNavigate(item.id)}
+        />
       ))}
       <div className="mt-auto">
-        <RailButton item={SETTINGS_NAV} active={page === "settings"} onClick={() => onNavigate("settings")} />
+        <RailButton
+          item={SETTINGS_NAV}
+          active={page === "settings"}
+          onClick={() => onNavigate("settings")}
+        />
       </div>
     </aside>
   );

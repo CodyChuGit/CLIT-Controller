@@ -73,5 +73,5 @@ async def _manager_lifecycle(cwd: str) -> tuple[bool, bool]:
 
 def test_manager_reuses_live_session_and_replaces_dead_one(tmp_path):
     reused, replaced = asyncio.run(_manager_lifecycle(str(tmp_path)))
-    assert reused is True   # a live session is reused, not duplicated
+    assert reused is True  # a live session is reused, not duplicated
     assert replaced is True  # once killed, the next connect starts a new one

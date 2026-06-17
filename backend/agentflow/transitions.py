@@ -15,20 +15,46 @@ from __future__ import annotations
 TASK_STATUSES = {"new", "idle", "in_progress", "running", "needs_user", "done", "failed", "cancelled", "abandoned"}
 
 STEP_STATUSES = {
-    "idle", "queued", "awaiting_approval", "running", "succeeded", "skipped",
-    "skipped_budget", "blocked", "failed", "cancelled", "provider_missing", "policy_denied", "error",
+    "idle",
+    "queued",
+    "awaiting_approval",
+    "running",
+    "succeeded",
+    "skipped",
+    "skipped_budget",
+    "blocked",
+    "failed",
+    "cancelled",
+    "provider_missing",
+    "policy_denied",
+    "error",
 }
 
 QUEUE_STATUSES = {
-    "queued", "awaiting_approval", "blocked", "running",
-    "done", "failed", "skipped", "cancelled",
+    "queued",
+    "awaiting_approval",
+    "blocked",
+    "running",
+    "done",
+    "failed",
+    "skipped",
+    "cancelled",
 }
 
 RUN_STATUSES = {"running", "succeeded", "failed", "cancelled", "error"}
 
 # Terminal states never transition further on their own.
 QUEUE_TERMINAL = {"done", "failed", "skipped", "cancelled"}
-STEP_TERMINAL = {"succeeded", "skipped", "skipped_budget", "failed", "cancelled", "provider_missing", "policy_denied", "error"}
+STEP_TERMINAL = {
+    "succeeded",
+    "skipped",
+    "skipped_budget",
+    "failed",
+    "cancelled",
+    "provider_missing",
+    "policy_denied",
+    "error",
+}
 
 
 # --------------------------------------------------------- allowed transitions
@@ -47,7 +73,16 @@ QUEUE_TRANSITIONS: dict[str, set[str]] = {
 }
 
 STEP_TRANSITIONS: dict[str, set[str]] = {
-    "idle": {"queued", "awaiting_approval", "running", "provider_missing", "policy_denied", "skipped", "skipped_budget", "blocked"},
+    "idle": {
+        "queued",
+        "awaiting_approval",
+        "running",
+        "provider_missing",
+        "policy_denied",
+        "skipped",
+        "skipped_budget",
+        "blocked",
+    },
     "queued": {"running", "awaiting_approval", "blocked", "provider_missing", "policy_denied", "skipped", "cancelled"},
     "awaiting_approval": {"queued", "running", "skipped", "cancelled"},
     "blocked": {"queued", "running", "skipped", "cancelled"},
@@ -70,7 +105,7 @@ TASK_TRANSITIONS: dict[str, set[str]] = {
     "running": {"in_progress", "idle", "done", "needs_user", "failed", "cancelled"},
     "needs_user": {"in_progress", "running", "cancelled", "abandoned"},
     "failed": {"in_progress", "running", "idle", "cancelled", "abandoned"},
-    "done": {"in_progress"},          # reopen for follow-up work
+    "done": {"in_progress"},  # reopen for follow-up work
     "cancelled": {"in_progress"},
     "abandoned": set(),
 }

@@ -27,7 +27,7 @@ def test_remote_and_install_require_approval():
 def test_dangerous_commands_denied():
     assert c("sudo rm -rf /").decision == DENY
     assert c("bash -c 'echo hi'").decision == DENY
-    assert c("npm test && rm -rf /").decision == DENY     # shell operator
+    assert c("npm test && rm -rf /").decision == DENY  # shell operator
     assert c("cat foo > bar").decision == DENY
 
 

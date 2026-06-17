@@ -76,14 +76,21 @@ export default function StepChat({
   }, [exchanges.length, liveText]);
 
   return (
-    <div className={`card border-t-2 ${color.border} ${involved ? "" : "opacity-50"}`} id={`step-${step}`}>
+    <div
+      className={`card border-t-2 ${color.border} ${involved ? "" : "opacity-50"}`}
+      id={`step-${step}`}
+    >
       <div className="flex items-center gap-2 border-b border-neutral-100 px-3 py-2 dark:border-neutral-800/60">
         <span className={`h-2 w-2 rounded-full ${color.dot}`} aria-hidden="true" />
         <span className="text-xs font-semibold">{SHORT_LABELS[step]}</span>
         <span className="font-mono text-[10px] text-neutral-400">{preview?.provider}</span>
         {state.status !== "idle" && <StatusBadge state={state.status} />}
         <span className="flex-1" />
-        <button className="btn-secondary btn-xs" onClick={onRun} disabled={state.status === "running"}>
+        <button
+          className="btn-secondary btn-xs"
+          onClick={onRun}
+          disabled={state.status === "running"}
+        >
           {state.status === "running" ? "Running..." : "Run"}
         </button>
       </div>
@@ -130,7 +137,10 @@ export default function StepChat({
                         {preview?.provider} - reply
                       </div>
                       {exchange.output.trim() ? (
-                        <Markdown content={exchange.output} fade="from-white to-transparent dark:from-neutral-900" />
+                        <Markdown
+                          content={exchange.output}
+                          fade="from-white to-transparent dark:from-neutral-900"
+                        />
                       ) : (
                         <p className="text-[11px] italic text-neutral-400">No output.</p>
                       )}
@@ -140,8 +150,22 @@ export default function StepChat({
                 {!isLive && (exchange.prompt || exchange.output) && (
                   <Disclosure label="Raw prompt / output" className="pl-1">
                     <div className="space-y-1.5">
-                      {exchange.prompt && <RawDetail text={exchange.prompt} label="prompt" kind="prompt" pageSize={50} />}
-                      {exchange.output && <RawDetail text={exchange.output} label="output" kind="stdout" pageSize={50} />}
+                      {exchange.prompt && (
+                        <RawDetail
+                          text={exchange.prompt}
+                          label="prompt"
+                          kind="prompt"
+                          pageSize={50}
+                        />
+                      )}
+                      {exchange.output && (
+                        <RawDetail
+                          text={exchange.output}
+                          label="output"
+                          kind="stdout"
+                          pageSize={50}
+                        />
+                      )}
                     </div>
                   </Disclosure>
                 )}

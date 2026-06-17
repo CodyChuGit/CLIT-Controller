@@ -101,7 +101,9 @@ export default function CommandPalette({
                 }`}
               >
                 <span className="min-w-0 flex-1 truncate">{a.label}</span>
-                {a.hint && <span className="shrink-0 font-mono text-[10px] text-neutral-400">{a.hint}</span>}
+                {a.hint && (
+                  <span className="shrink-0 font-mono text-[10px] text-neutral-400">{a.hint}</span>
+                )}
               </button>
             ))
           )}

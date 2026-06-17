@@ -87,7 +87,9 @@ def recommend(usage: dict, task_type: str = "feature", diff_size: int | None = N
         lines.append("Manual Approval: no agent command runs automatically — review each command preview, then run it.")
 
     if diff_size is not None and diff_size > 20_000:
-        lines.append("Large diff detected — send `git diff --stat` plus only the relevant file paths, not the full diff.")
+        lines.append(
+            "Large diff detected — send `git diff --stat` plus only the relevant file paths, not the full diff."
+        )
 
     return {
         "mode": mode,

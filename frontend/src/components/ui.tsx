@@ -99,7 +99,11 @@ export function EmptyState({
 }) {
   return (
     <div className={`flex flex-col items-center justify-center gap-2 text-center ${className}`}>
-      {icon && <span className="text-neutral-300 dark:text-neutral-600 [&>svg]:h-7 [&>svg]:w-7">{icon}</span>}
+      {icon && (
+        <span className="text-neutral-300 dark:text-neutral-600 [&>svg]:h-7 [&>svg]:w-7">
+          {icon}
+        </span>
+      )}
       <p className="text-xs text-neutral-500">{message}</p>
       {children}
     </div>

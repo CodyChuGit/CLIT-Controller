@@ -25,7 +25,21 @@ REQUIRE_APPROVAL = "require_approval"
 DENY = "deny"
 
 # Hard denials regardless of args.
-_BLOCKED_BINARIES = {"sudo", "su", "sh", "bash", "zsh", "fish", "env", "xargs", "shutdown", "reboot", "halt", "mkfs", "dd"}
+_BLOCKED_BINARIES = {
+    "sudo",
+    "su",
+    "sh",
+    "bash",
+    "zsh",
+    "fish",
+    "env",
+    "xargs",
+    "shutdown",
+    "reboot",
+    "halt",
+    "mkfs",
+    "dd",
+}
 _SHELL_OPERATORS = ("|", ">", "<", ";", "&&", "||", "`", "$(", "&")
 
 # Interpreters that can execute arbitrary inline code, escaping argument/workspace
@@ -36,7 +50,19 @@ _INTERPRETERS = {"python", "python3", "node", "nodejs", "deno", "ruby", "perl", 
 _EVAL_FLAGS = {"-e", "-c", "-r", "-p", "--eval", "--print"}
 
 # Actions that touch shared/remote state — allowed only with explicit approval.
-_APPROVAL_BINARIES = {"brew", "pip", "pip3", "docker", "kubectl", "terraform", "vercel", "netlify", "heroku", "flyctl", "fly"}
+_APPROVAL_BINARIES = {
+    "brew",
+    "pip",
+    "pip3",
+    "docker",
+    "kubectl",
+    "terraform",
+    "vercel",
+    "netlify",
+    "heroku",
+    "flyctl",
+    "fly",
+}
 _GIT_REMOTE_SUBCMDS = {"push", "pull", "fetch", "clone", "remote", "submodule"}
 _INSTALL_SUBCMDS = {"install", "add", "ci", "uninstall", "remove", "update", "upgrade", "publish", "link", "create"}
 _DEPLOY_SUBCMDS = {"deploy", "publish", "release"}
@@ -44,7 +70,7 @@ _DEPLOY_SUBCMDS = {"deploy", "publish", "release"}
 
 @dataclass(frozen=True)
 class PolicyResult:
-    decision: str            # allow | require_approval | deny
+    decision: str  # allow | require_approval | deny
     reason: str = ""
 
     @property
@@ -106,8 +132,10 @@ def classify_action(
         return PolicyResult(DENY, f"inline code execution (`{binary} -e/-c`) is not allowed")
 
     # destructive recursive delete at a filesystem root
-    if binary == "rm" and any(t.startswith("-") and "r" in t and "f" in t for t in tokens) and any(
-        t == "/" or t.startswith("/ ") for t in tokens
+    if (
+        binary == "rm"
+        and any(t.startswith("-") and "r" in t and "f" in t for t in tokens)
+        and any(t == "/" or t.startswith("/ ") for t in tokens)
     ):
         return PolicyResult(DENY, "refusing recursive force-delete on /")
 

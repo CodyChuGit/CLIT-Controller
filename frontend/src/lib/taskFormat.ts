@@ -90,10 +90,10 @@ export interface OutputSummary {
   long: boolean;
 }
 
-const ERROR_RE = /\b(error|exception|traceback|fatal|panic|cannot find|not found|failed|failure)\b/i;
+const ERROR_RE =
+  /\b(error|exception|traceback|fatal|panic|cannot find|not found|failed|failure)\b/i;
 const WARN_RE = /\bwarn(ing)?\b/i;
-const CHANGED_RE =
-  /\b(wrote|created|modified|updated|edited|added|deleted|removed)\b[:\s]+(\S+)/i;
+const CHANGED_RE = /\b(wrote|created|modified|updated|edited|added|deleted|removed)\b[:\s]+(\S+)/i;
 const TEST_RE =
   /(\d+)\s+(?:passed|passing)(?:[^\d]+(\d+)\s+(?:failed|failing))?|(\d+)\s+(?:failed|failing)/i;
 
@@ -168,8 +168,14 @@ export function summarizeOutput(text: string): OutputSummary {
 
 const COMMAND_TITLES: [RegExp, string][] = [
   [/^(npm|yarn|pnpm)\s+(run\s+)?test\b|^pytest\b|^vitest\b|^jest\b|^go\s+test\b/, "Run test suite"],
-  [/^(npm|pnpm)\s+(install|i|ci)\b|^yarn(\s+install|\s+add)?\b|^pip\s+install\b/, "Install dependencies"],
-  [/^(npm|yarn|pnpm)\s+run\s+build\b|^tsc\b|^vite\s+build\b|^make\b|^cargo\s+build\b/, "Build project"],
+  [
+    /^(npm|pnpm)\s+(install|i|ci)\b|^yarn(\s+install|\s+add)?\b|^pip\s+install\b/,
+    "Install dependencies",
+  ],
+  [
+    /^(npm|yarn|pnpm)\s+run\s+build\b|^tsc\b|^vite\s+build\b|^make\b|^cargo\s+build\b/,
+    "Build project",
+  ],
   [/^(npm|yarn|pnpm)\s+run\s+dev\b|^vite\b|^next\s+dev\b|^npm\s+start\b/, "Start dev server"],
   [/^(npm|yarn|pnpm)\s+run\s+lint\b|^eslint\b|^ruff\b|^flake8\b/, "Lint code"],
   [/^git\s+status\b/, "Check working tree"],

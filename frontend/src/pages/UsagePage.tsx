@@ -24,7 +24,7 @@ function pctColor(used: number): string {
 
 /** One aligned row per CLI-reported window: label · bar (fill = remaining) · % left · reset. */
 function QuotaCell({ liveData, loading }: { liveData?: LiveProviderUsage; loading?: boolean }) {
-  const windows = liveData?.available ? liveData.windows ?? [] : [];
+  const windows = liveData?.available ? (liveData.windows ?? []) : [];
   if (loading) {
     return (
       <div className="flex items-center gap-2.5 text-[11px]">
@@ -136,67 +136,80 @@ export default function UsagePage() {
     <PageShell
       title="Usage"
       actions={
-        <button onClick={() => void load()} title="Refresh" aria-label="Refresh usage" className="icon-btn">
+        <button
+          onClick={() => void load()}
+          title="Refresh"
+          aria-label="Refresh usage"
+          className="icon-btn"
+        >
           <Refresh className="h-3.5 w-3.5" />
         </button>
       }
     >
-        {!usage && <Loading label="Loading usage…" />}
+      {!usage && <Loading label="Loading usage…" />}
 
-        {usage && (
-          <>
-            <div className="flex items-center gap-3">
-              <span className="label">Traffic control</span>
-              <BudgetModePicker value={usage.orchestrationMode} onChange={(m) => void setMode(m)} />
-            </div>
+      {usage && (
+        <>
+          <div className="flex items-center gap-3">
+            <span className="label">Traffic control</span>
+            <BudgetModePicker value={usage.orchestrationMode} onChange={(m) => void setMode(m)} />
+          </div>
 
-            <section className="card overflow-hidden">
-              <table className="w-full table-fixed text-xs">
-                <colgroup>
-                  <col className="w-44" />
-                  <col className="w-28" />
-                  <col />
-                </colgroup>
-                <thead>
-                  <tr className="border-b border-neutral-200 text-left text-[10px] uppercase tracking-wide text-neutral-400 dark:border-neutral-800">
-                    <th className="px-3 py-1.5 font-semibold">Provider</th>
-                    <th className="px-2 py-1.5 font-semibold">Health</th>
-                    <th className="px-3 py-1.5 font-semibold">
-                      <div className="flex items-center gap-2.5">
-                        <span className="w-16 shrink-0" aria-hidden="true" />
-                        <span className="min-w-0 flex-1">Session quota</span>
-                        <span className="shrink-0">Resets</span>
+          <section className="card overflow-hidden">
+            <table className="w-full table-fixed text-xs">
+              <colgroup>
+                <col className="w-44" />
+                <col className="w-28" />
+                <col />
+              </colgroup>
+              <thead>
+                <tr className="border-b border-neutral-200 text-left text-[10px] uppercase tracking-wide text-neutral-400 dark:border-neutral-800">
+                  <th className="px-3 py-1.5 font-semibold">Provider</th>
+                  <th className="px-2 py-1.5 font-semibold">Health</th>
+                  <th className="px-3 py-1.5 font-semibold">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-16 shrink-0" aria-hidden="true" />
+                      <span className="min-w-0 flex-1">Session quota</span>
+                      <span className="shrink-0">Resets</span>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(usage.providers).map(([id, p]) => (
+                  <tr
+                    key={id}
+                    className="border-b border-neutral-100 last:border-0 dark:border-neutral-800/60"
+                  >
+                    <td className="px-3 py-2.5">
+                      <div className="truncate font-mono font-semibold">{id}</div>
+                      <div className="truncate text-[10px] text-neutral-400">
+                        {p.preferredUse}
+                        {live?.[id]?.plan ? ` · ${live[id].plan}` : ""}
                       </div>
-                    </th>
+                    </td>
+                    <td className="px-2 py-2.5">
+                      <UsageHealthBadge
+                        value={p.health}
+                        onChange={(h) => void setHealth(id, h)}
+                        name={id}
+                      />
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <QuotaCell liveData={live?.[id]} loading={live === null} />
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(usage.providers).map(([id, p]) => (
-                    <tr key={id} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800/60">
-                      <td className="px-3 py-2.5">
-                        <div className="truncate font-mono font-semibold">{id}</div>
-                        <div className="truncate text-[10px] text-neutral-400">
-                          {p.preferredUse}
-                          {live?.[id]?.plan ? ` · ${live[id].plan}` : ""}
-                        </div>
-                      </td>
-                      <td className="px-2 py-2.5">
-                        <UsageHealthBadge value={p.health} onChange={(h) => void setHealth(id, h)} name={id} />
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <QuotaCell liveData={live?.[id]} loading={live === null} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
+                ))}
+              </tbody>
+            </table>
+          </section>
 
-            <p className="text-[11px] text-neutral-500">
-              {usage.localStepsCompleted} local steps · {usage.expensiveCallsAvoided} expensive calls avoided
-            </p>
-          </>
-        )}
+          <p className="text-[11px] text-neutral-500">
+            {usage.localStepsCompleted} local steps · {usage.expensiveCallsAvoided} expensive calls
+            avoided
+          </p>
+        </>
+      )}
 
       {rec && <RoutingRecommendationCard rec={rec} />}
     </PageShell>

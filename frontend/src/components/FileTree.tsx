@@ -90,7 +90,14 @@ interface Props {
   onToggleDir: (path: string, open: boolean) => void;
 }
 
-export default function FileTree({ nodes, onOpenFile, selected, truncated, expanded, onToggleDir }: Props) {
+export default function FileTree({
+  nodes,
+  onOpenFile,
+  selected,
+  truncated,
+  expanded,
+  onToggleDir,
+}: Props) {
   if (nodes.length === 0) {
     return <p className="p-4 text-sm text-neutral-500 dark:text-neutral-400">Empty folder.</p>;
   }
@@ -108,7 +115,9 @@ export default function FileTree({ nodes, onOpenFile, selected, truncated, expan
         />
       ))}
       {truncated && (
-        <p className="px-3 py-2 text-[11px] text-neutral-500">Tree truncated (depth 8 / 2000 files max).</p>
+        <p className="px-3 py-2 text-[11px] text-neutral-500">
+          Tree truncated (depth 8 / 2000 files max).
+        </p>
       )}
     </div>
   );

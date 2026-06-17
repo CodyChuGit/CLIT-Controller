@@ -28,7 +28,13 @@ function copyText(text: string) {
 }
 
 /** One agent as a dense, expandable row (VS Code extensions-list style — see DESIGN.md). */
-export default function ProviderCard({ provider: p, onCheck, onLogin, onInstall, onSetModel }: Props) {
+export default function ProviderCard({
+  provider: p,
+  onCheck,
+  onLogin,
+  onInstall,
+  onSetModel,
+}: Props) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -59,13 +65,19 @@ export default function ProviderCard({ provider: p, onCheck, onLogin, onInstall,
     await run(() => onSetModel(p.id, next.trim()));
   };
 
-  const dotState = p.installing ? "bg-blue-500 animate-pulse" : DOT[p.installed ? p.status : "missing"] ?? DOT.unchecked;
+  const dotState = p.installing
+    ? "bg-blue-500 animate-pulse"
+    : (DOT[p.installed ? p.status : "missing"] ?? DOT.unchecked);
 
   return (
     <div className="border-b border-neutral-200 last:border-0 dark:border-neutral-800">
       {/* main row */}
       <div className="flex items-center gap-2.5 px-3 py-2">
-        <span className={`h-2 w-2 shrink-0 rounded-full ${dotState}`} title={p.installed ? p.status : "not installed"} aria-hidden="true" />
+        <span
+          className={`h-2 w-2 shrink-0 rounded-full ${dotState}`}
+          title={p.installed ? p.status : "not installed"}
+          aria-hidden="true"
+        />
         <button
           onClick={() => setExpanded(!expanded)}
           aria-expanded={expanded}
@@ -78,7 +90,10 @@ export default function ProviderCard({ provider: p, onCheck, onLogin, onInstall,
           )}
           <span className="truncate text-xs font-semibold">{p.displayName}</span>
         </button>
-        <span className="hidden truncate font-mono text-[11px] text-neutral-400 sm:inline" title={p.version ?? ""}>
+        <span
+          className="hidden truncate font-mono text-[11px] text-neutral-400 sm:inline"
+          title={p.version ?? ""}
+        >
           {p.version ?? ""}
         </span>
 
@@ -101,8 +116,9 @@ export default function ProviderCard({ provider: p, onCheck, onLogin, onInstall,
           </button>
         )}
 
-        {p.modelEditable && p.installed && (
-          customMode ? (
+        {p.modelEditable &&
+          p.installed &&
+          (customMode ? (
             <input
               id={`model-${p.id}`}
               autoFocus
@@ -136,7 +152,9 @@ export default function ProviderCard({ provider: p, onCheck, onLogin, onInstall,
               }}
             >
               <option value="">CLI default</option>
-              {p.model && !p.modelOptions.includes(p.model) && <option value={p.model}>{p.model}</option>}
+              {p.model && !p.modelOptions.includes(p.model) && (
+                <option value={p.model}>{p.model}</option>
+              )}
               {p.modelOptions.map((m) => (
                 <option key={m} value={m}>
                   {m}
@@ -144,24 +162,29 @@ export default function ProviderCard({ provider: p, onCheck, onLogin, onInstall,
               ))}
               <option value={CUSTOM}>Custom…</option>
             </select>
-          )
-        )}
+          ))}
 
         {p.usageHealth && <UsageHealthBadge value={p.usageHealth} name={p.id} />}
 
-        <button className="btn-secondary btn-xs" onClick={() => void run(() => onCheck(p.id))} disabled={busy || p.installing}>
+        <button
+          className="btn-secondary btn-xs"
+          onClick={() => void run(() => onCheck(p.id))}
+          disabled={busy || p.installing}
+        >
           {busy ? <Spinner className="h-3 w-3" /> : "Check"}
         </button>
         {p.loginCommand && p.installed && (
-          <button className="btn-secondary btn-xs" onClick={() => void run(() => onLogin(p.id))} disabled={busy}>
+          <button
+            className="btn-secondary btn-xs"
+            onClick={() => void run(() => onLogin(p.id))}
+            disabled={busy}
+          >
             Login
           </button>
         )}
       </div>
 
-      {note && (
-        <p className="px-9 pb-2 text-[11px] text-amber-700 dark:text-amber-400">{note}</p>
-      )}
+      {note && <p className="px-9 pb-2 text-[11px] text-amber-700 dark:text-amber-400">{note}</p>}
 
       {/* expanded detail */}
       {expanded && (
@@ -174,12 +197,19 @@ export default function ProviderCard({ provider: p, onCheck, onLogin, onInstall,
               ["Usage mode", p.usageMode, false],
               ["Preferred use", p.preferredUse, false],
               ["Calls today", String(p.callsToday ?? 0), false],
-              ["Last checked", p.lastChecked ? new Date(p.lastChecked).toLocaleTimeString() : "never", false],
+              [
+                "Last checked",
+                p.lastChecked ? new Date(p.lastChecked).toLocaleTimeString() : "never",
+                false,
+              ],
               ["Login command", p.loginCommand ?? "—", true],
             ].map(([label, value, mono]) => (
               <div key={label as string} className="flex justify-between gap-3">
                 <dt className="shrink-0 text-neutral-500 dark:text-neutral-400">{label}</dt>
-                <dd className={`truncate text-right text-neutral-700 dark:text-neutral-300 ${mono ? "font-mono" : ""}`} title={value as string}>
+                <dd
+                  className={`truncate text-right text-neutral-700 dark:text-neutral-300 ${mono ? "font-mono" : ""}`}
+                  title={value as string}
+                >
                   {value}
                 </dd>
               </div>
@@ -203,12 +233,20 @@ export default function ProviderCard({ provider: p, onCheck, onLogin, onInstall,
               Copy command
             </button>
             {p.lastLog && (
-              <button className="btn-secondary btn-xs" onClick={() => setShowLog(!showLog)} aria-expanded={showLog}>
+              <button
+                className="btn-secondary btn-xs"
+                onClick={() => setShowLog(!showLog)}
+                aria-expanded={showLog}
+              >
                 {showLog ? "Hide log" : "Last log"}
               </button>
             )}
           </div>
-          {showLog && p.lastLog && <pre className="mono-block mt-2 max-h-44 whitespace-pre-wrap text-[10px]">{p.lastLog}</pre>}
+          {showLog && p.lastLog && (
+            <pre className="mono-block mt-2 max-h-44 whitespace-pre-wrap text-[10px]">
+              {p.lastLog}
+            </pre>
+          )}
         </div>
       )}
     </div>

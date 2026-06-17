@@ -150,7 +150,9 @@ export default function PreviewPage() {
         >
           {showOutput ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
           Server output
-          {state?.running && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />}
+          {state?.running && (
+            <span className="ml-1 h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+          )}
         </button>
         {showOutput && (
           <pre className="mono-block max-h-48 overflow-auto whitespace-pre-wrap rounded-none border-t border-neutral-100 text-[10px] dark:border-neutral-800">

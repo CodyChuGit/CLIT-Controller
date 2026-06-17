@@ -25,8 +25,8 @@ from . import config, event_bus, paths
 from .process_runner import now_iso
 
 SCHEMA_VERSION = 1
-MAX_EVENTS = 2000          # bounded timeline; oldest pruned
-MAX_RUNS = 200             # bounded run ledger; never prunes a `running` run
+MAX_EVENTS = 2000  # bounded timeline; oldest pruned
+MAX_RUNS = 200  # bounded run ledger; never prunes a `running` run
 
 # Run failure kinds (docs/orchestrator-backend/02 §Run). A run that is not `running`
 # and has no failure kind is a clean success.
@@ -195,8 +195,12 @@ def create_approval(
     doc["approvals"][approval["id"]] = approval
     config.write_json(approvals_file(workspace), doc)
     append_event(
-        workspace, "approval.required", reason or action,
-        task_id=task_id, provider=provider, data={"approvalId": approval["id"], "action": action},
+        workspace,
+        "approval.required",
+        reason or action,
+        task_id=task_id,
+        provider=provider,
+        data={"approvalId": approval["id"], "action": action},
     )
     return approval
 
@@ -215,9 +219,11 @@ def resolve_approval(workspace: Path, approval_id: str, *, approved: bool, resol
     approval["resolver"] = resolver
     config.write_json(approvals_file(workspace), doc)
     append_event(
-        workspace, "approval.granted" if approved else "approval.rejected",
+        workspace,
+        "approval.granted" if approved else "approval.rejected",
         approval.get("reason") or approval.get("action", ""),
-        task_id=approval.get("taskId"), provider=approval.get("provider"),
+        task_id=approval.get("taskId"),
+        provider=approval.get("provider"),
         data={"approvalId": approval_id},
     )
     return approval
@@ -285,8 +291,12 @@ def recover_workspace(workspace: Path) -> dict:
         summary["runs"] += 1
         changed = True
         append_event(
-            workspace, "run.finished", f"recovered after restart: {note}",
-            task_id=rec.get("taskId"), step=rec.get("step"), provider=rec.get("provider"),
+            workspace,
+            "run.finished",
+            f"recovered after restart: {note}",
+            task_id=rec.get("taskId"),
+            step=rec.get("step"),
+            provider=rec.get("provider"),
             data={"runId": rid, "status": "failed", "failureKind": "backend_restart"},
         )
     if changed:
@@ -305,8 +315,12 @@ def recover_workspace(workspace: Path) -> dict:
         summary["items"] += 1
         qchanged = True
         append_event(
-            workspace, "queue.failed", note,
-            task_id=item["taskId"], step=item.get("step"), provider=item.get("provider"),
+            workspace,
+            "queue.failed",
+            note,
+            task_id=item["taskId"],
+            step=item.get("step"),
+            provider=item.get("provider"),
             data={"itemId": item["id"], "reason": "backend_restart"},
         )
     if failed_tasks:
@@ -327,8 +341,12 @@ def recover_workspace(workspace: Path) -> dict:
                 summary["steps"] += 1
                 meta_changed = True
                 append_event(
-                    workspace, "task.status_changed", "step interrupted by backend restart",
-                    task_id=tid, step=step, provider=s.get("provider"),
+                    workspace,
+                    "task.status_changed",
+                    "step interrupted by backend restart",
+                    task_id=tid,
+                    step=step,
+                    provider=s.get("provider"),
                     data={"status": "failed", "reason": "backend_restart"},
                 )
         seq = meta.get("fullSequence") or {}
@@ -342,7 +360,8 @@ def recover_workspace(workspace: Path) -> dict:
 
     if summary["runs"] or summary["items"] or summary["steps"]:
         append_event(
-            workspace, "recovery.completed",
+            workspace,
+            "recovery.completed",
             f"restart recovery: {summary['runs']} run(s), {summary['items']} queue item(s), "
             f"{summary['steps']} step(s) settled",
             data=summary,

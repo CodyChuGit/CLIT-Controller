@@ -8,7 +8,13 @@ import { cardFromTaskEvent } from "../../lib/displayModel";
 import type { Approval, QueueState, TaskDetail, TaskEvent } from "../../types";
 import { QUEUE_ACTIVE } from "./taskPageModel";
 
-export function HandoffLog({ events, onOpenFile }: { events: TaskEvent[]; onOpenFile: (name: string) => void }) {
+export function HandoffLog({
+  events,
+  onOpenFile,
+}: {
+  events: TaskEvent[];
+  onOpenFile: (name: string) => void;
+}) {
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "nearest" });
@@ -21,7 +27,12 @@ export function HandoffLog({ events, onOpenFile }: { events: TaskEvent[]; onOpen
   return (
     <div className="max-h-96 space-y-1.5 overflow-y-auto pr-1">
       {events.map((event, i) => (
-        <TimelineCard key={`${event.time}-${i}`} card={cardFromTaskEvent(event, i)} density="compact" onOpenArtifact={onOpenFile} />
+        <TimelineCard
+          key={`${event.time}-${i}`}
+          card={cardFromTaskEvent(event, i)}
+          density="compact"
+          onOpenArtifact={onOpenFile}
+        />
       ))}
       <div ref={endRef} />
     </div>
@@ -41,7 +52,9 @@ export function QueueStrip({
   onRetry: (id: string) => void;
   onSkip: (id: string) => void;
 }) {
-  const items = queue.items.filter((item) => QUEUE_ACTIVE.includes(item.status) || item.status === "failed");
+  const items = queue.items.filter(
+    (item) => QUEUE_ACTIVE.includes(item.status) || item.status === "failed",
+  );
   if (items.length === 0) return null;
   return (
     <div className="card overflow-hidden">
@@ -50,11 +63,18 @@ export function QueueStrip({
           key={item.id}
           className="flex items-center gap-2 border-b border-neutral-100 px-3 py-1.5 last:border-0 dark:border-neutral-800/60"
         >
-          {item.status === "running" ? <Spinner className="h-3 w-3 shrink-0 text-blue-500" /> : <StatusBadge state={item.status} />}
+          {item.status === "running" ? (
+            <Spinner className="h-3 w-3 shrink-0 text-blue-500" />
+          ) : (
+            <StatusBadge state={item.status} />
+          )}
           <span className="text-xs font-medium">{item.label}</span>
           <span className="chip">{item.provider}</span>
           {item.note && (
-            <span className="min-w-0 flex-1 truncate text-[10px] text-amber-600 dark:text-amber-400" title={item.note}>
+            <span
+              className="min-w-0 flex-1 truncate text-[10px] text-amber-600 dark:text-amber-400"
+              title={item.note}
+            >
               {item.note}
             </span>
           )}
@@ -64,7 +84,9 @@ export function QueueStrip({
               Approve
             </button>
           )}
-          {(item.status === "failed" || item.status === "blocked" || item.status === "cancelled") && (
+          {(item.status === "failed" ||
+            item.status === "blocked" ||
+            item.status === "cancelled") && (
             <button className="btn-secondary btn-xs" onClick={() => onRetry(item.id)}>
               Retry
             </button>
@@ -102,10 +124,16 @@ export function StateCard({
   const task = detail.task;
   const items = (queue?.items ?? []).filter((item) => item.taskId === task.id);
   const queued = items.filter((item) => item.status === "queued").length;
-  const blocked = items.filter((item) => ["blocked", "awaiting_approval"].includes(item.status)).length;
-  const pendingApprovals = approvals.filter((approval) => !approval.taskId || approval.taskId === task.id).length;
+  const blocked = items.filter((item) =>
+    ["blocked", "awaiting_approval"].includes(item.status),
+  ).length;
+  const pendingApprovals = approvals.filter(
+    (approval) => !approval.taskId || approval.taskId === task.id,
+  ).length;
   const changed = new Set<string>();
-  Object.values(task.steps).forEach((step) => (step.codeChanged ?? []).forEach((file) => changed.add(file)));
+  Object.values(task.steps).forEach((step) =>
+    (step.codeChanged ?? []).forEach((file) => changed.add(file)),
+  );
   const lastRun = [...(detail.runs ?? [])]
     .filter((run) => run.durationMs != null)
     .sort((a, b) => ((a.endedAt ?? "") < (b.endedAt ?? "") ? 1 : -1))[0];
@@ -121,7 +149,9 @@ export function StateCard({
         </span>
       )}
       {queued > 0 && <span className="text-neutral-500 tabular-nums">{queued} queued</span>}
-      {blocked > 0 && <span className="text-amber-600 tabular-nums dark:text-amber-400">{blocked} blocked</span>}
+      {blocked > 0 && (
+        <span className="text-amber-600 tabular-nums dark:text-amber-400">{blocked} blocked</span>
+      )}
       {pendingApprovals > 0 && (
         <span className="text-amber-600 tabular-nums dark:text-amber-400">
           {pendingApprovals} approval{pendingApprovals === 1 ? "" : "s"}
@@ -133,7 +163,9 @@ export function StateCard({
         </span>
       )}
       {lastRun && formatDuration(lastRun.durationMs) && (
-        <span className="font-mono text-neutral-400">last {formatDuration(lastRun.durationMs)}</span>
+        <span className="font-mono text-neutral-400">
+          last {formatDuration(lastRun.durationMs)}
+        </span>
       )}
     </div>
   );

@@ -81,7 +81,12 @@ export default function Composer({
         />
         {actions}
         {busy && onStop ? (
-          <button className="btn-danger shrink-0 px-2.5" onClick={onStop} title="Stop" aria-label="Stop">
+          <button
+            className="btn-danger shrink-0 px-2.5"
+            onClick={onStop}
+            title="Stop"
+            aria-label="Stop"
+          >
             <StopSquare className="h-4 w-4" />
           </button>
         ) : (

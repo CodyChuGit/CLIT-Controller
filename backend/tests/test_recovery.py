@@ -17,8 +17,15 @@ def setup_interrupted_workspace(tmp_path: Path):
     tid = task_service.create_task(ws, "Recover me", "Goal.")["id"]
 
     # A persisted run that was in flight when the backend stopped.
-    rec = RunRecord(id="run-x", argv=["codex", "exec"], cwd=str(ws),
-                    task_id=tid, step="codex_spec", provider="codex", status="running")
+    rec = RunRecord(
+        id="run-x",
+        argv=["codex", "exec"],
+        cwd=str(ws),
+        task_id=tid,
+        step="codex_spec",
+        provider="codex",
+        status="running",
+    )
     rec.pid = DEAD_PID
     state_store.persist_run(ws, rec.to_ledger(ws))
 

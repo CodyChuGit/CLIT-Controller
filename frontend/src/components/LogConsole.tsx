@@ -47,7 +47,10 @@ export default function LogConsole({ entries, running = [] }: Props) {
       {running.length > 0 && (
         <div className="mb-3 space-y-2" aria-live="polite">
           {running.map((r) => (
-            <div key={r.id} className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 dark:border-blue-900 dark:bg-blue-950/30">
+            <div
+              key={r.id}
+              className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 dark:border-blue-900 dark:bg-blue-950/30"
+            >
               <div className="mb-1 flex items-center gap-2 text-xs">
                 <StatusBadge state="running" />
                 <span className="chip">{r.provider ?? "process"}</span>
@@ -69,7 +72,9 @@ export default function LogConsole({ entries, running = [] }: Props) {
         <div className="flex flex-col items-center gap-2 py-10 text-center">
           <Inbox className="h-6 w-6 text-neutral-300 dark:text-neutral-600" />
           <p className="text-sm text-neutral-500">No log entries yet.</p>
-          <p className="text-xs text-neutral-400">Check an agent or run a task step to see activity here.</p>
+          <p className="text-xs text-neutral-400">
+            Check an agent or run a task step to see activity here.
+          </p>
         </div>
       ) : (
         [...entries].reverse().map((e) => <Entry key={e.id} entry={e} />)

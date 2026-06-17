@@ -290,9 +290,7 @@ def codex_live_usage():
                 "available": True,
                 "plan": rl.get("plan_type"),
                 "windows": windows,
-                "sourcedAt": datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc).isoformat(
-                    timespec="seconds"
-                ),
+                "sourcedAt": datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc).isoformat(timespec="seconds"),
             }
     return None
 
@@ -358,8 +356,7 @@ async def live_usage(force: bool = False) -> dict:
     except Exception:  # noqa: BLE001 — live data is best-effort
         claude = None
     data = {
-        "codex": codex_live_usage()
-        or {"available": False, "note": "no recent codex session data — run codex once"},
+        "codex": codex_live_usage() or {"available": False, "note": "no recent codex session data — run codex once"},
         "claude": claude or {"available": False, "note": "claude -p /usage returned nothing — manual limit"},
         "antigravity": {"available": False, "note": "agy exposes no usage call — manual limit"},
     }
@@ -388,7 +385,8 @@ def live_summary_line() -> str:
     claude = data.get("claude", {})
     if claude.get("available"):
         bits = [
-            f"{w['label']} {w['usedPercent']:.0f}% used" + (f" (resets {w['resetsText']})" if w.get("resetsText") else "")
+            f"{w['label']} {w['usedPercent']:.0f}% used"
+            + (f" (resets {w['resetsText']})" if w.get("resetsText") else "")
             for w in claude.get("windows", [])
         ]
         parts.append("Claude live quota: " + "; ".join(bits))

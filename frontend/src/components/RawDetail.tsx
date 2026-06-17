@@ -111,7 +111,9 @@ export default function RawDetail({
           className="select px-1 py-0.5 text-[10px]"
         >
           {PAGE_SIZES.map((s) => (
-            <option key={s} value={s}>{s}/pg</option>
+            <option key={s} value={s}>
+              {s}/pg
+            </option>
           ))}
         </select>
         <button className="btn-secondary btn-xs" onClick={() => void copy("page")}>
@@ -148,7 +150,9 @@ export default function RawDetail({
       {/* page body — bounded height, read-only */}
       <div className="max-h-72 overflow-auto bg-neutral-50 font-mono text-[10px] leading-relaxed dark:bg-neutral-950">
         {pageLines.length === 0 ? (
-          <p className="px-3 py-2 text-[11px] text-neutral-400">{query ? "No matching lines." : "Empty."}</p>
+          <p className="px-3 py-2 text-[11px] text-neutral-400">
+            {query ? "No matching lines." : "Empty."}
+          </p>
         ) : (
           pageLines.map((l) => (
             <div key={l.n} className="flex">
@@ -161,7 +165,9 @@ export default function RawDetail({
                   {l.n}
                 </span>
               )}
-              <span className={`whitespace-pre-wrap break-words px-2 text-neutral-700 dark:text-neutral-300 ${isDiff ? diffClass(l.content) : ""}`}>
+              <span
+                className={`whitespace-pre-wrap break-words px-2 text-neutral-700 dark:text-neutral-300 ${isDiff ? diffClass(l.content) : ""}`}
+              >
                 {l.content || " "}
               </span>
             </div>

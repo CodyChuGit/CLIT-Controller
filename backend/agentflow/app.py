@@ -51,9 +51,7 @@ async def _lifespan(app: FastAPI):
     try:
         reaped = sweep_orphaned_sessions()
         if reaped:
-            add_log_entry(
-                "system", f"startup cleanup: reaped {reaped} orphaned terminal session(s)", status="warn"
-            )
+            add_log_entry("system", f"startup cleanup: reaped {reaped} orphaned terminal session(s)", status="warn")
     except Exception as exc:  # noqa: BLE001 — cleanup must never block startup
         add_log_entry("system", f"terminal cleanup failed: {exc}", status="error")
 

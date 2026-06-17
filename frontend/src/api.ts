@@ -55,8 +55,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-const get = <T,>(path: string) => request<T>(path);
-const post = <T,>(path: string, body?: unknown) =>
+const get = <T>(path: string) => request<T>(path);
+const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: "POST", body: body === undefined ? "{}" : JSON.stringify(body) });
 
 export const api = {
@@ -64,17 +64,22 @@ export const api = {
 
   // projects
   current: () => get<CurrentProject>("/projects/current"),
-  setWorkspace: (path: string) => post<{ ok: boolean; workspacePath: string }>("/projects/workspace", { path }),
+  setWorkspace: (path: string) =>
+    post<{ ok: boolean; workspacePath: string }>("/projects/workspace", { path }),
   tree: () => get<Tree>("/projects/tree"),
   file: (path: string) => get<FileContent>(`/projects/file?path=${encodeURIComponent(path)}`),
-  saveFile: (path: string, content: string) => post<FileContent>("/projects/file", { path, content }),
+  saveFile: (path: string, content: string) =>
+    post<FileContent>("/projects/file", { path, content }),
   git: () => get<GitInfo>("/projects/git"),
   gitStatus: () => get<GitStatus>("/projects/git/status"),
   gitFileDiff: (path: string, staged: boolean) =>
     get<FileDiff>(`/projects/git/file-diff?path=${encodeURIComponent(path)}&staged=${staged}`),
-  gitStage: (path: string | null) => post<{ ok: boolean; output: string }>("/projects/git/stage", { path }),
-  gitUnstage: (path: string) => post<{ ok: boolean; output: string }>("/projects/git/unstage", { path }),
-  gitCommit: (message: string) => post<{ ok: boolean; output: string }>("/projects/git/commit", { message }),
+  gitStage: (path: string | null) =>
+    post<{ ok: boolean; output: string }>("/projects/git/stage", { path }),
+  gitUnstage: (path: string) =>
+    post<{ ok: boolean; output: string }>("/projects/git/unstage", { path }),
+  gitCommit: (message: string) =>
+    post<{ ok: boolean; output: string }>("/projects/git/commit", { message }),
   openWorkspaceFolder: () => post<{ ok: boolean }>("/projects/open-folder"),
   settings: () => get<Settings>("/projects/settings"),
   saveSettings: (routing: RoutingConfig | null, commandTemplates: Record<string, string> | null) =>
@@ -101,7 +106,8 @@ export const api = {
   runFull: (taskId: string, confirm = false) =>
     post<RunStepResult>(`/tasks/${encodeURIComponent(taskId)}/run-full`, { confirm }),
   stop: (runId?: string) => post<{ stopped: string[] }>("/tasks/stop", { runId: runId ?? null }),
-  openTaskFolder: (taskId: string) => post<{ ok: boolean }>(`/tasks/${encodeURIComponent(taskId)}/open-folder`),
+  openTaskFolder: (taskId: string) =>
+    post<{ ok: boolean }>(`/tasks/${encodeURIComponent(taskId)}/open-folder`),
   taskLogs: (taskId: string) =>
     get<{ files: { name: string; size: number; content: string }[]; runs: TaskDetail["runs"] }>(
       `/tasks/${encodeURIComponent(taskId)}/logs`,
@@ -116,7 +122,8 @@ export const api = {
   setMode: (mode: OrchestrationMode) => post<Usage>("/usage/mode", { mode }),
   setProviderHealth: (provider: string, health: string) =>
     post<Usage>("/usage/provider-health", { provider, health }),
-  usageLive: (force = false) => get<Record<string, LiveProviderUsage>>(`/usage/live?force=${force}`),
+  usageLive: (force = false) =>
+    get<Record<string, LiveProviderUsage>>(`/usage/live?force=${force}`),
   recommendations: () => get<Recommendation>("/usage/recommendations"),
 
   // logs
@@ -147,14 +154,17 @@ export const api = {
   run: (id: string) => get<RunRecord>(`/runs/${id}`),
   approvals: (pendingOnly = false) =>
     get<{ approvals: Approval[] }>(`/approvals?pendingOnly=${pendingOnly}`),
-  approvalApprove: (id: string) => post<{ status: string; approval: Approval }>(`/approvals/${id}/approve`),
-  approvalReject: (id: string) => post<{ status: string; approval: Approval }>(`/approvals/${id}/reject`),
+  approvalApprove: (id: string) =>
+    post<{ status: string; approval: Approval }>(`/approvals/${id}/approve`),
+  approvalReject: (id: string) =>
+    post<{ status: string; approval: Approval }>(`/approvals/${id}/reject`),
 
   // preview
   preview: () => get<PreviewState>("/preview"),
   previewCheck: () => get<{ ok: boolean }>("/preview/check"),
   previewSetUrl: (url: string) => post<PreviewState>("/preview/url", { url }),
-  previewStart: (command?: string) => post<PreviewState & { status?: string; message?: string }>("/preview/start", { command }),
+  previewStart: (command?: string) =>
+    post<PreviewState & { status?: string; message?: string }>("/preview/start", { command }),
   previewStop: () => post<PreviewState & { stopped: boolean }>("/preview/stop"),
 
   taskExchanges: (id: string) =>

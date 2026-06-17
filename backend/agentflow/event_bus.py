@@ -94,11 +94,7 @@ class EventBus:
         """Events with ``id > after_id`` for this workspace, oldest first."""
         ws = str(workspace) if workspace else None
         with self._lock:
-            items = [
-                e
-                for e in self._buf
-                if e["id"] > after_id and (ws is None or e["workspacePath"] in (ws, None))
-            ]
+            items = [e for e in self._buf if e["id"] > after_id and (ws is None or e["workspacePath"] in (ws, None))]
         if limit is not None:
             # Keep the OLDEST `limit` unseen events, not the newest. Readers resume
             # by cursor (the id of the last event they consumed); returning the tail

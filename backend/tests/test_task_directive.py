@@ -61,10 +61,7 @@ def test_done_and_needs_user_directives():
 def test_run_directives_parse_and_cap():
     from agentflow.chat_service import parse_run_directives
 
-    text = (
-        "Starting it now.\n```agentflow-run\ncommand: npm run dev\n```\n"
-        "```agentflow-run\ncommand: git push\n```"
-    )
+    text = "Starting it now.\n```agentflow-run\ncommand: npm run dev\n```\n```agentflow-run\ncommand: git push\n```"
     assert parse_run_directives(text) == ["npm run dev", "git push"]
     many = "\n".join("```agentflow-run\ncommand: echo %d\n```" % i for i in range(5))
     assert len(parse_run_directives(many)) == 3  # capped

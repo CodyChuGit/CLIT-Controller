@@ -28,9 +28,7 @@ def test_event_bus_redacts_filters_and_resumes():
 def _run(cmd, ws, stream_kind):
     async def go():
         before = event_bus.BUS.cursor()
-        record, consume = await RUNNER.start(
-            cmd, ws, provider="test", workspace=ws, stream_kind=stream_kind
-        )
+        record, consume = await RUNNER.start(cmd, ws, provider="test", workspace=ws, stream_kind=stream_kind)
         await consume
         return record, event_bus.BUS.events_after(ws, after_id=before)
 

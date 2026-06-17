@@ -20,11 +20,14 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void api.settings().then((s) => {
-      setSettings(s);
-      setRouting(s.routing);
-      setTemplates(s.commandTemplates);
-    }).catch((e) => setError(String(e)));
+    void api
+      .settings()
+      .then((s) => {
+        setSettings(s);
+        setRouting(s.routing);
+        setTemplates(s.commandTemplates);
+      })
+      .catch((e) => setError(String(e)));
   }, []);
 
   const save = async () => {
@@ -58,7 +61,9 @@ export default function SettingsPage() {
                 onChange={(e) => setRouting({ ...routing, [role]: e.target.value })}
               >
                 {PROVIDER_OPTIONS.map((p) => (
-                  <option key={p} value={p}>{p}</option>
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
                 ))}
               </select>
             </div>
@@ -68,8 +73,8 @@ export default function SettingsPage() {
 
       <Card title="Command templates" pad>
         <p className="mb-3 text-xs text-neutral-500">
-          <code className="font-mono">{"{prompt}"}</code> is replaced with the generated prompt (passed as a
-          single argument, never through a shell string).
+          <code className="font-mono">{"{prompt}"}</code> is replaced with the generated prompt
+          (passed as a single argument, never through a shell string).
         </p>
         <div className="space-y-3">
           {Object.entries(templates).map(([provider, template]) => (
@@ -86,7 +91,9 @@ export default function SettingsPage() {
       </Card>
 
       <div className="flex items-center gap-3">
-        <button className="btn-primary" onClick={save}>Save settings</button>
+        <button className="btn-primary" onClick={save}>
+          Save settings
+        </button>
         {saved && <span className="text-xs text-emerald-600 dark:text-emerald-400">Saved ✓</span>}
         {error && <span className="text-xs text-rose-500">{error}</span>}
       </div>
@@ -101,7 +108,10 @@ export default function SettingsPage() {
           ].map(([label, value]) => (
             <div key={label} className="flex justify-between gap-4">
               <dt className="shrink-0 text-neutral-400">{label}</dt>
-              <dd className="truncate font-mono text-neutral-600 dark:text-neutral-400" title={value ?? ""}>
+              <dd
+                className="truncate font-mono text-neutral-600 dark:text-neutral-400"
+                title={value ?? ""}
+              >
                 {value}
               </dd>
             </div>

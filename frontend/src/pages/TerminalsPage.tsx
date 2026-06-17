@@ -176,7 +176,9 @@ export default function TerminalsPage() {
     <div className="flex h-full flex-col">
       <header className="flex shrink-0 items-center gap-2 px-6 pb-2 pt-5">
         <h1 className="text-xl font-semibold">Terminals</h1>
-        <span className="text-xs text-neutral-500">live CLI sessions · type into them like a real terminal</span>
+        <span className="text-xs text-neutral-500">
+          live CLI sessions · type into them like a real terminal
+        </span>
       </header>
       <div className="flex min-h-0 flex-1 flex-col gap-3 px-6 pb-6">
         {providers.map((p) => (

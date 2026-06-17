@@ -43,7 +43,14 @@ function Item({
 }
 
 /** Quiet status strip: neutral surface, color only as signal. */
-export default function StatusBar({ backendUp, project, git, usage, queuedCount, onNavigate }: Props) {
+export default function StatusBar({
+  backendUp,
+  project,
+  git,
+  usage,
+  queuedCount,
+  onNavigate,
+}: Props) {
   const changed = git?.changedFileCount ?? 0;
   const connection = useConnection();
   return (
@@ -52,7 +59,10 @@ export default function StatusBar({ backendUp, project, git, usage, queuedCount,
       aria-label="Status bar"
     >
       <Item>
-        <span className={`h-2 w-2 rounded-full ${backendUp ? "bg-emerald-500" : "bg-rose-500"}`} aria-hidden="true" />
+        <span
+          className={`h-2 w-2 rounded-full ${backendUp ? "bg-emerald-500" : "bg-rose-500"}`}
+          aria-hidden="true"
+        />
         <span className={backendUp ? "" : "font-medium text-rose-600 dark:text-rose-400"}>
           {backendUp ? "Backend :8787" : "Backend offline"}
         </span>
@@ -69,7 +79,9 @@ export default function StatusBar({ backendUp, project, git, usage, queuedCount,
         <Item onClick={() => onNavigate("projects")} title="Git branch (open Explorer)">
           <GitBranch className="h-3 w-3" />
           {git.branch}
-          {changed > 0 && <span className="tabular-nums text-amber-600 dark:text-amber-400">±{changed}</span>}
+          {changed > 0 && (
+            <span className="tabular-nums text-amber-600 dark:text-amber-400">±{changed}</span>
+          )}
         </Item>
       )}
 
@@ -88,7 +100,13 @@ export default function StatusBar({ backendUp, project, git, usage, queuedCount,
         </Item>
       )}
       {project?.workspacePath && connection !== "live" && (
-        <Item title={connection === "polling" ? "Streaming degraded — polling for updates" : "Streaming offline"}>
+        <Item
+          title={
+            connection === "polling"
+              ? "Streaming degraded — polling for updates"
+              : "Streaming offline"
+          }
+        >
           <span
             className={`h-2 w-2 rounded-full ${connection === "polling" ? "bg-amber-500" : "bg-neutral-400"}`}
             aria-hidden="true"

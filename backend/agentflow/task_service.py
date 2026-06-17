@@ -150,12 +150,17 @@ def create_task(workspace: Path, title: str, goal: str, orchestrated: bool = Fal
     }
     _save_meta(workspace, meta)
     _add_event(
-        workspace, task_id, "task_created",
+        workspace,
+        task_id,
+        "task_created",
         f"task created — handoff files written to {_task_rel_dir(task_id)}/ ({len(prompt_templates.TASK_FILES)} files)",
     )
     state_store.append_event(
-        workspace, "task.created", f"task created: {title}",
-        task_id=task_id, data={"title": title, "orchestrated": orchestrated},
+        workspace,
+        "task.created",
+        f"task created: {title}",
+        task_id=task_id,
+        data={"title": title, "orchestrated": orchestrated},
     )
     add_log_entry("task", f"created task {task_id}: {title}", task_id=task_id)
     return _load_meta(workspace, task_id)
@@ -216,9 +221,7 @@ def get_task_detail(workspace: Path, task_id: str) -> dict:
                 {
                     "name": name,
                     "size": st.st_size,
-                    "modifiedAt": datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat(
-                        timespec="seconds"
-                    ),
+                    "modifiedAt": datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat(timespec="seconds"),
                 }
             )
     usage = usage_service.ensure_usage(workspace)
@@ -324,8 +327,11 @@ def _set_step_state(workspace: Path, task_id: str, step: str, **fields) -> None:
     new_step = fields.get("status", prev_step)
     if new_step != prev_step and not transitions.is_valid("step", prev_step, new_step):
         add_log_entry(
-            "system", f"invalid step transition {prev_step}→{new_step} for {task_id}/{step}",
-            task_id=task_id, step=step, status="error",
+            "system",
+            f"invalid step transition {prev_step}→{new_step} for {task_id}/{step}",
+            task_id=task_id,
+            step=step,
+            status="error",
         )
 
     meta["steps"][step].update(fields, updatedAt=now_iso())
@@ -335,14 +341,21 @@ def _set_step_state(workspace: Path, task_id: str, step: str, **fields) -> None:
 
     if new_step != prev_step:
         state_store.append_event(
-            workspace, "task.status_changed", f"step {step}: {prev_step} → {new_step}",
-            task_id=task_id, step=step, provider=meta["steps"][step].get("provider"),
+            workspace,
+            "task.status_changed",
+            f"step {step}: {prev_step} → {new_step}",
+            task_id=task_id,
+            step=step,
+            provider=meta["steps"][step].get("provider"),
             data={"scope": "step", "from": prev_step, "to": new_step},
         )
     if meta["status"] != prev_task:
         state_store.append_event(
-            workspace, "task.status_changed", f"task {prev_task} → {meta['status']}",
-            task_id=task_id, data={"scope": "task", "from": prev_task, "to": meta["status"]},
+            workspace,
+            "task.status_changed",
+            f"task {prev_task} → {meta['status']}",
+            task_id=task_id,
+            data={"scope": "task", "from": prev_task, "to": meta["status"]},
         )
 
 
@@ -410,23 +423,35 @@ async def run_step(
         )
         _set_step_state(workspace, task_id, step, status="provider_missing", provider=provider)
         _add_event(
-            workspace, task_id, "provider_missing",
+            workspace,
+            task_id,
+            "provider_missing",
             f"`{provider}` is not installed — prompt ({len(prompt):,} chars) saved to logs/{saved.name}",
-            step=step, provider=provider,
+            step=step,
+            provider=provider,
         )
         state_store.append_event(
-            workspace, "run.finished", f"`{provider}` not installed — step skipped",
-            task_id=task_id, step=step, provider=provider,
+            workspace,
+            "run.finished",
+            f"`{provider}` not installed — step skipped",
+            task_id=task_id,
+            step=step,
+            provider=provider,
             data={"status": "provider_missing", "failureKind": "provider_missing"},
         )
         routing_service.append_decision(
-            workspace, task_id,
+            workspace,
+            task_id,
             f"Step `{step}` skipped: provider `{provider}` is not installed. "
             f"Prompt saved to logs/{saved.name}. Install hint and command preview shown in UI.",
         )
         add_log_entry(
-            "task-step", f"{step}: provider {provider} missing — saved prompt instead",
-            provider=provider, task_id=task_id, step=step, status="warn",
+            "task-step",
+            f"{step}: provider {provider} missing — saved prompt instead",
+            provider=provider,
+            task_id=task_id,
+            step=step,
+            status="warn",
         )
         return {
             "status": "provider_missing",
@@ -467,37 +492,51 @@ async def run_step(
         record.failure_kind = _classify_run_failure(record)
         post_files = _snapshot_task_files(workspace, task_id)
         artifacts = sorted(
-            name
-            for name, sig in post_files.items()
-            if name != "ROUTING_DECISIONS.md" and pre_files.get(name) != sig
+            name for name, sig in post_files.items() if name != "ROUTING_DECISIONS.md" and pre_files.get(name) != sig
         )
         code_changed = sorted((await _changed_code_paths(workspace)) - pre_code)
 
         usage_service.record_call(
-            workspace, provider,
+            workspace,
+            provider,
             prompt_chars=len(prompt),
             output_chars=len(record.stdout) + len(record.stderr),
             duration_ms=record.duration_ms or 0,
             status=record.status,
         )
         _set_step_state(
-            workspace, task_id, step,
-            status=record.status, exitCode=record.exit_code, runId=record.id, provider=provider,
-            artifactsWritten=artifacts, codeChanged=code_changed,
-            promptFile=prompt_file.name, logFile=log_file.name,
+            workspace,
+            task_id,
+            step,
+            status=record.status,
+            exitCode=record.exit_code,
+            runId=record.id,
+            provider=provider,
+            artifactsWritten=artifacts,
+            codeChanged=code_changed,
+            promptFile=prompt_file.name,
+            logFile=log_file.name,
         )
         wrote = (", wrote " + ", ".join(artifacts)) if artifacts else ""
-        touched = (f", changed {len(code_changed)} production file(s): " + ", ".join(code_changed[:5])) if code_changed else ""
+        touched = (
+            (f", changed {len(code_changed)} production file(s): " + ", ".join(code_changed[:5]))
+            if code_changed
+            else ""
+        )
         _add_event(
-            workspace, task_id, "step_finished",
+            workspace,
+            task_id,
+            "step_finished",
             f"{provider} finished {STEP_DEFS[step]['label']}: {record.status} "
             f"(exit {record.exit_code}, {(record.duration_ms or 0) / 1000:.1f}s, "
             f"{len(record.stdout):,} chars out){wrote}{touched}",
-            step=step, provider=provider,
+            step=step,
+            provider=provider,
             extra={"artifacts": artifacts, "codeChanged": code_changed, "status": record.status},
         )
         routing_service.append_decision(
-            workspace, task_id,
+            workspace,
+            task_id,
             f"Step `{step}` finished via `{provider}`: {record.status} "
             f"(exit {record.exit_code}, {(record.duration_ms or 0) / 1000:.1f}s). Log: logs/{log_file.name}"
             + (f" Wrote: {', '.join(artifacts)}." if artifacts else "")
@@ -506,16 +545,21 @@ async def run_step(
         add_log_entry(
             "task-step",
             f"{step} ({provider}) {record.status} in {(record.duration_ms or 0) / 1000:.1f}s",
-            provider=provider, task_id=task_id, step=step,
+            provider=provider,
+            task_id=task_id,
+            step=step,
             status="info" if record.status == "succeeded" else "warn",
             output=(record.stdout + "\n" + record.stderr)[-3000:],
         )
         # Durable run ledger + finish event survive restart; in-memory records do not.
         state_store.persist_run(workspace, record.to_ledger(workspace))
         state_store.append_event(
-            workspace, "run.finished",
+            workspace,
+            "run.finished",
             f"{provider} {record.status} (exit {record.exit_code}, {(record.duration_ms or 0) / 1000:.1f}s)",
-            task_id=task_id, step=step, provider=provider,
+            task_id=task_id,
+            step=step,
+            provider=provider,
             data={"runId": record.id, "status": record.status, "failureKind": record.failure_kind},
         )
 
@@ -524,10 +568,15 @@ async def run_step(
         return {**provider_busy_result(provider, busy.id, busy.step), **preview}
 
     record, consume_task = await RUNNER.start(
-        argv, workspace,
-        task_id=task_id, step=step, provider=provider,
-        log_file=str(log_file), on_complete=on_complete,
-        workspace=workspace, stream_kind="run",
+        argv,
+        workspace,
+        task_id=task_id,
+        step=step,
+        provider=provider,
+        log_file=str(log_file),
+        on_complete=on_complete,
+        workspace=workspace,
+        stream_kind="run",
     )
     record.prompt_file = prompt_file.name
     if record.status == "error":
@@ -535,8 +584,12 @@ async def run_step(
         _set_step_state(workspace, task_id, step, status="error", provider=provider)
         state_store.persist_run(workspace, record.to_ledger(workspace))
         state_store.append_event(
-            workspace, "run.finished", f"failed to start `{provider}`",
-            task_id=task_id, step=step, provider=provider,
+            workspace,
+            "run.finished",
+            f"failed to start `{provider}`",
+            task_id=task_id,
+            step=step,
+            provider=provider,
             data={"runId": record.id, "status": "error", "failureKind": "start_error"},
         )
         return {"status": "error", "message": record.stderr[:500], **preview}
@@ -545,15 +598,22 @@ async def run_step(
     # Persist the running run immediately so a restart before completion can recover it.
     state_store.persist_run(workspace, record.to_ledger(workspace))
     state_store.append_event(
-        workspace, "run.started", f"{provider} started {STEP_DEFS[step]['label']}",
-        task_id=task_id, step=step, provider=provider, data={"runId": record.id, "pid": record.pid},
+        workspace,
+        "run.started",
+        f"{provider} started {STEP_DEFS[step]['label']}",
+        task_id=task_id,
+        step=step,
+        provider=provider,
+        data={"runId": record.id, "pid": record.pid},
     )
     reads = ", ".join(r.replace("@diff", "git diff").replace("@folder", "task folder") for r in STEP_IO[step]["reads"])
     _add_event(
-        workspace, task_id, "step_started",
-        f"controller routed {STEP_DEFS[step]['label']} → {provider} "
-        f"(sent {len(prompt):,} chars; reads: {reads})",
-        step=step, provider=provider,
+        workspace,
+        task_id,
+        "step_started",
+        f"controller routed {STEP_DEFS[step]['label']} → {provider} (sent {len(prompt):,} chars; reads: {reads})",
+        step=step,
+        provider=provider,
     )
     add_log_entry("task-step", f"started {step} via {provider}", provider=provider, task_id=task_id, step=step)
     return {"status": "started", "runId": record.id, "consumeTaskName": consume_task.get_name(), **preview}
@@ -609,7 +669,9 @@ async def run_full_sequence(workspace: Path, task_id: str, confirm: bool = False
             )
             add_log_entry("git", f"local pre-check for {task_id} (branch {git.get('branch', '-')})", task_id=task_id)
             _add_event(
-                workspace, task_id, "local_check",
+                workspace,
+                task_id,
+                "local_check",
                 f"local git pre-check (free): branch {git.get('branch', '-')}, "
                 f"{git.get('changedFileCount', 0)} changed file(s) — no AI call",
                 provider="git",
@@ -626,32 +688,47 @@ async def run_full_sequence(workspace: Path, task_id: str, confirm: bool = False
                     usage_service.increment_avoided(workspace)
                     _set_step_state(workspace, task_id, step, status="skipped_budget")
                     _add_event(
-                        workspace, task_id, "skipped",
+                        workspace,
+                        task_id,
+                        "skipped",
                         "Budget Saver skipped the Codex spec for this small task — expensive call avoided",
-                        step=step, provider=step_provider(workspace, step),
+                        step=step,
+                        provider=step_provider(workspace, step),
                     )
                     routing_service.append_decision(
-                        workspace, task_id,
+                        workspace,
+                        task_id,
                         "Budget Saver: skipped Codex spec for this small task — Claude gets the compact "
                         "user goal directly. Expensive call avoided.",
                     )
                     continue
 
-                if step == "claude_implement" and usage_service.provider_health(fresh_usage, "claude") == "red" and not confirm:
+                if (
+                    step == "claude_implement"
+                    and usage_service.provider_health(fresh_usage, "claude") == "red"
+                    and not confirm
+                ):
                     _set_sequence(workspace, task_id, "blocked_claude_red", step)
                     _add_event(
-                        workspace, task_id, "blocked",
+                        workspace,
+                        task_id,
+                        "blocked",
                         "sequence paused before Implement — Claude health is RED (explicit confirmation required)",
-                        step=step, provider="claude",
+                        step=step,
+                        provider="claude",
                     )
                     routing_service.append_decision(
-                        workspace, task_id,
+                        workspace,
+                        task_id,
                         "Full sequence stopped before `claude_implement`: Claude health is RED. "
                         "Run the step manually with explicit confirmation, or route around Claude.",
                     )
                     add_log_entry(
-                        "task-step", f"sequence blocked before {step}: Claude is red",
-                        task_id=task_id, step=step, status="warn",
+                        "task-step",
+                        f"sequence blocked before {step}: Claude is red",
+                        task_id=task_id,
+                        step=step,
+                        status="warn",
                     )
                     return
 
@@ -676,9 +753,7 @@ async def run_full_sequence(workspace: Path, task_id: str, confirm: bool = False
 
     _set_sequence(workspace, task_id, "running", FULL_SEQUENCE[0])
     asyncio.create_task(sequence())
-    warning = (
-        "Claude is RED: the sequence will pause before claude_implement unless confirmed." if claude_red else None
-    )
+    warning = "Claude is RED: the sequence will pause before claude_implement unless confirmed." if claude_red else None
     return {"status": "started", "message": "Full sequence started.", "warning": warning}
 
 

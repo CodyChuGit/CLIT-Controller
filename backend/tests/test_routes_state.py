@@ -40,6 +40,7 @@ def test_run_endpoint_404_then_found(tmp_path, monkeypatch):
         routes_state.get_run("nope")
     assert exc.value.status_code == 404
     from agentflow.process_runner import RunRecord
+
     state_store.persist_run(ws, RunRecord(id="r1", argv=["x"], cwd=str(ws), status="succeeded").to_ledger(ws))
     assert routes_state.get_run("r1")["id"] == "r1"
 

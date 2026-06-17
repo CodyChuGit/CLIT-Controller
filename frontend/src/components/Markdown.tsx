@@ -63,7 +63,9 @@ export function StepChip({ name }: { name: string }) {
     return <span className="chip">{name}</span>;
   }
   return (
-    <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${meta.chip}`}>
+    <span
+      className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${meta.chip}`}
+    >
       <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} aria-hidden="true" />
       {meta.label}
     </span>
@@ -74,9 +76,11 @@ const STEP_TOKEN_RE = /(codex_spec|claude_implement|gemini_qa|codex_review|claud
 
 /** Replace step ids inside prose with colored chips. */
 export function withStepChips(text: string): ReactNode[] {
-  return text.split(STEP_TOKEN_RE).map((part, i) =>
-    STEP_META[part] ? <StepChip key={i} name={part} /> : <Fragment key={i}>{part}</Fragment>,
-  );
+  return text
+    .split(STEP_TOKEN_RE)
+    .map((part, i) =>
+      STEP_META[part] ? <StepChip key={i} name={part} /> : <Fragment key={i}>{part}</Fragment>,
+    );
 }
 
 /* ------------------------------------------------- message rendering helpers */
@@ -108,7 +112,10 @@ function renderInline(text: string): ReactNode[] {
       const meta = stepMeta(inner);
       if (meta) return <StepChip key={i} name={inner} />;
       return (
-        <code key={i} className="rounded bg-neutral-100 px-1 font-mono text-[10px] dark:bg-neutral-700/60">
+        <code
+          key={i}
+          className="rounded bg-neutral-100 px-1 font-mono text-[10px] dark:bg-neutral-700/60"
+        >
           {inner}
         </code>
       );
@@ -119,7 +126,11 @@ function renderInline(text: string): ReactNode[] {
 
 function MdTable({ rows }: { rows: string[] }) {
   const parse = (r: string) =>
-    r.replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+    r
+      .replace(/^\|/, "")
+      .replace(/\|$/, "")
+      .split("|")
+      .map((c) => c.trim());
   const header = parse(rows[0]);
   const body = rows
     .slice(1)
@@ -139,7 +150,10 @@ function MdTable({ rows }: { rows: string[] }) {
         </thead>
         <tbody>
           {body.map((row, i) => (
-            <tr key={i} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800">
+            <tr
+              key={i}
+              className="border-b border-neutral-100 last:border-0 dark:border-neutral-800"
+            >
               {row.map((cell, j) => (
                 <td key={j} className="px-2 py-1 align-top">
                   {renderInline(cell)}
@@ -233,19 +247,37 @@ function DirectiveCard({ lang, code }: { lang: string; code: string }) {
     const idx = line.indexOf(":");
     if (idx > 0) fields[line.slice(0, idx).trim().toLowerCase()] = line.slice(idx + 1).trim();
   }
-  const steps = (fields.steps ?? (fields.queue === "full" ? "codex_spec,claude_implement,gemini_qa,codex_review" : fields.queue) ?? "")
+  const steps = (
+    fields.steps ??
+    (fields.queue === "full"
+      ? "codex_spec,claude_implement,gemini_qa,codex_review"
+      : fields.queue) ??
+    ""
+  )
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
   return (
     <div className={`my-1.5 rounded-md border px-2.5 py-1.5 ${style.cls}`}>
       <div className="text-[10px] font-semibold uppercase tracking-wide">{style.label}</div>
-      {fields.title && <div className="mt-0.5 text-xs font-medium text-neutral-800 dark:text-neutral-100">{fields.title}</div>}
-      {fields.command && (
-        <div className="mt-0.5 font-mono text-[11px] text-neutral-800 dark:text-neutral-200">$ {fields.command}</div>
+      {fields.title && (
+        <div className="mt-0.5 text-xs font-medium text-neutral-800 dark:text-neutral-100">
+          {fields.title}
+        </div>
       )}
-      {fields.reason && <div className="mt-0.5 text-xs text-neutral-700 dark:text-neutral-300">{fields.reason}</div>}
-      {fields.goal && <div className="mt-0.5 text-[11px] text-neutral-600 dark:text-neutral-400">{fields.goal}</div>}
+      {fields.command && (
+        <div className="mt-0.5 font-mono text-[11px] text-neutral-800 dark:text-neutral-200">
+          $ {fields.command}
+        </div>
+      )}
+      {fields.reason && (
+        <div className="mt-0.5 text-xs text-neutral-700 dark:text-neutral-300">{fields.reason}</div>
+      )}
+      {fields.goal && (
+        <div className="mt-0.5 text-[11px] text-neutral-600 dark:text-neutral-400">
+          {fields.goal}
+        </div>
+      )}
       {steps.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1">
           {steps.map((s) => (
@@ -286,7 +318,9 @@ export function Markdown({
           ),
         )}
         {long && !expanded && (
-          <div className={`pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t ${fade}`} />
+          <div
+            className={`pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t ${fade}`}
+          />
         )}
       </div>
       {long && (

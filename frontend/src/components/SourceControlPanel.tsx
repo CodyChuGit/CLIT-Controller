@@ -38,7 +38,9 @@ function FileRow({
         className="focusable flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded text-left"
       >
         <FileTypeIcon name={name} />
-        <span className={`truncate text-xs ${entry.code === "D" ? "text-neutral-400 line-through" : "text-neutral-700 dark:text-neutral-300"}`}>
+        <span
+          className={`truncate text-xs ${entry.code === "D" ? "text-neutral-400 line-through" : "text-neutral-700 dark:text-neutral-300"}`}
+        >
           {name}
         </span>
         {dir && <span className="truncate text-[10px] text-neutral-400">{dir}</span>}
@@ -144,8 +146,12 @@ export default function SourceControlPanel({ workspacePath, onOpenDiff }: Props)
             <span className="ml-1 flex items-center gap-1 font-mono text-[10px] normal-case text-neutral-500">
               <GitBranch className="h-3 w-3" />
               {status.branch}
-              {(status.ahead ?? 0) > 0 && <span className="text-emerald-600 dark:text-emerald-400">↑{status.ahead}</span>}
-              {(status.behind ?? 0) > 0 && <span className="text-amber-600 dark:text-amber-400">↓{status.behind}</span>}
+              {(status.ahead ?? 0) > 0 && (
+                <span className="text-emerald-600 dark:text-emerald-400">↑{status.ahead}</span>
+              )}
+              {(status.behind ?? 0) > 0 && (
+                <span className="text-amber-600 dark:text-amber-400">↓{status.behind}</span>
+              )}
             </span>
           )}
         </button>

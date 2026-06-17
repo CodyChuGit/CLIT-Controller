@@ -45,7 +45,7 @@ def test_run_ledger_roundtrip_and_prune_keeps_running(tmp_path, monkeypatch):
         rec.started_at = f"2026-01-01T00:00:0{i}+00:00"
         state_store.persist_run(ws, rec.to_ledger(ws))
     runs = state_store.load_runs(ws)
-    assert "run-live" in runs                      # never pruned while running
+    assert "run-live" in runs  # never pruned while running
     assert len(runs) <= 3
     assert state_store.get_run(ws, "run-live")["status"] == "running"
 
@@ -60,7 +60,7 @@ def test_runs_for_task_filters_and_sorts(tmp_path):
     for r in (a, b, other):
         state_store.persist_run(ws, r.to_ledger(ws))
     got = state_store.runs_for_task(ws, "t1")
-    assert [r["id"] for r in got] == ["b", "a"]     # sorted by startedAt
+    assert [r["id"] for r in got] == ["b", "a"]  # sorted by startedAt
 
 
 def test_approvals_create_and_resolve(tmp_path):

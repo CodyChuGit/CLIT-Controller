@@ -54,19 +54,24 @@ export function ContextSummary({ budget, repeated }: { budget: BudgetSummary; re
     <div className="rounded-md border border-neutral-200 bg-neutral-50/70 px-2.5 py-1.5 dark:border-neutral-800 dark:bg-neutral-900/40">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-neutral-500">
         <span className="font-semibold uppercase tracking-wide text-neutral-400">Context</span>
-        {budget.mode && <span className="font-medium text-neutral-600 dark:text-neutral-300">{budget.mode}</span>}
+        {budget.mode && (
+          <span className="font-medium text-neutral-600 dark:text-neutral-300">{budget.mode}</span>
+        )}
         {budget.providers.map((p) => (
           <span key={p.name} className="inline-flex items-center gap-1">
-            <span className={`h-1.5 w-1.5 rounded-full ${HEALTH_DOT[p.health] ?? "bg-neutral-400"}`} aria-hidden="true" />
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${HEALTH_DOT[p.health] ?? "bg-neutral-400"}`}
+              aria-hidden="true"
+            />
             {p.name}
           </span>
         ))}
-        {repeated > 1 && (
-          <span className="text-neutral-400">· repeated {repeated}×</span>
-        )}
+        {repeated > 1 && <span className="text-neutral-400">· repeated {repeated}×</span>}
       </div>
       <Disclosure label="View raw" className="mt-1">
-        <pre className="mono-block max-h-48 whitespace-pre-wrap break-words text-[10px]">{budget.raw}</pre>
+        <pre className="mono-block max-h-48 whitespace-pre-wrap break-words text-[10px]">
+          {budget.raw}
+        </pre>
       </Disclosure>
     </div>
   );
@@ -223,14 +228,24 @@ export function ApprovalCard({
         </code>
       </div>
       {approval.reason && (
-        <p className="mt-1 text-[11px] leading-snug text-neutral-600 dark:text-neutral-400">{approval.reason}</p>
+        <p className="mt-1 text-[11px] leading-snug text-neutral-600 dark:text-neutral-400">
+          {approval.reason}
+        </p>
       )}
       {pending && (
         <div className="mt-2 flex items-center gap-1.5">
-          <button className="btn-primary btn-xs" onClick={() => onApprove(approval.id)} disabled={busy}>
+          <button
+            className="btn-primary btn-xs"
+            onClick={() => onApprove(approval.id)}
+            disabled={busy}
+          >
             Approve
           </button>
-          <button className="btn-danger btn-xs" onClick={() => onReject(approval.id)} disabled={busy}>
+          <button
+            className="btn-danger btn-xs"
+            onClick={() => onReject(approval.id)}
+            disabled={busy}
+          >
             Reject
           </button>
         </div>
@@ -262,7 +277,9 @@ export function CommandCard({ run }: { run: RunInfo }) {
     <div className={`card border-l-2 ${accent} p-2.5`}>
       <div className="flex flex-wrap items-center gap-2">
         <Terminal className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
-        <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">{title}</span>
+        <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+          {title}
+        </span>
         {run.status === "running" ? (
           <Spinner className="h-3 w-3 text-blue-500" />
         ) : (
@@ -282,7 +299,11 @@ export function CommandCard({ run }: { run: RunInfo }) {
         </code>
       </div>
 
-      {cwd && <p className="mt-1 font-mono text-[10px] text-neutral-400" title={run.cwd}>in {cwd}</p>}
+      {cwd && (
+        <p className="mt-1 font-mono text-[10px] text-neutral-400" title={run.cwd}>
+          in {cwd}
+        </p>
+      )}
 
       {merged && (
         <div className="mt-1.5">

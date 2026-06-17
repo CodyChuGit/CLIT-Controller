@@ -13,9 +13,9 @@ def test_parse_branch_with_ahead_behind():
 def test_parse_staged_and_unstaged_groups():
     out = (
         "## main\n"
-        "M  staged_only.py\n"      # staged modify
-        " M unstaged_only.py\n"    # unstaged modify
-        "MM both.py\n"             # staged + unstaged
+        "M  staged_only.py\n"  # staged modify
+        " M unstaged_only.py\n"  # unstaged modify
+        "MM both.py\n"  # staged + unstaged
         "A  added.py\n"
         " D deleted.py\n"
         "?? brand_new.py\n"

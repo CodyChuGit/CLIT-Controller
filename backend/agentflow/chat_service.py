@@ -31,7 +31,7 @@ from .provider_probe import AGENT_PROVIDER_IDS, resolve_executable
 from .redaction import redact
 
 MAX_STORED_MESSAGES = 200
-REPLAY_MESSAGES = 12      # how many past messages are replayed to the CLI
+REPLAY_MESSAGES = 12  # how many past messages are replayed to the CLI
 REPLAY_CLIP_CHARS = 1500  # per-message clip when replaying
 
 # "workspace::channel" -> run id of the in-flight chat response
@@ -42,6 +42,7 @@ ORCHESTRATOR_CHANNEL = "orchestrator"
 
 def _pkey(workspace: Path, channel: str) -> str:
     return f"{workspace}::{channel}"
+
 
 MAX_CONSULTS_PER_TASK = 6
 RUN_WAIT_SECONDS = 15  # quick commands report their result; longer ones keep running
@@ -69,13 +70,22 @@ async def execute_run_directive(
     usage = usage_service.ensure_usage(workspace)
     mode = usage.get("orchestrationMode", "balanced")
     policy = policy_service.classify_action(
-        command, workspace, source="orchestrator", provider=provider, task_id=task_id, mode=mode,
+        command,
+        workspace,
+        source="orchestrator",
+        provider=provider,
+        task_id=task_id,
+        mode=mode,
     )
 
     if policy.denied:
         state_store.append_event(
-            workspace, "policy.denied", f"denied `{command}` — {policy.reason}",
-            task_id=task_id, provider=provider, data={"command": command, "reason": policy.reason},
+            workspace,
+            "policy.denied",
+            f"denied `{command}` — {policy.reason}",
+            task_id=task_id,
+            provider=provider,
+            data={"command": command, "reason": policy.reason},
         )
         append_message(workspace, "system", f"Didn't run `{command}` — {policy.reason}.", provider=provider)
         return
@@ -84,19 +94,28 @@ async def execute_run_directive(
     # durable approval rather than running automatically.
     if policy.decision == policy_service.REQUIRE_APPROVAL and not approved:
         state_store.create_approval(
-            workspace, action=command, kind="command", source="orchestrator",
-            provider=provider, task_id=task_id, reason=policy.reason,
+            workspace,
+            action=command,
+            kind="command",
+            source="orchestrator",
+            provider=provider,
+            task_id=task_id,
+            reason=policy.reason,
         )
         append_message(
-            workspace, "system",
+            workspace,
+            "system",
             f"Approval needed before `{command}` — {policy.reason}. Approve it to run.",
             provider=provider,
         )
         if task_id:
             try:
                 task_service._add_event(
-                    workspace, task_id, "approval_required",
-                    f"`{command}` needs approval — {policy.reason}", provider=provider,
+                    workspace,
+                    task_id,
+                    "approval_required",
+                    f"`{command}` needs approval — {policy.reason}",
+                    provider=provider,
                 )
             except FileNotFoundError:
                 pass
@@ -104,8 +123,10 @@ async def execute_run_directive(
 
     if mode == "manual_approval":
         append_message(
-            workspace, "system",
-            f"Manual Approval mode — run it yourself: `{command}`", provider=provider,
+            workspace,
+            "system",
+            f"Manual Approval mode — run it yourself: `{command}`",
+            provider=provider,
         )
         return
 
@@ -117,11 +138,18 @@ async def execute_run_directive(
     argv[0] = resolved
 
     record, consume = await RUNNER.start(
-        argv, workspace, step="run", provider="shell", task_id=task_id,
-        workspace=workspace, stream_kind="command",
+        argv,
+        workspace,
+        step="run",
+        provider="shell",
+        task_id=task_id,
+        workspace=workspace,
+        stream_kind="command",
     )
     if record.status == "error":
-        append_message(workspace, "system", f"`{command}` failed to start: {record.stderr.strip()[:200]}", provider=provider)
+        append_message(
+            workspace, "system", f"`{command}` failed to start: {record.stderr.strip()[:200]}", provider=provider
+        )
         return
     try:
         await asyncio.wait_for(asyncio.shield(consume), timeout=RUN_WAIT_SECONDS)
@@ -138,7 +166,9 @@ async def execute_run_directive(
     if task_id:
         try:
             task_service._add_event(
-                workspace, task_id, "run",
+                workspace,
+                task_id,
+                "run",
                 f"controller ran `{command}` → {record.status}"
                 + (f" (exit {record.exit_code})" if record.exit_code is not None else ""),
                 provider=provider,
@@ -146,8 +176,10 @@ async def execute_run_directive(
         except FileNotFoundError:
             pass
     add_log_entry(
-        "run", f"controller ran: $ {command} → {record.status}",
-        provider="shell", task_id=task_id,
+        "run",
+        f"controller ran: $ {command} → {record.status}",
+        provider="shell",
+        task_id=task_id,
         output=(record.stdout + "\n" + record.stderr)[-2000:],
     )
 
@@ -255,9 +287,7 @@ async def _workspace_summary(workspace: Path) -> str:
     tasks = task_service.list_tasks(workspace)[:5]
     task_lines = "".join(f"\n- {t['id']}: {t['title']} ({t['status']})" for t in tasks) or " none yet"
     # The controller must see what each agent actually did, not just task names.
-    detail = "\n\n".join(
-        task_service.task_state_summary(workspace, t["id"]) for t in tasks[:2]
-    )
+    detail = "\n\n".join(task_service.task_state_summary(workspace, t["id"]) for t in tasks[:2])
     live_line = usage_service.live_summary_line()
     return (
         f"Workspace: {workspace} ({git_line})\n"
@@ -333,8 +363,7 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
             )
             out = record.stdout.strip()
             if record.status == "succeeded" and out:
-                append_message(workspace, "assistant", out, provider=provider,
-                               durationMs=record.duration_ms)
+                append_message(workspace, "assistant", out, provider=provider, durationMs=record.duration_ms)
                 # The controller can create tasks and queue steps via fenced blocks.
                 directive = parse_task_directive(out)
                 if directive is not None:
@@ -350,8 +379,10 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
                         note = f"Created \u201c{title}\u201d · queued {', '.join(steps_to_queue)}"
                         append_message(workspace, "system", note, provider=provider)
                         add_log_entry(
-                            "chat", f"controller created task {meta['id']}: {title}",
-                            provider=provider, task_id=meta["id"],
+                            "chat",
+                            f"controller created task {meta['id']}: {title}",
+                            provider=provider,
+                            task_id=meta["id"],
                         )
                     except Exception as exc:  # noqa: BLE001 — never break the chat loop
                         append_message(workspace, "system", f"Could not create the task: {exc}", provider=provider)
@@ -363,14 +394,17 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
                         task_id = _resolve_task_ref(workspace, ref)
                         if task_id is None:
                             append_message(
-                                workspace, "system",
-                                f"Couldn\u2019t queue steps — no task matches `{ref}`.", provider=provider,
+                                workspace,
+                                "system",
+                                f"Couldn\u2019t queue steps — no task matches `{ref}`.",
+                                provider=provider,
                             )
                         else:
                             task_service.set_orchestrated(workspace, task_id)
                             queue_service.add_steps(workspace, task_id, steps, source="orchestrator")
                             append_message(
-                                workspace, "system",
+                                workspace,
+                                "system",
                                 f"Queued {', '.join(steps)} · {_slug(task_id)}",
                                 provider=provider,
                             )
@@ -387,14 +421,16 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
             else:
                 err_tail = (record.stderr or record.stdout or "no output").strip()[-800:]
                 append_message(
-                    workspace, "system",
+                    workspace,
+                    "system",
                     f"`{provider}` exited with {record.exit_code}: {err_tail}",
                     provider=provider,
                 )
             add_log_entry(
                 "chat",
                 f"controller chat via {provider}: {record.status} in {(record.duration_ms or 0) / 1000:.1f}s",
-                provider=provider, step="chat",
+                provider=provider,
+                step="chat",
                 status="info" if record.status == "succeeded" else "warn",
             )
         finally:
@@ -405,8 +441,13 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
     if busy is not None:
         return busy
     record, _task = await RUNNER.start(
-        argv, workspace, step="chat", provider=provider, on_complete=on_complete,
-        workspace=workspace, stream_kind="controller",
+        argv,
+        workspace,
+        step="chat",
+        provider=provider,
+        on_complete=on_complete,
+        workspace=workspace,
+        stream_kind="controller",
     )
     if record.status == "error":
         _pending.pop(ws_key, None)
@@ -454,7 +495,8 @@ async def send_direct(workspace: Path, provider: str, message: str) -> dict:
     async def on_complete(record: RunRecord) -> None:
         try:
             usage_service.record_call(
-                workspace, provider,
+                workspace,
+                provider,
                 prompt_chars=len(prompt),
                 output_chars=len(record.stdout) + len(record.stderr),
                 duration_ms=record.duration_ms or 0,
@@ -462,21 +504,25 @@ async def send_direct(workspace: Path, provider: str, message: str) -> dict:
             )
             out = record.stdout.strip()
             if record.status == "succeeded" and out:
-                append_message(workspace, "assistant", out, channel=provider,
-                               provider=provider, durationMs=record.duration_ms)
+                append_message(
+                    workspace, "assistant", out, channel=provider, provider=provider, durationMs=record.duration_ms
+                )
             elif record.status == "cancelled":
                 append_message(workspace, "system", "Response stopped.", channel=provider, provider=provider)
             else:
                 err_tail = (record.stderr or record.stdout or "no output").strip()[-800:]
                 append_message(
-                    workspace, "system",
+                    workspace,
+                    "system",
                     f"`{provider}` exited with {record.exit_code}: {err_tail}",
-                    channel=provider, provider=provider,
+                    channel=provider,
+                    provider=provider,
                 )
             add_log_entry(
                 "chat",
                 f"direct chat via {provider}: {record.status} in {(record.duration_ms or 0) / 1000:.1f}s",
-                provider=provider, step="chat",
+                provider=provider,
+                step="chat",
                 status="info" if record.status == "succeeded" else "warn",
             )
         finally:
@@ -484,8 +530,13 @@ async def send_direct(workspace: Path, provider: str, message: str) -> dict:
                 _pending.pop(key, None)
 
     record, _task = await RUNNER.start(
-        argv, workspace, step="chat", provider=provider, on_complete=on_complete,
-        workspace=workspace, stream_kind="chat",
+        argv,
+        workspace,
+        step="chat",
+        provider=provider,
+        on_complete=on_complete,
+        workspace=workspace,
+        stream_kind="chat",
     )
     if record.status == "error":
         _pending.pop(key, None)
@@ -504,7 +555,9 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
     consults = int(meta.get("consults", 0))
     if consults >= MAX_CONSULTS_PER_TASK:
         task_service._add_event(
-            workspace, task_id, "needs_user",
+            workspace,
+            task_id,
+            "needs_user",
             f"controller consult limit reached ({MAX_CONSULTS_PER_TASK}) — continue manually or via chat",
         )
         return {"status": "consult_limit"}
@@ -518,7 +571,9 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
         return busy
     if resolve_executable(shlex.split(template)[0]) is None:
         task_service._add_event(
-            workspace, task_id, "needs_user",
+            workspace,
+            task_id,
+            "needs_user",
             f"controller consult skipped — `{provider}` is not installed",
         )
         return {"status": "provider_missing"}
@@ -539,7 +594,9 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
     meta["consults"] = consults + 1
     task_service._save_meta(workspace, meta)
     task_service._add_event(
-        workspace, task_id, "consult",
+        workspace,
+        task_id,
+        "consult",
         f"system consulted the controller ({provider}): {trigger[:120]}",
         provider=provider,
     )
@@ -547,7 +604,8 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
     async def on_complete(record) -> None:
         try:
             usage_service.record_call(
-                workspace, provider,
+                workspace,
+                provider,
                 prompt_chars=len(prompt),
                 output_chars=len(record.stdout) + len(record.stderr),
                 duration_ms=record.duration_ms or 0,
@@ -556,7 +614,9 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
             out = record.stdout.strip()
             if record.status != "succeeded" or not out:
                 task_service._add_event(
-                    workspace, task_id, "needs_user",
+                    workspace,
+                    task_id,
+                    "needs_user",
                     f"controller consult failed ({record.status}, exit {record.exit_code}) — decide the next step manually",
                     provider=provider,
                 )
@@ -580,12 +640,15 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
                 _ref, steps = queued
                 queue_service.add_steps(workspace, task_id, steps, source="orchestrator")
                 task_service._add_event(
-                    workspace, task_id, "consult",
+                    workspace,
+                    task_id,
+                    "consult",
                     f"controller decision: queue {', '.join(steps)}" + (f" — {reasoning}" if reasoning else ""),
                     provider=provider,
                 )
                 append_message(
-                    workspace, "system",
+                    workspace,
+                    "system",
                     f"Reviewed {trigger.split(' via ')[0]} → queued {', '.join(steps)}",
                     provider=provider,
                 )
@@ -595,62 +658,85 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
                 meta2["orchestratorVerdict"] = {"verdict": "done", "reason": done_reason, "at": now_iso()}
                 task_service._save_meta(workspace, meta2)
                 task_service._add_event(
-                    workspace, task_id, "done",
+                    workspace,
+                    task_id,
+                    "done",
                     f"controller declared the task complete: {done_reason}",
                     provider=provider,
                 )
                 state_store.append_event(
-                    workspace, "task.summary_ready", done_reason,
-                    task_id=task_id, provider=provider,
+                    workspace,
+                    "task.summary_ready",
+                    done_reason,
+                    task_id=task_id,
+                    provider=provider,
                     data={"status": "done", "verdict": "done"},
                 )
                 append_message(
-                    workspace, "system",
+                    workspace,
+                    "system",
                     f"\u201c{_slug(task_id)}\u201d complete — {done_reason}",
                     provider=provider,
                 )
             elif user_reason is not None:
                 task_service._add_event(
-                    workspace, task_id, "needs_user",
+                    workspace,
+                    task_id,
+                    "needs_user",
                     f"controller needs your decision: {user_reason}",
                     provider=provider,
                 )
                 append_message(
-                    workspace, "system",
+                    workspace,
+                    "system",
                     f"Needs your input — {user_reason}",
                     provider=provider,
                 )
             elif not commands:
                 task_service._add_event(
-                    workspace, task_id, "needs_user",
+                    workspace,
+                    task_id,
+                    "needs_user",
                     "controller replied without an actionable block — decide the next step manually"
                     + (f" (it said: {reasoning})" if reasoning else ""),
                     provider=provider,
                 )
             if record.status == "succeeded":
                 state_store.append_event(
-                    workspace, "controller.decision_received",
+                    workspace,
+                    "controller.decision_received",
                     "controller decided the next step",
-                    task_id=task_id, provider=provider, step="orchestrate",
+                    task_id=task_id,
+                    provider=provider,
+                    step="orchestrate",
                     data={"runId": record.id},
                 )
             add_log_entry(
                 "orchestrate",
                 f"consult for {task_id} via {provider}: {record.status} in {(record.duration_ms or 0) / 1000:.1f}s",
-                provider=provider, task_id=task_id, step="orchestrate",
+                provider=provider,
+                task_id=task_id,
+                step="orchestrate",
             )
         except Exception as exc:  # noqa: BLE001 — the loop must never die here
             add_log_entry("orchestrate", f"consult post-processing failed: {exc}", status="error", task_id=task_id)
 
     record, _task = await RUNNER.start(
-        argv, workspace,
-        task_id=task_id, step="orchestrate", provider=provider,
-        log_file=str(log_file), on_complete=on_complete,
-        workspace=workspace, stream_kind="controller",
+        argv,
+        workspace,
+        task_id=task_id,
+        step="orchestrate",
+        provider=provider,
+        log_file=str(log_file),
+        on_complete=on_complete,
+        workspace=workspace,
+        stream_kind="controller",
     )
     if record.status == "error":
         task_service._add_event(
-            workspace, task_id, "needs_user",
+            workspace,
+            task_id,
+            "needs_user",
             f"controller consult could not start: {record.stderr.strip()[:200]}",
             provider=provider,
         )

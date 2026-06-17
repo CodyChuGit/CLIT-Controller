@@ -1,9 +1,5 @@
 export type Health = "green" | "yellow" | "red";
-export type OrchestrationMode =
-  | "maximum_quality"
-  | "balanced"
-  | "budget_saver"
-  | "manual_approval";
+export type OrchestrationMode = "maximum_quality" | "balanced" | "budget_saver" | "manual_approval";
 
 export interface CurrentProject {
   workspacePath: string | null;

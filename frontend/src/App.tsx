@@ -6,7 +6,16 @@ import StatusBar from "./components/StatusBar";
 import { loadState, saveState } from "./persist";
 import { EventStreamProvider } from "./stream";
 
-const PAGE_IDS: PageId[] = ["projects", "agents", "tasks", "terminals", "preview", "usage", "logs", "settings"];
+const PAGE_IDS: PageId[] = [
+  "projects",
+  "agents",
+  "tasks",
+  "terminals",
+  "preview",
+  "usage",
+  "logs",
+  "settings",
+];
 import AgentsPage from "./pages/AgentsPage";
 import LogsPage from "./pages/LogsPage";
 import PreviewPage from "./pages/PreviewPage";
@@ -55,7 +64,15 @@ export default function App() {
       const saved = await api.saveFile(path, content);
       setOpenFiles((prev) =>
         prev.map((f) =>
-          f.path === path ? { ...f, content: saved.content, size: saved.size, truncated: saved.truncated, error: undefined } : f,
+          f.path === path
+            ? {
+                ...f,
+                content: saved.content,
+                size: saved.size,
+                truncated: saved.truncated,
+                error: undefined,
+              }
+            : f,
         ),
       );
       clearDraft(path);
@@ -121,7 +138,10 @@ export default function App() {
     setUsage(null);
     const ws = project?.workspacePath;
     if (!ws) return;
-    const saved = loadState<{ paths: string[]; active: string | null }>(`tabs:${ws}`, { paths: [], active: null });
+    const saved = loadState<{ paths: string[]; active: string | null }>(`tabs:${ws}`, {
+      paths: [],
+      active: null,
+    });
     if (saved.paths.length === 0) return;
     restoringRef.current = true;
     void (async () => {
@@ -139,7 +159,7 @@ export default function App() {
       setActivePath(
         saved.active && files.some((f) => f.path === saved.active)
           ? saved.active
-          : files[files.length - 1]?.path ?? null,
+          : (files[files.length - 1]?.path ?? null),
       );
     })();
   }, [project?.workspacePath]);
@@ -182,7 +202,12 @@ export default function App() {
         truncated: d.truncated,
       };
     } catch (e) {
-      file = { path: key, content: null, kind: "diff", error: e instanceof Error ? e.message : String(e) };
+      file = {
+        path: key,
+        content: null,
+        kind: "diff",
+        error: e instanceof Error ? e.message : String(e),
+      };
     }
     setOpenFiles((prev) => {
       const i = prev.findIndex((f) => f.path === key);
@@ -209,85 +234,89 @@ export default function App() {
     [activePath, clearDraft],
   );
 
-  const needsWorkspace = page !== "projects" && page !== "agents" && page !== "settings" && !project?.workspacePath;
+  const needsWorkspace =
+    page !== "projects" && page !== "agents" && page !== "settings" && !project?.workspacePath;
 
   return (
     <EventStreamProvider workspacePath={project?.workspacePath ?? null}>
-    <div className="flex h-screen flex-col bg-surface font-sans text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
-      <a
-        href="#main"
-        className="focusable absolute left-2 top-2 z-50 -translate-y-16 rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-transform focus:translate-y-0"
-      >
-        Skip to content
-      </a>
+      <div className="flex h-screen flex-col bg-surface font-sans text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+        <a
+          href="#main"
+          className="focusable absolute left-2 top-2 z-50 -translate-y-16 rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-transform focus:translate-y-0"
+        >
+          Skip to content
+        </a>
 
-      <div className="flex min-h-0 flex-1">
-        <ActivityBar page={page} onNavigate={setPage} />
+        <div className="flex min-h-0 flex-1">
+          <ActivityBar page={page} onNavigate={setPage} />
 
-        <main id="main" className="min-w-0 flex-1 overflow-y-auto">
-          {!backendUp && (
-            <div className="border-b border-rose-200 bg-rose-50 px-8 py-2.5 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
-              Backend not reachable at http://localhost:8787 — start it with{" "}
-              <code className="font-mono">./scripts/dev.sh</code>
-              <button className="focusable ml-3 cursor-pointer rounded underline" onClick={loadProject}>
-                Retry
-              </button>
-            </div>
-          )}
+          <main id="main" className="min-w-0 flex-1 overflow-y-auto">
+            {!backendUp && (
+              <div className="border-b border-rose-200 bg-rose-50 px-8 py-2.5 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+                Backend not reachable at http://localhost:8787 — start it with{" "}
+                <code className="font-mono">./scripts/dev.sh</code>
+                <button
+                  className="focusable ml-3 cursor-pointer rounded underline"
+                  onClick={loadProject}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
 
-          {needsWorkspace ? (
-            <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-              <p className="text-sm text-neutral-500">No workspace selected yet.</p>
-              <button className="btn-primary" onClick={() => setPage("projects")}>
-                Choose a workspace
-              </button>
-            </div>
-          ) : (
-            <>
-              {page === "projects" && (
-                <ProjectsPage
-                  project={project}
-                  onProjectChange={loadProject}
-                  openFiles={openFiles}
-                  activePath={activePath}
-                  drafts={drafts}
-                  onOpenFile={openFile}
-                  onOpenDiff={openDiff}
-                  onCloseFile={closeFile}
-                  onActivateFile={setActivePath}
-                  onDraftChange={setDraft}
-                  onSaveFile={saveFile}
-                />
-              )}
-              {page === "agents" && <AgentsPage />}
-              {page === "tasks" && <TasksPage />}
-              {page === "terminals" && <TerminalsPage />}
-              {page === "preview" && <PreviewPage />}
-              {page === "usage" && <UsagePage />}
-              {page === "logs" && <LogsPage />}
-              {page === "settings" && <SettingsPage />}
-            </>
-          )}
-        </main>
+            {needsWorkspace ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+                <p className="text-sm text-neutral-500">No workspace selected yet.</p>
+                <button className="btn-primary" onClick={() => setPage("projects")}>
+                  Choose a workspace
+                </button>
+              </div>
+            ) : (
+              <>
+                {page === "projects" && (
+                  <ProjectsPage
+                    project={project}
+                    onProjectChange={loadProject}
+                    openFiles={openFiles}
+                    activePath={activePath}
+                    drafts={drafts}
+                    onOpenFile={openFile}
+                    onOpenDiff={openDiff}
+                    onCloseFile={closeFile}
+                    onActivateFile={setActivePath}
+                    onDraftChange={setDraft}
+                    onSaveFile={saveFile}
+                  />
+                )}
+                {page === "agents" && <AgentsPage />}
+                {page === "tasks" && <TasksPage />}
+                {page === "terminals" && <TerminalsPage />}
+                {page === "preview" && <PreviewPage />}
+                {page === "usage" && <UsagePage />}
+                {page === "logs" && <LogsPage />}
+                {page === "settings" && <SettingsPage />}
+              </>
+            )}
+          </main>
 
-        <ChatPanel
-          workspacePath={project?.workspacePath ?? null}
+          <ChatPanel
+            workspacePath={project?.workspacePath ?? null}
+            project={project}
+            git={git}
+            usage={usage}
+            onNavigate={setPage}
+          />
+        </div>
+
+        <StatusBar
+          backendUp={backendUp}
           project={project}
           git={git}
           usage={usage}
+          queuedCount={queuedCount}
           onNavigate={setPage}
         />
       </div>
-
-      <StatusBar
-        backendUp={backendUp}
-        project={project}
-        git={git}
-        usage={usage}
-        queuedCount={queuedCount}
-        onNavigate={setPage}
-      />
-    </div>
     </EventStreamProvider>
   );
 }

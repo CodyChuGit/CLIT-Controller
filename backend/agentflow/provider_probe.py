@@ -280,8 +280,7 @@ async def check_provider(provider_id: str) -> dict:
 
     add_log_entry(
         "agent-check",
-        f"checked {d['displayName']}: {result['status']}"
-        + (f" ({result['version']})" if result["version"] else ""),
+        f"checked {d['displayName']}: {result['status']}" + (f" ({result['version']})" if result["version"] else ""),
         provider=provider_id,
         status="info" if result["status"] in ("ok",) else "warn",
         output=result["lastLog"],

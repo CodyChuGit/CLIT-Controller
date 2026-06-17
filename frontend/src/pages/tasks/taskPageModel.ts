@@ -2,7 +2,13 @@ import { parsePrompt, type BudgetSummary } from "../../lib/taskFormat";
 import type { CardModel, CardType } from "../../lib/displayModel";
 import type { Exchange, RunInfo, TaskDetail } from "../../types";
 
-export const STEP_ORDER = ["codex_spec", "claude_implement", "gemini_qa", "codex_review", "claude_fix"];
+export const STEP_ORDER = [
+  "codex_spec",
+  "claude_implement",
+  "gemini_qa",
+  "codex_review",
+  "claude_fix",
+];
 
 export const SHORT_LABELS: Record<string, string> = {
   codex_spec: "Spec",
@@ -34,7 +40,9 @@ export function taskCommandRuns(detail: TaskDetail | null): RunInfo[] {
 
 export function taskChangedFiles(detail: TaskDetail | null): string[] {
   if (!detail) return [];
-  return Array.from(new Set(Object.values(detail.task.steps).flatMap((step) => step.codeChanged ?? [])));
+  return Array.from(
+    new Set(Object.values(detail.task.steps).flatMap((step) => step.codeChanged ?? [])),
+  );
 }
 
 export function buildFinalCard(detail: TaskDetail | null): CardModel | null {
@@ -43,12 +51,22 @@ export function buildFinalCard(detail: TaskDetail | null): CardModel | null {
   if (!["done", "failed", "needs_user", "cancelled", "abandoned"].includes(status)) return null;
 
   const events = detail.task.events ?? [];
-  const verdict = [...events].reverse().find((event) => ["done", "needs_user"].includes(event.type));
+  const verdict = [...events]
+    .reverse()
+    .find((event) => ["done", "needs_user"].includes(event.type));
   const changed = new Set<string>();
-  Object.values(detail.task.steps).forEach((step) => (step.codeChanged ?? []).forEach((file) => changed.add(file)));
-  const stepsRun = Object.values(detail.task.steps).filter((step) => step.status && step.status !== "idle").length;
+  Object.values(detail.task.steps).forEach((step) =>
+    (step.codeChanged ?? []).forEach((file) => changed.add(file)),
+  );
+  const stepsRun = Object.values(detail.task.steps).filter(
+    (step) => step.status && step.status !== "idle",
+  ).length;
   const isDone = status === "done";
-  const type: CardType = isDone ? "FINAL_SUMMARY" : status === "needs_user" ? "NEEDS_USER" : "FAILURE";
+  const type: CardType = isDone
+    ? "FINAL_SUMMARY"
+    : status === "needs_user"
+      ? "NEEDS_USER"
+      : "FAILURE";
   const bullets: string[] = [];
   if (verdict?.detail) bullets.push(verdict.detail);
   bullets.push(`${stepsRun} step${stepsRun === 1 ? "" : "s"} run`);
@@ -60,7 +78,11 @@ export function buildFinalCard(detail: TaskDetail | null): CardModel | null {
     action: { taskId: detail.task.id, stateTo: status },
     display: {
       cardType: type,
-      title: isDone ? "Task complete" : status === "needs_user" ? "Needs your input" : `Task ${status}`,
+      title: isDone
+        ? "Task complete"
+        : status === "needs_user"
+          ? "Needs your input"
+          : `Task ${status}`,
       severity: isDone ? "ok" : status === "needs_user" ? "warn" : "error",
       taskId: detail.task.id,
       summary: { title: "Final report", bullets: bullets.slice(0, 5) },

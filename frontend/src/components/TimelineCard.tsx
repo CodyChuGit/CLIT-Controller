@@ -25,14 +25,21 @@ export default function TimelineCard({
   if (density === "compact") {
     return (
       <div className="flex items-start gap-2">
-        <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${style.dot}`} aria-hidden="true" />
+        <span
+          className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${style.dot}`}
+          aria-hidden="true"
+        />
         {time && (
-          <span className="w-16 shrink-0 font-mono text-[10px] tabular-nums leading-5 text-neutral-400">{time}</span>
+          <span className="w-16 shrink-0 font-mono text-[10px] tabular-nums leading-5 text-neutral-400">
+            {time}
+          </span>
         )}
         <div className="min-w-0 flex-1 text-xs leading-5 text-neutral-700 dark:text-neutral-300">
           <span className={`mr-1.5 font-medium ${SEVERITY_TEXT[d.severity]}`}>{d.title}</span>
           {d.step && <StepChip name={d.step} />}
-          {d.provider && <span className="ml-1 font-mono text-[10px] text-neutral-400">{d.provider}</span>}
+          {d.provider && (
+            <span className="ml-1 font-mono text-[10px] text-neutral-400">{d.provider}</span>
+          )}
           {d.summary?.bullets[0] && <span className="ml-1.5">{d.summary.bullets[0]}</span>}
           {(d.artifacts ?? []).length > 0 && (
             <span className="ml-1.5 inline-flex flex-wrap gap-1 align-middle">
@@ -54,7 +61,9 @@ export default function TimelineCard({
         {d.step && <StepChip name={d.step} />}
         {d.provider && <span className="chip">{d.provider}</span>}
         <span className="flex-1" />
-        {time && <span className="font-mono text-[10px] tabular-nums text-neutral-400">{time}</span>}
+        {time && (
+          <span className="font-mono text-[10px] tabular-nums text-neutral-400">{time}</span>
+        )}
       </div>
 
       {d.summary && d.summary.bullets.length > 0 && (

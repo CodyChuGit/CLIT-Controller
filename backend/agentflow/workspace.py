@@ -20,9 +20,29 @@ IGNORED_DIRS = {
 }
 
 TEXT_EXTENSIONS = {
-    ".swift", ".js", ".jsx", ".ts", ".tsx", ".json", ".md", ".css", ".html",
-    ".py", ".sh", ".yml", ".yaml", ".toml", ".rs", ".go", ".java", ".kt",
-    ".c", ".cpp", ".h", ".hpp", ".txt",
+    ".swift",
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".json",
+    ".md",
+    ".css",
+    ".html",
+    ".py",
+    ".sh",
+    ".yml",
+    ".yaml",
+    ".toml",
+    ".rs",
+    ".go",
+    ".java",
+    ".kt",
+    ".c",
+    ".cpp",
+    ".h",
+    ".hpp",
+    ".txt",
 }
 
 # Extensionless / special files that are safe to preview.
