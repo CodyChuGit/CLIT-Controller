@@ -23,7 +23,7 @@ Instead of bouncing between chats, terminals, folders, diffs, and task notes, yo
 ![CLITC Agents](docs/assets/dark_mode_CLI.png)
 *Agents view for checking connected assistants, setup status, and configuration.*
 
-## 💡 Why You Need It
+## ❓ Why You Need It
 
 AI-assisted design work gets messy fast. One assistant is good at planning, another is better at implementation, another is useful for review. Without a controller, the designer becomes the glue: copying prompts, pasting context, checking files, repeating constraints, and hoping the expensive model is used for the right job.
 
@@ -95,14 +95,8 @@ Each assistant keeps its own official login. CLIT Controller does not ask for or
 - **Local voice I/O**: optional dictation and spoken summaries for hands-light task review.
 - **More review intelligence**: better summaries of what changed, what still needs attention, and where design intent may have drifted.
 
-## 🙌 Credits
-
-Built for designers who want AI help without losing control of the craft.
-
-Powered by the work of the OpenAI Codex, Anthropic Claude Code, Google Antigravity, React, Vite, FastAPI, and open-source communities.
-
 ---
 
 <p align="center">
-  <em>Vibe with CLIT Controller.</em>
+  <em>Vibe with CLIT Controller</em>
 </p>
