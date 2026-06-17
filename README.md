@@ -130,9 +130,18 @@ make verify      # format-check + lint + typecheck + tests + build (run before p
 make test        # backend (pytest+coverage) + frontend (vitest)
 ```
 
-Docs: [Architecture](docs/ARCHITECTURE.md) · [Operations](docs/OPERATIONS.md) ·
-[Security](docs/SECURITY.md) · [Engineering Standards](docs/ENGINEERING_STANDARDS.md) ·
-[Audit](docs/audit/FINAL_REPORT.md). Configuration knobs: [.env.example](.env.example).
+**Documentation:** start at the [docs index](docs/INDEX.md). Highlights —
+[Product pillars / interaction model](docs/PILLARS.md) ·
+[Getting started](docs/GETTING_STARTED.md) · [Architecture](docs/ARCHITECTURE.md) ·
+[Feature status](docs/FEATURE_STATUS.md) · [Backend](docs/BACKEND.md) ·
+[Frontend](docs/FRONTEND.md) · [API](docs/API.md) · [Configuration](docs/CONFIGURATION.md) ·
+[Testing](docs/TESTING.md) · [Security](docs/SECURITY.md) ·
+[Troubleshooting](docs/TROUBLESHOOTING.md) · [Limitations](docs/LIMITATIONS.md) ·
+[Roadmap](docs/ROADMAP.md). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+**Token saving (optional):** route the claude/codex agents through a
+[Headroom](docs/PILLARS.md#pillar-1--token-saving-and-output-speed) proxy — run
+[`scripts/headroom.sh`](scripts/headroom.sh) and enable it in Settings.
 
 ## 🗺️ Roadmap
 

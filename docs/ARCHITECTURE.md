@@ -312,7 +312,7 @@ never wedged), so legacy `task.json` values keep working.
 
 ## 8. Trust boundaries
 
-(See [SECURITY.md](../SECURITY.md) for depth; brief here.)
+(See [SECURITY.md](SECURITY.md) for depth; brief here.)
 
 - **Localhost-only binding** — backend serves on `127.0.0.1` only
   ([__main__.py](../backend/agentflow/__main__.py)).
@@ -333,7 +333,8 @@ never wedged), so legacy `task.json` values keep working.
 - **WebSocket origin allowlist** — the PTY WebSocket
   ([routes_terminals.py](../backend/agentflow/api/routes_terminals.py)) rejects browser
   origins outside `localhost:5180` / `localhost:8787` (a missing Origin, e.g. native/test
-  clients, is allowed), so a malicious page can't drive a real shell. (HTTP routes use
-  FastAPI CORS allowing `:5173`/`:8787` origins.)
+  clients, is allowed), so a malicious page can't drive a real shell. HTTP routes share the
+  same allowlist via [origins.py](../backend/agentflow/origins.py) — CORS plus an
+  `OriginGuard` CSRF check on mutating methods, allowing `:5180`/`:8787` origins.
 - **Preview confinement** — preview URLs and the reachability check are restricted to
   `localhost` / `127.0.0.1` ([routes_preview.py](../backend/agentflow/api/routes_preview.py)).
