@@ -11,7 +11,7 @@
 
 ---
 
-## ✨ What It Is
+## 🫘 What It Is
 
 **CLIT Controller IDE** is a visual control room for designers who use AI coding assistants to bring interface ideas to life.
 
@@ -39,7 +39,7 @@ CLIT Controller keeps that workflow tidy.
 
 The goal is simple: **less prompt wrangling, more product shaping**.
 
-## 🚀 Install
+## ⬇️ Install
 
 Clone the project, then run:
 
