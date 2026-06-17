@@ -26,7 +26,7 @@ from .chat_directives import (
     parse_task_directive,
     strip_action_blocks,
 )
-from .process_runner import RUNNER, RunRecord, add_log_entry, now_iso
+from .process_runner import AGENT_RUN_TIMEOUT, RUNNER, RunRecord, add_log_entry, now_iso
 from .provider_probe import AGENT_PROVIDER_IDS, resolve_executable
 from .redaction import redact
 
@@ -145,6 +145,7 @@ async def execute_run_directive(
         task_id=task_id,
         workspace=workspace,
         stream_kind="command",
+        max_runtime=AGENT_RUN_TIMEOUT,
     )
     if record.status == "error":
         append_message(
@@ -453,6 +454,7 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
         on_complete=on_complete,
         workspace=workspace,
         stream_kind="controller",
+        max_runtime=AGENT_RUN_TIMEOUT,
     )
     if record.status == "error":
         _pending.pop(ws_key, None)
@@ -542,6 +544,7 @@ async def send_direct(workspace: Path, provider: str, message: str) -> dict:
         on_complete=on_complete,
         workspace=workspace,
         stream_kind="chat",
+        max_runtime=AGENT_RUN_TIMEOUT,
     )
     if record.status == "error":
         _pending.pop(key, None)
@@ -736,6 +739,7 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
         on_complete=on_complete,
         workspace=workspace,
         stream_kind="controller",
+        max_runtime=AGENT_RUN_TIMEOUT,
     )
     if record.status == "error":
         task_service._add_event(

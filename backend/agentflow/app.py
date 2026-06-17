@@ -25,7 +25,7 @@ from .api import (
     routes_usage,
 )
 from .origins import LOCAL_ORIGINS, is_allowed_origin, origin_of
-from .process_runner import add_log_entry
+from .process_runner import RUNNER, add_log_entry
 from .terminal_service import TERMINALS, sweep_orphaned_sessions
 
 _MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
@@ -81,6 +81,12 @@ async def _lifespan(app: FastAPI):
     dispatcher = asyncio.create_task(queue_service.dispatcher_loop())
     yield
     dispatcher.cancel()
+    # Cancel in-flight agent/dev-server runs so their detached process groups don't
+    # outlive the backend (esp. a preview server holding a port) — audit P1-04.
+    try:
+        await RUNNER.cancel_all()
+    except Exception as exc:  # noqa: BLE001 — shutdown must not raise
+        add_log_entry("system", f"run cancel_all on shutdown failed: {exc}", status="error")
     await TERMINALS.shutdown()
 
 

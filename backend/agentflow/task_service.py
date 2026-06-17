@@ -22,7 +22,7 @@ from . import (
 )
 from .agent_commands import build_argv as _build_argv
 from .agent_commands import provider_busy_result
-from .process_runner import RUNNER, RunRecord, add_log_entry, now_iso
+from .process_runner import AGENT_RUN_TIMEOUT, RUNNER, RunRecord, add_log_entry, now_iso
 from .redaction import redact
 from .workflow import FULL_SEQUENCE, STEP_DEFS, STEP_IO
 
@@ -577,6 +577,7 @@ async def run_step(
         on_complete=on_complete,
         workspace=workspace,
         stream_kind="run",
+        max_runtime=AGENT_RUN_TIMEOUT,
     )
     record.prompt_file = prompt_file.name
     if record.status == "error":

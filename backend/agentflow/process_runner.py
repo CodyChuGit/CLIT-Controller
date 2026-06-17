@@ -20,6 +20,10 @@ MAX_CAPTURE_CHARS = 2_000_000  # per stream, in memory
 LOG_BUFFER_MAX = 500
 HEARTBEAT_SECONDS = 10  # while a run is alive but quiet, prove liveness to the UI
 _STREAM_HOLD_MAX = 65536  # force-flush a whitespace-less blob beyond this
+# Generous wall-clock cap for long-running agent runs: a CLI wedged on auth/network
+# must not hold its provider lane (and the autonomous queue) forever (audit P1-03).
+# Deliberately NOT applied to the preview dev server, which is meant to run forever.
+AGENT_RUN_TIMEOUT = 1200.0  # 20 minutes
 
 
 def now_iso() -> str:
@@ -191,8 +195,18 @@ class ProcessRunner:
     def __init__(self) -> None:
         self.runs: dict[str, RunRecord] = {}
         self.procs: dict[str, asyncio.subprocess.Process] = {}
+        # Retain references to fire-and-forget background tasks (heartbeat, watchdog,
+        # hard-kill, consume) so the event loop can't GC them mid-flight (audit P3-12).
+        self._bg_tasks: set[asyncio.Task] = set()
 
     # ------------------------------------------------------------- helpers
+
+    def _spawn(self, coro) -> asyncio.Task:
+        """Schedule a background task and keep a strong reference until it finishes."""
+        task = asyncio.create_task(coro)
+        self._bg_tasks.add(task)
+        task.add_done_callback(self._bg_tasks.discard)
+        return task
 
     def _new_record(self, argv: list[str], cwd: Path, **meta) -> RunRecord:
         record = RunRecord(id=uuid.uuid4().hex[:12], argv=argv, cwd=str(cwd), **meta)
@@ -265,6 +279,20 @@ class ProcessRunner:
             self._emit(
                 record, "run.heartbeat", data={"elapsedMs": int((time.monotonic() - record._start_monotonic) * 1000)}
             )
+
+    async def _watchdog(self, record: RunRecord, max_runtime: float) -> None:
+        """Cancel a run that overruns its wall-clock deadline (audit P1-03)."""
+        await asyncio.sleep(max_runtime)
+        if record.status == "running":
+            add_log_entry(
+                "system",
+                f"run {record.id} ({record.provider or '-'}) exceeded {max_runtime:.0f}s — cancelling",
+                provider=record.provider,
+                task_id=record.task_id,
+                status="warn",
+            )
+            await self.cancel(record.id)
+            record.failure_kind = "timeout"  # refine cancel()'s generic 'cancelled'
 
     async def _read_stream(
         self, stream: asyncio.StreamReader, parts: list[str], record: RunRecord, channel: str = "stdout"
@@ -361,11 +389,13 @@ class ProcessRunner:
         workspace: Optional[Path] = None,
         queue_item_id: Optional[str] = None,
         stream_kind: str = "run",
+        max_runtime: Optional[float] = None,
     ) -> tuple[RunRecord, asyncio.Task]:
         """Start a process and return immediately; output is consumed in the background.
 
         Pass ``workspace`` to make the run stream live events (deltas/heartbeat/
         lifecycle) to the event bus. Quick probes/git omit it and stay silent.
+        Pass ``max_runtime`` (seconds) to arm a watchdog that cancels a wedged run.
         """
         record = self._new_record(
             argv,
@@ -411,7 +441,9 @@ class ProcessRunner:
                 self._emit(record, "command.started", data={"command": record.command_preview()})
             elif stream_kind in ("chat", "controller"):
                 self._emit(record, "run.started", data={"command": record.command_preview(), "streamKind": stream_kind})
-            asyncio.create_task(self._heartbeat(record))
+            self._spawn(self._heartbeat(record))
+        if max_runtime is not None:
+            self._spawn(self._watchdog(record, max_runtime))
 
         async def _consume() -> None:
             assert proc.stdout is not None and proc.stderr is not None
@@ -436,7 +468,7 @@ class ProcessRunner:
                 except Exception as exc:  # noqa: BLE001 — never kill the loop
                     add_log_entry("system", f"on_complete hook failed: {exc}", status="error")
 
-        return record, asyncio.create_task(_consume())
+        return record, self._spawn(_consume())
 
     async def cancel(self, run_id: str) -> bool:
         record = self.runs.get(run_id)
@@ -460,7 +492,7 @@ class ProcessRunner:
                 except (ProcessLookupError, PermissionError):
                     pass
 
-        asyncio.create_task(_hard_kill())
+        self._spawn(_hard_kill())
         self.procs.pop(run_id, None)
         return True
 

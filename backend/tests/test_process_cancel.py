@@ -82,6 +82,21 @@ def test_cancel_all_returns_running_run_ids(tmp_path):
         assert _wait_gone(pid)
 
 
+def test_watchdog_cancels_overrunning_run(tmp_path):
+    """A run that exceeds its max_runtime is cancelled and marked timeout (P1-03)."""
+
+    async def go():
+        runner = ProcessRunner()
+        record, consume = await runner.start(SLEEP, tmp_path, max_runtime=0.3)
+        await asyncio.wait_for(consume, timeout=10)
+        return record
+
+    record = asyncio.run(go())
+    assert record.status == "cancelled"
+    assert record.failure_kind == "timeout"
+    assert _wait_gone(record.pid)
+
+
 def test_start_failure_records_error_status(tmp_path):
     """A nonexistent binary fails to start and is recorded as error, not running."""
 
