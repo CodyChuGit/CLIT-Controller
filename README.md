@@ -71,6 +71,8 @@ You can copy and paste the following prompt into your coding CLI (e.g., Claude C
 
 ### Chrome PWA Install
 
+*(Note: This only works after you have completed the Manual Install or CLI Install above and the local app is running.)*
+
 To run the app in its own standalone window like a native app:
 
 1. Open `http://localhost:5173` in Google Chrome.
