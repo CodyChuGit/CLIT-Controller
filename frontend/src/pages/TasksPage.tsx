@@ -5,7 +5,8 @@ import StatusBadge from "../components/StatusBadge";
 import { ApprovalCard, CommandCard, ContextSummary } from "../components/TaskViews";
 import TimelineCard from "../components/TimelineCard";
 import RawDetail from "../components/RawDetail";
-import Composer, { ComposerChip } from "../components/Composer";
+import { ComposerChip } from "../components/Composer";
+import InputComposer from "../components/input/InputComposer";
 import { Card, EmptyState } from "../components/ui";
 import { useStructuralRevision } from "../stream";
 import { loadState, saveState } from "../persist";
@@ -31,8 +32,6 @@ export default function TasksPage() {
   const [error, setError] = useState<string | null>(null);
   const [taskFile, setTaskFile] = useState<{ name: string; content: string } | null>(null);
   const [diffFile, setDiffFile] = useState<{ name: string; diff: string } | null>(null);
-  const [continueText, setContinueText] = useState("");
-  const [continuing, setContinuing] = useState(false);
   const [queue, setQueue] = useState<QueueState | null>(null);
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const streamRev = useStructuralRevision();
@@ -235,26 +234,6 @@ export default function TasksPage() {
     }
   };
 
-  const sendContinue = async () => {
-    const msg = continueText.trim();
-    if (!msg || continuing) return;
-    setContinuing(true);
-    setNotice(null);
-    try {
-      const res = await api.chatSend(msg, null);
-      if (res.status === "started") {
-        setContinueText("");
-        setNotice("Sent to the controller - the reply streams in the controller dock.");
-      } else if (res.message) {
-        setNotice(res.message);
-      }
-    } catch (e) {
-      setNotice(e instanceof Error ? e.message : String(e));
-    } finally {
-      setContinuing(false);
-    }
-  };
-
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-5xl space-y-3 p-6 pt-0">
@@ -370,12 +349,20 @@ export default function TasksPage() {
             )}
 
             <Card title="Continue task" pad>
-              <Composer
-                value={continueText}
-                onChange={setContinueText}
-                onSend={() => void sendContinue()}
-                busy={continuing}
+              <InputComposer
+                workspaceId="workspace"
+                destination={{ kind: "task", taskId: detail.task.id, intent: "continue" }}
+                submitMode="continue"
                 placeholder="Tell the controller what to do next for this task..."
+                onResult={(res) => {
+                  if (["error", "busy", "provider_missing", "claude_red"].includes(res.status)) {
+                    setNotice(res.message ?? res.status);
+                  } else {
+                    setNotice(
+                      "Sent — the reply streams in the controller dock, scoped to this task.",
+                    );
+                  }
+                }}
                 contextChips={
                   <>
                     <ComposerChip mono title="Task">

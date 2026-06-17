@@ -37,12 +37,17 @@ retained, tested, and documented here.
 Not done in this stage; built on the contracts above and the existing shared
 primitives ([03-component-system.md](03-component-system.md)). Concrete plan:
 
-1. **InputComposer family** — one composer producing a typed `InputSubmission`
-   (destination picker controller/provider/task, reference picker, draft lifecycle
-   via `persist`, intent-aware task input). Fixes the discovery bug where the Tasks
-   "Continue" box sends an unscoped controller message ignoring its `taskId`
-   ([00-current-state.md](00-current-state.md)). Requires a backend route accepting
-   `InputSubmission` (alongside the current `chatSend/chatDirect`).
+1. **InputComposer family — DONE.** `components/input/InputComposer.tsx` produces a
+   typed `InputSubmission` (explicit destination + intent, draft lifecycle via
+   `persist`: persists per (workspace, destination), restores on reload, clears only
+   on confirmed submit, preserved on failed submit). Backed by `POST /api/chat/submit`
+   ([routes_chat.py](../../backend/agentflow/api/routes_chat.py)) which validates the
+   submission and dispatches by destination, threading `focus_task_id` for a task
+   destination. **Fixes the Tasks-"Continue"-ignores-taskId bug end-to-end** (the
+   taskId now reaches the backend, scoping the controller to that task) — verified in
+   the browser (the POST body carries `destination.taskId`) and by integration tests.
+   Adopted on the Tasks page; ChatPanel adoption (controller + provider channels) is
+   the next increment — InputComposer is ready to drop in.
 2. **Typed event pipeline** — `event_bus` emits the `OutputEventEnvelope`; the
    stream store validates via `validateOutputEvent` and derives presentation records;
    page-local polling for event-covered state is removed.

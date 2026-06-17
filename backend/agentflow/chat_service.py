@@ -312,8 +312,28 @@ def _transcript(workspace: Path, channel: str = ORCHESTRATOR_CHANNEL) -> str:
     return "\n".join(lines)
 
 
-async def send(workspace: Path, message: str, provider: Optional[str] = None) -> dict:
-    """Append the user message and start a real CLI run for the reply."""
+def _focus_task_brief(workspace: Path, task_id: str) -> str:
+    """Explicit one-block context for a task-scoped submission (Input plane). Keeps
+    the user's stored message clean while telling the controller which task to
+    continue — context is structured prompt input, never buried in the user text."""
+    try:
+        meta = task_service._load_meta(workspace, task_id)
+    except FileNotFoundError:
+        return f"Focused task: {task_id} (not found)."
+    return (
+        f"FOCUSED TASK (continue this task): {meta.get('id', task_id)} — "
+        f"{meta.get('title', '(untitled)')} [status: {meta.get('status', 'unknown')}]. "
+        f"Goal: {meta.get('goal', '')}".strip()
+    )
+
+
+async def send(
+    workspace: Path, message: str, provider: Optional[str] = None, focus_task_id: Optional[str] = None
+) -> dict:
+    """Append the user message and start a real CLI run for the reply.
+
+    ``focus_task_id`` scopes the turn to a task: its brief is added to the
+    controller's context so "continue this task" actually continues *that* task."""
     if pending_state(workspace) is not None:
         return {"status": "busy", "message": "A response is already in progress. Stop it or wait."}
 
@@ -352,6 +372,8 @@ async def send(workspace: Path, message: str, provider: Optional[str] = None) ->
 
     # Build the prompt only after the cheap checks pass.
     summary = await _workspace_summary(workspace)
+    if focus_task_id:
+        summary = f"{summary}\n\n{_focus_task_brief(workspace, focus_task_id)}"
     prompt = prompt_templates.orchestrator_chat_prompt(usage, summary, transcript, message)
     argv = build_argv(template, prompt, config.get_models().get(provider))
 

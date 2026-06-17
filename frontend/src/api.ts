@@ -1,3 +1,4 @@
+import type { InputSubmission } from "./lib/ioContracts";
 import type {
   Approval,
   ChatSendResult,
@@ -176,6 +177,8 @@ export const api = {
     post<ChatSendResult>("/chat/send", { message, provider: provider ?? undefined }),
   chatDirect: (provider: string, message: string) =>
     post<ChatSendResult>("/chat/direct", { message, provider }),
+  // Typed input plane (I/O rebuild): destination + intent are explicit fields.
+  chatSubmit: (submission: InputSubmission) => post<ChatSendResult>("/chat/submit", submission),
   chatStop: (channel: string) => post<{ stopped: boolean }>("/chat/stop", { channel }),
   chatClear: (channel: string) => post<{ ok: boolean }>("/chat/clear", { channel }),
 };
