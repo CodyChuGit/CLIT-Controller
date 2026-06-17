@@ -150,9 +150,13 @@ conversations feel like one product, not separate apps.
 - ✅ Exactly one markdown renderer (enforced by repo convention; no competing
   `parseSegments`).
 - ✅ One validated event-interpretation pipeline.
-- ◐ Auto-scroll is consolidated into a shared hook but not yet adopted at all six
-  legacy call sites; reduced-motion is honored in streaming text but not audited on
-  every surface. See [LIMITATIONS.md](LIMITATIONS.md).
+- ✅ One shared chat-message renderer: `conversation/Message` + `ConversationView`
+  (composing the shared `useAutoScroll`); ChatPanel and the conversation view use
+  it, so no surface keeps a competing message renderer.
+- ◐ `ConversationView` is adopted by the dock; the per-step task-replay layout
+  still composes the shared prose/raw/streaming primitives directly (valid
+  surface composition); reduced-motion is honored in streaming text but not audited
+  on every surface. See [LIMITATIONS.md](LIMITATIONS.md).
 
 ---
 
@@ -180,9 +184,11 @@ compared — without guessing the meaning of arbitrary prose.
 - ✅ Network input is validated at the boundary (`coerceStreamEvent`).
 - ✅ Structured summaries reference full output by event range
   (`OutputRef`) instead of re-embedding it — canonical history is never discarded.
-- ◐ The orchestrator still *emits* markdown directive blocks that are then
-  validated; emitting native structured output (provider structured-output mode)
-  is a recommended next step. See [ROADMAP.md](ROADMAP.md).
+- ✅ Native structured controller output: the orchestrator can emit a fenced
+  `agentflow` JSON block of validated decisions; the parsers are structured-first
+  with markdown fallback (`chat_directives.extract_structured_decisions`), so the
+  controller's machine-consumed decisions are validated records, with the legacy
+  markdown form still accepted. Prompts teach the structured form as preferred.
 
 ---
 

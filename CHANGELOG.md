@@ -16,6 +16,13 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   versioned, `kind`-discriminated schemas for controller directives, command/test/
   task summaries, failures, approvals, hand-offs, and token-efficiency reports,
   with safe validation.
+- **Pillar 5 — native structured controller output**: the orchestrator can emit a
+  fenced `agentflow` JSON block of validated decisions; parsers are structured-first
+  with markdown fallback ([chat_directives.py](backend/agentflow/chat_directives.py)).
+- **Pillar 4 — shared conversation renderer**:
+  [`ConversationView`](frontend/src/components/conversation/ConversationView.tsx) +
+  `Message` are the single chat-message renderer (composing `useAutoScroll`); ChatPanel
+  uses them instead of its own inline bubble.
 - **Pillar 3/4 frontend primitives**: ANSI normalization ([lib/ansi.ts](frontend/src/lib/ansi.ts)),
   network-boundary validation ([lib/streamEvent.ts](frontend/src/lib/streamEvent.ts)),
   and a shared auto-scroll hook ([hooks/useAutoScroll.ts](frontend/src/hooks/useAutoScroll.ts)).
