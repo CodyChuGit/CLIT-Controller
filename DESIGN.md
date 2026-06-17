@@ -95,9 +95,12 @@ icon buttons, status badges, markdown renderer, terminal stack, and task views.
 - **Transcript:** user prompts, agent replies, system notices, command results,
   failures, task directives, and queue updates render as styled rows. Raw prompts,
   raw logs, and long outputs live behind expanders.
-- **Live output:** active runs append transcript deltas, command output chunks,
-  approval waits, queue changes, errors, and completion status in place. The user
-  should never need a separate terminal to know whether a run is still moving.
+- **Live output:** active runs type out transcript deltas and append command
+  output chunks as they are generated or received, along with approval waits,
+  queue changes, errors, and completion status in place. The user should never
+  need a separate terminal or final result before reviewing progress.
+  All surfaces should consume the same event stream so dock, task detail, logs,
+  terminals, and status/footer state stay synchronized.
 - **Terminal drawer:** provider-scoped PTY terminals are docked inside the Agent
   Dock as a drawer or split pane, using the same xterm.js theme as Terminals.
 - **Approval and diff cards:** use compact bordered panels for approval holds,

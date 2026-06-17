@@ -96,14 +96,19 @@ def create_app() -> FastAPI:
     # Serve the built frontend when it exists (single-port mode on :8787).
     dist = paths.frontend_dist()
     if dist.is_dir() and (dist / "index.html").exists():
+        dist_root = dist.resolve()
         app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
 
         @app.get("/{full_path:path}", include_in_schema=False)
         def spa(full_path: str) -> FileResponse:
-            candidate = dist / full_path
-            if full_path and candidate.is_file():
+            # Confine to dist: `full_path` is attacker-controllable and may contain
+            # `..` (Starlette URL-decodes the path), so resolve and verify the
+            # candidate stays inside dist before serving — otherwise this is an
+            # arbitrary file read. Anything else falls back to the SPA shell.
+            candidate = (dist_root / full_path).resolve()
+            if full_path and candidate.is_file() and candidate.is_relative_to(dist_root):
                 return FileResponse(candidate)
-            return FileResponse(dist / "index.html")
+            return FileResponse(dist_root / "index.html")
 
     return app
 

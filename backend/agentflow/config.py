@@ -168,6 +168,13 @@ def ensure_workspace(workspace: Path) -> dict:
 
 def set_workspace(path_str: str) -> dict:
     workspace = Path(path_str).expanduser().resolve()
+    # The read/write/git/command surfaces are confined to the workspace, so a
+    # broad root (/, $HOME) would turn those into host-wide file access. Refuse
+    # the most dangerous roots and require an actual project folder.
+    if workspace == workspace.parent:
+        raise ValueError("Refusing to use the filesystem root as a workspace.")
+    if workspace == Path.home().resolve():
+        raise ValueError("Refusing to use your home directory as a workspace — pick a project folder.")
     cfg = ensure_workspace(workspace)
     g = load_global_config()
     g["currentWorkspace"] = str(workspace)

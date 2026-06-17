@@ -54,10 +54,14 @@ session timelines, prompt/output exchanges, task files, approvals, diffs, logs,
 retries, reroutes, and final reports.
 
 In that revision, live output is required in both places. Active runs should show
-streaming transcript updates, command output, approval waits, queue changes,
-errors, and completion status in the Agent Dock and in the selected Tasks tab
-detail. Polling can remain as a compatibility fallback, but the target UX is not
-final-snapshot-only.
+text as it is generated or received: streaming transcript deltas, command output
+chunks, approval waits, queue changes, errors, and completion status in the Agent
+Dock and in the selected Tasks tab detail. Polling can remain as a compatibility
+fallback, but the target UX is not final-snapshot-only.
+
+The same event-backed text stream should also feed global logs, terminal-linked
+run output, queue/status state, approvals, failures, cancellation, and durable
+task replay, so every surface shows the same redacted progress record.
 
 Both surfaces stay inside CLITC. They use the official CLIs through the existing
 backend traffic control, PTY terminal, task, log, policy, and approval systems.

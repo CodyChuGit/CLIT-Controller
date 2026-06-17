@@ -102,9 +102,14 @@ control of risky operations.
 
 - Show current queue, running providers, task events, logs, prompt/output exchanges,
   provider usage, and final verdict.
-- Add streaming events for logs and queue/task state updates.
+- Add streaming text events for direct chat, controller decisions, run output,
+  stderr, command lifecycle, logs, queue/task state updates, approvals, failures,
+  cancellation, and completion. Text deltas should be emitted as generated or
+  received so users can review partial output before the run finishes.
 - Keep polling endpoints as a fallback.
 - Make every automatic decision inspectable from task files or structured events.
+- Rebuild completed task replay from the same durable events shown during the live
+  run, so live progress and history never diverge.
 
 ## Non-Goals
 

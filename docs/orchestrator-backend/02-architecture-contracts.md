@@ -184,14 +184,22 @@ unknown
 
 Every state change should append an event:
 
+- `chat.delta`
+- `chat.finished`
 - `task.created`
 - `task.status_changed`
 - `queue.enqueued`
+- `queue.changed`
 - `queue.approval_required`
 - `queue.dispatched`
+- `command.started`
+- `command.finished`
 - `run.started`
 - `run.output`
+- `run.stderr`
+- `run.heartbeat`
 - `run.finished`
+- `run.cancelled`
 - `orchestrator.consult_requested`
 - `orchestrator.decision_received`
 - `policy.denied`
@@ -201,6 +209,30 @@ Every state change should append an event:
 
 Events are the basis for streaming updates and for rebuilding projections after
 restart.
+
+Text-bearing events should include stable ordering and routing fields:
+
+- `id`
+- `createdAt`
+- `workspacePath`
+- `provider`
+- `taskId`
+- `runId`
+- `queueItemId`
+- `step`
+- `sequence`
+- `channel`
+- `textDelta`
+- `redacted`
+- `truncated`
+
+The backend must redact before persisting or broadcasting text events. Frontend
+surfaces should render text events from the shared stream rather than each page
+polling logs independently.
+
+Text events should be emitted as generated or received. The execution service
+must not wait for process exit or complete stdout/stderr capture before emitting
+`textDelta` events.
 
 ## Provider Adapter Contract
 

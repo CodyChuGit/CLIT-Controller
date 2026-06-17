@@ -503,11 +503,13 @@ export default function TasksPage() {
     }
   }, []);
 
-  // While the queue is executing, keep the selected task's detail fresh too.
+  // Refresh the selected task's detail when the queue *transitions* into a busy
+  // state. The dedicated 2.5s poller below covers continuous refresh while it
+  // runs — depending on the whole `queue` object here would double every fetch.
   const queueBusy = (queue?.items ?? []).some((i) => i.status === "running");
   useEffect(() => {
     if (queueBusy && selectedId) void loadDetail(selectedId);
-  }, [queueBusy, queue, selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [queueBusy, selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     void loadTasks().then((list) => {

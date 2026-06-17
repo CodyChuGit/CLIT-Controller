@@ -25,8 +25,15 @@ REQUIRE_APPROVAL = "require_approval"
 DENY = "deny"
 
 # Hard denials regardless of args.
-_BLOCKED_BINARIES = {"sudo", "su", "sh", "bash", "zsh", "shutdown", "reboot", "halt", "mkfs", "dd"}
+_BLOCKED_BINARIES = {"sudo", "su", "sh", "bash", "zsh", "fish", "env", "xargs", "shutdown", "reboot", "halt", "mkfs", "dd"}
 _SHELL_OPERATORS = ("|", ">", "<", ";", "&&", "||", "`", "$(", "&")
+
+# Interpreters that can execute arbitrary inline code, escaping argument/workspace
+# analysis entirely (e.g. `node -e "...fs.writeFileSync('/etc/...')"`).
+_INTERPRETERS = {"python", "python3", "node", "nodejs", "deno", "ruby", "perl", "php", "bun", "rscript"}
+# Inline-eval flags across these interpreters: -e/-c/-r (eval), -p (print-eval).
+# Deliberately omits python's -E (ignore-env, not eval) to avoid false positives.
+_EVAL_FLAGS = {"-e", "-c", "-r", "-p", "--eval", "--print"}
 
 # Actions that touch shared/remote state — allowed only with explicit approval.
 _APPROVAL_BINARIES = {"brew", "pip", "pip3", "docker", "kubectl", "terraform", "vercel", "netlify", "heroku", "flyctl", "fly"}
@@ -85,8 +92,18 @@ def classify_action(
     binary = tokens[0]
     sub = tokens[1] if len(tokens) > 1 else ""
 
+    # `FOO=bar cmd` — a var-assignment prefix hides the real binary from
+    # classification (the real command is tokens[1]); refuse it.
+    if "=" in binary:
+        return PolicyResult(DENY, "environment-variable prefixes are not supported — one plain command only")
+
     if binary in _BLOCKED_BINARIES:
         return PolicyResult(DENY, f"`{binary}` is not allowed for direct execution")
+
+    # Interpreters running inline code (`python -c`, `node -e`, …) bypass all
+    # argument and workspace analysis — that's arbitrary code execution.
+    if binary in _INTERPRETERS and any(t in _EVAL_FLAGS for t in tokens[1:]):
+        return PolicyResult(DENY, f"inline code execution (`{binary} -e/-c`) is not allowed")
 
     # destructive recursive delete at a filesystem root
     if binary == "rm" and any(t.startswith("-") and "r" in t and "f" in t for t in tokens) and any(

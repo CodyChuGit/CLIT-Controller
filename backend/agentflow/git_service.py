@@ -125,7 +125,7 @@ async def file_diff(workspace: Path, rel_path: str, staged: bool) -> dict:
     if code == 0 and not out.strip():
         # Probably untracked — synthesize an all-added view.
         target = (workspace / rel_path).resolve()
-        if str(target).startswith(str(workspace.resolve())) and target.is_file():
+        if target.is_relative_to(workspace.resolve()) and target.is_file():
             try:
                 raw = target.read_bytes()[:FULL_DIFF_LIMIT]
                 if b"\x00" not in raw[:8192]:

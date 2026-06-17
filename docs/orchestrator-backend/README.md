@@ -29,6 +29,9 @@ provider contracts, predictable approvals, and a complete verification matrix.
   practical phases with acceptance criteria.
 - [04 Verification And Operations](./04-verification-and-operations.md) defines the
   tests, recovery checks, safety checks, and production-readiness gates.
+- [Text Streaming Across The Board](../text-streaming-across-the-board.md)
+  defines the shared live text contract for chat, runs, tasks, logs, terminals,
+  approvals, and replay.
 - [VS Code-Style Agent Dock And Tasks Tab](../vscode-style-agent-dock.md) defines
   the native feature-parity direction for Codex, Claude Code, Antigravity, and
   controller workflows.
@@ -57,6 +60,9 @@ provider contracts, predictable approvals, and a complete verification matrix.
   Active runs should emit structured output, command lifecycle, approval, queue,
   error, and completion events that both surfaces can render immediately, with
   polling endpoints kept only as compatibility fallbacks.
+- Extend that contract across the product: direct chat, queued runs, task detail,
+  global logs, terminals, approvals, status/footer state, and durable replay
+  should consume the same redacted event stream.
 
 ## Current Backend Map
 

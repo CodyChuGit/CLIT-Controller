@@ -116,8 +116,6 @@ export const api = {
   setMode: (mode: OrchestrationMode) => post<Usage>("/usage/mode", { mode }),
   setProviderHealth: (provider: string, health: string) =>
     post<Usage>("/usage/provider-health", { provider, health }),
-  setProviderLimit: (provider: string, limitCalls: number | null, windowHours: number | null) =>
-    post<Usage>("/usage/provider-limit", { provider, limitCalls, windowHours }),
   usageLive: (force = false) => get<Record<string, LiveProviderUsage>>(`/usage/live?force=${force}`),
   recommendations: () => get<Recommendation>("/usage/recommendations"),
 

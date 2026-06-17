@@ -64,8 +64,8 @@ class RunRecord:
             "exitCode": self.exit_code,
             "promptFile": self.prompt_file,
             "logFile": self.log_file,
-            "stdoutTail": redact(self.stdout)[-tail:],
-            "stderrTail": redact(self.stderr)[-tail:],
+            "stdoutTail": self._tail_redact(self.stdout, tail),
+            "stderrTail": self._tail_redact(self.stderr, tail),
             "outputTruncated": self.truncated,
             "failureKind": self.failure_kind,
         }
@@ -81,13 +81,19 @@ class RunRecord:
     def command_preview(self) -> str:
         return redact(shlex.join(self.argv))
 
+    @staticmethod
+    def _tail_redact(raw: str, tail: int) -> str:
+        # Tail BEFORE redacting: while a run is live, stdout can be up to
+        # MAX_CAPTURE_CHARS (~2MB) and this is polled every couple seconds —
+        # redacting the whole buffer just to keep the last `tail` chars is wasted
+        # work. Redact a 2× window so a secret straddling the cut is still masked.
+        if tail and len(raw) > tail:
+            return "…[truncated]…\n" + redact(raw[-tail * 2 :])[-tail:]
+        return redact(raw)
+
     def to_dict(self, output_tail: int = 20_000) -> dict:
-        out = redact(self.stdout)
-        err = redact(self.stderr)
-        if output_tail and len(out) > output_tail:
-            out = "…[truncated]…\n" + out[-output_tail:]
-        if output_tail and len(err) > output_tail:
-            err = "…[truncated]…\n" + err[-output_tail:]
+        out = self._tail_redact(self.stdout, output_tail)
+        err = self._tail_redact(self.stderr, output_tail)
         return {
             "id": self.id,
             "taskId": self.task_id,

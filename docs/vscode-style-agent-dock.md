@@ -27,8 +27,9 @@ are native CLITC product surfaces, not wrappers around VS Code.
 
 Live output is part of the product decision, not a follow-up nice-to-have. During
 an active controller, Codex, Claude Code, or Antigravity run, CLITC should show
-progress in both the Agent Dock and the selected Tasks tab detail without making
-the user open a separate terminal or wait for a final snapshot.
+text as it is generated or received in both the Agent Dock and the selected Tasks
+tab detail without making the user open a separate terminal or wait for a final
+snapshot.
 
 ## Target UX
 
@@ -40,8 +41,8 @@ Right-hand Agent Dock:
   stop, clear, and command palette actions.
 - Chat panes that render user prompts, agent replies, task directives, command
   results, and failures as styled rows instead of raw text dumps.
-- Active run streams that show transcript deltas, tool or command start/finish
-  events, terminal output chunks, approval waits, queue changes, errors, and
+- Active run streams that type out transcript deltas, terminal output chunks, tool
+  or command start/finish events, approval waits, queue changes, errors, and
   completion status as the run progresses.
 - A terminal drawer per provider for live CLI sessions, reusing the existing
   PTY/WebSocket/xterm.js terminal stack.

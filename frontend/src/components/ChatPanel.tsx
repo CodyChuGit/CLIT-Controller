@@ -337,6 +337,14 @@ export default function ChatPanel({
     const ws = workspacePath;
     if (!ws) return;
     try {
+      // Collapsed, the dock only renders unread/activity dots from chat state —
+      // skip the queue/logs/approvals payloads (logs can carry KBs of run tails).
+      if (!open) {
+        const chat = await api.chat();
+        if (wsRef.current !== ws) return;
+        setData(chat);
+        return;
+      }
       const [chat, q, logs, appr] = await Promise.all([
         api.chat(),
         api.queue(),
@@ -351,7 +359,7 @@ export default function ChatPanel({
     } catch {
       /* backend banner covers outages */
     }
-  }, [workspacePath]);
+  }, [workspacePath, open]);
 
   const resolveApproval = useCallback(
     async (id: string, approve: boolean) => {
@@ -377,11 +385,36 @@ export default function ChatPanel({
     running.length > 0;
 
   // Poll while collapsed too (slowly) — the rail shows unread + activity dots.
+  // The dock is always mounted, so pause the timer while the tab is hidden and
+  // refetch once on return, instead of polling a background tab forever.
   useEffect(() => {
     if (!hasWorkspace) return;
+    const ms = !open ? 10000 : busy ? 2000 : 6000;
+    let id: number | undefined;
+    const start = () => {
+      if (id === undefined) id = window.setInterval(load, ms);
+    };
+    const stop = () => {
+      if (id !== undefined) {
+        window.clearInterval(id);
+        id = undefined;
+      }
+    };
+    const onVisibility = () => {
+      if (document.hidden) {
+        stop();
+      } else {
+        void load();
+        start();
+      }
+    };
     void load();
-    const id = window.setInterval(load, !open ? 10000 : busy ? 2000 : 6000);
-    return () => window.clearInterval(id);
+    if (!document.hidden) start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [open, hasWorkspace, load, busy]);
 
   // The active tab is always caught up; other tabs flag replies that arrived meanwhile.

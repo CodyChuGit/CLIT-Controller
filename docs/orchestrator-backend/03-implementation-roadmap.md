@@ -136,21 +136,35 @@ Acceptance criteria:
 
 ## Phase 6: Streaming Observability
 
-Goal: remove stale polling behavior while preserving fallback endpoints.
+Goal: remove stale polling behavior and stream active text across the product
+while preserving fallback endpoints.
 
 Tasks:
 
 - Add an event bus backed by durable event IDs.
 - Add `GET /api/events/stream` using SSE.
-- Emit run output chunks, queue changes, task status changes, provider status changes,
-  and approval changes.
+- Emit chat deltas, controller deltas, run stdout/stderr chunks, command lifecycle
+  events, queue changes, task status changes, provider status changes, approval
+  changes, heartbeats, cancellation, and completion as text is generated or
+  received, before the final response or process exit whenever possible.
+- Attach events to workspace, provider, task, run, queue item, step, channel, and
+  per-run sequence numbers where available.
+- Redact text before persistence and broadcast.
+- Update the Agent Dock, Tasks tab, Logs page, status/footer state, and terminal
+  context to consume the same event stream instead of separate ad hoc refresh
+  loops.
 - Keep existing polling endpoints for compatibility.
 - Update response DTOs so frontend types stay stable.
 
 Acceptance criteria:
 
-- Logs and queue state update live without 2.5-3 second polling delay.
+- Provider chat, queued runs, logs, task detail, queue state, approvals, and status
+  update live without 2.5-3 second polling delay.
+- Users can review partial generated text and command output before the active run
+  finishes.
 - Reconnecting clients can resume from a cursor.
+- Task replay after completion is built from the same durable events that streamed
+  during the active run.
 - Polling still works if SSE is unavailable.
 
 ## Phase 7: Context Builder And Artifact Manager

@@ -45,7 +45,7 @@ def current_project():
 def set_workspace(body: WorkspaceRequest):
     try:
         cfg = config.set_workspace(body.path)
-    except FileNotFoundError as exc:
+    except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     add_log_entry("system", f"workspace set to {cfg['workspacePath']}")
     # Heal any state left running by a previous session for this workspace.

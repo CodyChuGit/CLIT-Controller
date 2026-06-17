@@ -17,6 +17,17 @@ from ..terminal_service import CLOSED, TERMINALS, launch_command, session_key
 
 router = APIRouter()
 
+# WebSocket handshakes are not subject to CORS, so a malicious page the user
+# visits could otherwise open ws://localhost:8787/.../ws and drive a real shell.
+# Reject browser origins outside the app's own. A missing Origin (native clients,
+# tests) is allowed.
+_ALLOWED_WS_ORIGINS = {
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:8787",
+    "http://127.0.0.1:8787",
+}
+
 
 @router.get("/status")
 def terminals_status():
@@ -39,6 +50,10 @@ async def terminal_kill(provider: str):
 
 @router.websocket("/{provider}/ws")
 async def terminal_ws(ws: WebSocket, provider: str) -> None:
+    origin = ws.headers.get("origin")
+    if origin is not None and origin not in _ALLOWED_WS_ORIGINS:
+        await ws.close(code=4403)
+        return
     await ws.accept()
     if provider not in AGENT_PROVIDER_IDS:
         await ws.close(code=4404)

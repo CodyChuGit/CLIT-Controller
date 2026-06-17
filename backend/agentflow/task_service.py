@@ -272,7 +272,9 @@ def get_task_detail(workspace: Path, task_id: str) -> dict:
 def read_task_file(workspace: Path, task_id: str, name: str) -> dict:
     folder = paths.task_dir(workspace, task_id).resolve()
     target = (folder / name).resolve()
-    if not str(target).startswith(str(folder)) or not target.is_file():
+    # is_relative_to confines correctly (a bare startswith would also accept a
+    # sibling dir whose name shares the prefix, e.g. `<task>-evil`).
+    if not target.is_relative_to(folder) or not target.is_file():
         raise FileNotFoundError(name)
     content = target.read_text(encoding="utf-8", errors="replace")
     return {"name": name, "content": redact(content)}
