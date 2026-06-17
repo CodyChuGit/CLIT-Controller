@@ -325,7 +325,7 @@ Tasks:
 - Add a launcher script such as `scripts/app-mode.sh` that resolves the repo root,
   starts the FastAPI backend if needed, waits for the health endpoint, writes a
   local backend log, and opens Chrome with
-  `--app=http://127.0.0.1:${AGENTFLOW_PORT:-8787}`.
+  `--app=http://localhost:${AGENTFLOW_PORT:-8787}`.
 - Add an optional `scripts/create-macos-app-mode.sh` that generates a thin
   `CLIT Controller IDE.app` wrapper using the bean icon and delegating to the
   launcher script.

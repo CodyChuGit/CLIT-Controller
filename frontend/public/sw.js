@@ -8,13 +8,23 @@
    It caches only the built app shell + hashed static assets so the window opens
    fast and offline; everything dynamic is network-only. */
 
-const CACHE = "clitc-shell-v4";
-const SHELL = ["/", "/index.html", "/manifest.webmanifest"];
+const CACHE = "clitc-shell-v5";
+const SHELL = [
+  "/",
+  "/index.html",
+  "/manifest.webmanifest",
+  "/icons/bean.svg",
+  "/icons/bean-192.png",
+  "/icons/bean-512.png",
+];
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL).catch(() => undefined)),
+    caches
+      .open(CACHE)
+      .then((c) => Promise.allSettled(SHELL.map((path) => c.add(path))))
+      .catch(() => undefined),
   );
 });
 
@@ -43,7 +53,7 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return; // third-party: passthrough
 
   // Live backend data is always network-only — never served from cache.
-  if (url.pathname.startsWith("/api/") || url.pathname.includes("/events/stream")) return;
+  if (url.pathname === "/api" || url.pathname.startsWith("/api/") || url.pathname.includes("/events/stream")) return;
   if ((req.headers.get("accept") || "").includes("text/event-stream")) return;
 
   // App-shell navigations: network-first, fall back to the cached shell offline.

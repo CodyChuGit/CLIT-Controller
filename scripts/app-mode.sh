@@ -16,7 +16,7 @@ REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO"
 
 PORT="${AGENTFLOW_PORT:-8787}"
-URL="http://127.0.0.1:${PORT}"
+URL="http://localhost:${PORT}"
 HEALTH="${URL}/api/health"
 RUNTIME_DIR="${CLITC_RUNTIME_DIR:-/tmp/clitc-controller}"
 LOG="${RUNTIME_DIR}/backend.log"

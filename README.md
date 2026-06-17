@@ -56,35 +56,40 @@ Clone the project, then run:
 ./scripts/install.sh
 ```
 
-Start the app:
+Build the installable app and start it on `localhost:8787`:
 
 ```bash
-./scripts/dev.sh
+npm --prefix frontend run build
+AGENTFLOW_PORT=8787 .venv/bin/python -m agentflow
 ```
 
 Open the local app:
 
 ```text
-http://localhost:5180
+http://localhost:8787
 ```
 
 The install script creates a local Python environment, installs the app backend, and installs the frontend packages. If an assistant is missing, the app shows setup guidance in the Agents view.
+
+For hot-reload development, run `./scripts/dev.sh`; PWA install should use the backend-served production app at `http://localhost:8787`.
 
 ### Install via a Coding CLI
 
 You can copy and paste the following prompt into your coding CLI (e.g., Claude Code, Codex or Antigravity) to have it install and run the app for you:
 
-> Clone the repository https://github.com/CodyChuGit/CLIT-Controller.git, navigate into it, run `./scripts/install.sh`, and then start the dev server with `./scripts/dev.sh`.
+> Clone the repository https://github.com/CodyChuGit/CLIT-Controller.git, navigate into it, run `./scripts/install.sh`, build the frontend with `npm --prefix frontend run build`, start the backend with `AGENTFLOW_PORT=8787 .venv/bin/python -m agentflow`, and open `http://localhost:8787`.
 
 ### Chrome PWA Install
 
-*(Note: This only works after you have completed the Manual Install or CLI Install above and the local app is running.)*
+Install the PWA from the production single-port app, not the Vite dev server.
 
 To run the app in its own standalone window like a native app:
 
-1. Open `http://localhost:5180` in Google Chrome.
-2. Click the **Install** icon (a monitor with a down arrow) on the far right side of the address bar.
-3. The app will install and open in its own window, and you can pin it to your Dock or taskbar.
+1. Build and start the app at `http://localhost:8787`.
+2. Open `http://localhost:8787` in Google Chrome.
+3. Click the **Install** icon (a monitor with a down arrow) on the far right side of the address bar.
+4. Confirm **Install CLIT Controller IDE**.
+5. The installed app uses the bean icon and can be pinned to your Dock or taskbar.
 
 ## 🧰 Requirements
 

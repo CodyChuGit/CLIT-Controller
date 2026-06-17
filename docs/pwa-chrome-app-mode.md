@@ -26,8 +26,8 @@ Use:
 
 - Web app manifest for name, icon, theme, and standalone display.
 - Service worker for static app-shell caching only.
-- Backend-served built frontend at `http://127.0.0.1:<port>`.
-- Chrome app-mode launch: `--app=http://127.0.0.1:<port>`.
+- Backend-served built frontend at `http://localhost:8787`.
+- Chrome app-mode launch: `--app=http://localhost:8787`.
 - Optional generated macOS `.app` wrapper that runs the launcher script.
 
 Do not use:
@@ -59,11 +59,14 @@ Add a web app manifest, served by the frontend/backend:
   "name": "CLIT Controller IDE",
   "short_name": "CLITC",
   "description": "Vibe with CLIT Controller",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#0f1115",
   "theme_color": "#0f1115",
+  "categories": ["productivity", "developer", "utilities"],
   "icons": [
     {
       "src": "/icons/bean-192.png",
@@ -96,6 +99,14 @@ Service worker scope:
 - Do not cache task data, logs, approvals, provider state, or queue responses.
 - Streaming and live status must always come from the backend.
 
+PWA install flow:
+
+- Build the frontend with `npm --prefix frontend run build`.
+- Start the backend with `AGENTFLOW_PORT=8787 .venv/bin/python -m agentflow`.
+- Open `http://localhost:8787` in Chrome and use the address-bar install action.
+- Do not install from the Vite dev server; the service worker only registers in
+  production builds.
+
 ## Launcher Requirements
 
 Add a script such as `scripts/app-mode.sh`.
@@ -105,7 +116,7 @@ Responsibilities:
 - Resolve repo root.
 - Ensure `.venv` exists or print the install command.
 - Build frontend if the backend should serve `frontend/dist` and it is missing.
-- Start the backend if `http://127.0.0.1:${AGENTFLOW_PORT:-8787}` is not healthy.
+- Start the backend if `http://localhost:${AGENTFLOW_PORT:-8787}` is not healthy.
 - Write backend stdout/stderr to a local log file, for example
   `.agentflow/runtime/app-mode-backend.log` or `/tmp/clitc-controller/backend.log`.
 - Store a PID file only for the process it starts.
@@ -113,7 +124,7 @@ Responsibilities:
 - Open Chrome in app mode:
 
 ```bash
-open -na "Google Chrome" --args --app="http://127.0.0.1:${AGENTFLOW_PORT:-8787}"
+open -na "Google Chrome" --args --app="http://localhost:${AGENTFLOW_PORT:-8787}"
 ```
 
 Optional flags may be documented, but should not be defaulted unless needed:
@@ -167,10 +178,11 @@ state.
 
 ## Acceptance Criteria
 
-- `manifest.webmanifest` is served and points to the CLITC bean icons.
+- `manifest.webmanifest` is served from `http://localhost:8787` and points to
+  the CLITC bean icons.
 - Chrome can install or run CLITC as a standalone PWA-style app window.
 - `scripts/app-mode.sh` starts the backend if needed and opens Chrome with
-  `--app=http://127.0.0.1:<port>`.
+  `--app=http://localhost:8787` by default.
 - The launcher waits for backend health before opening Chrome.
 - If the backend fails to start, the user gets a clear terminal error and log path.
 - Live streaming, API calls, task state, logs, queue state, and approvals are not
