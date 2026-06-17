@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Optional
 
+from . import contracts
 from .workflow import FULL_SEQUENCE, STEP_DEFS
 
 TASK_DIRECTIVE_RE = re.compile(r"```agentflow-task\s*\n(.*?)```", re.DOTALL)
@@ -95,6 +96,32 @@ def parse_queue_directive(text: str) -> Optional[tuple[str, list[str]]]:
     if not task_ref or not steps:
         return None
     return task_ref, steps
+
+
+def controller_directive_records(text: str) -> list[dict]:
+    """Deterministic, validated records for the controller directives in ``text``
+    (Pillar 5). Bridges the legacy markdown-block parsers to the versioned
+    contracts so controller decisions can be emitted and styled as typed records
+    rather than re-parsed from prose. Additive — does not change parsing behaviour.
+    """
+    records: list[contracts.ControllerDirective] = []
+    task = parse_task_directive(text)
+    if task:
+        title, goal, steps = task
+        records.append(contracts.TaskDirective(title=title, goal=goal, queueSteps=steps))
+    queue = parse_queue_directive(text)
+    if queue:
+        task_ref, steps = queue
+        records.append(contracts.QueueDirective(taskRef=task_ref, steps=steps))
+    for cmd in parse_run_directives(text):
+        records.append(contracts.RunDirective(command=cmd))
+    done = parse_done_directive(text)
+    if done:
+        records.append(contracts.DoneDirective(reason=done))
+    needs_user = parse_needs_user_directive(text)
+    if needs_user:
+        records.append(contracts.NeedsUserDirective(reason=needs_user))
+    return [r.model_dump() for r in records]
 
 
 def strip_action_blocks(text: str) -> str:
