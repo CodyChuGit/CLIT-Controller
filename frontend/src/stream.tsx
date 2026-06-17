@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore, type ReactNode } from "react";
+import { coerceStreamEvent } from "./lib/streamEvent";
 import type { RunStream, StreamConnection, StreamEvent } from "./types";
 
 /* One workspace-scoped event subscription for the whole app.
@@ -187,7 +188,10 @@ export function EventStreamProvider({
             const res = await fetch(`/api/events?cursor=${streamStore.cursor}`);
             if (res.ok) {
               const j = await res.json();
-              (j.events ?? []).forEach((ev: StreamEvent) => streamStore.apply(ev));
+              (j.events ?? []).forEach((raw: unknown) => {
+                const ev = coerceStreamEvent(raw);
+                if (ev) streamStore.apply(ev);
+              });
             }
           } catch {
             /* keep retrying quietly */
@@ -215,7 +219,8 @@ export function EventStreamProvider({
       };
       es.onmessage = (m) => {
         try {
-          streamStore.apply(JSON.parse(m.data) as StreamEvent);
+          const ev = coerceStreamEvent(JSON.parse(m.data));
+          if (ev) streamStore.apply(ev);
         } catch {
           /* ignore malformed frame */
         }

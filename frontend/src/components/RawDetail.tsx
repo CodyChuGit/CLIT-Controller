@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { stripAnsi } from "../lib/ansi";
 import { ChevronLeft, ChevronRight } from "./icons";
+
+// Kinds that are raw CLI streams and should have ANSI escapes normalized away for
+// readable prose display (Pillar 3). Terminal panes use xterm and keep their ANSI.
+const ANSI_KINDS: ReadonlySet<string> = new Set(["stdout", "stderr", "log"]);
 
 /* Shared paginated, read-only viewer for machine-readable detail — raw prompts,
    stdout, stderr, logs, structured events, JSON, directives, and long diffs.
@@ -52,10 +57,10 @@ export default function RawDetail({
   const [query, setQuery] = useState("");
   const [copied, setCopied] = useState<"" | "page" | "all">("");
 
-  const allLines = useMemo(
-    () => (text ?? "").split("\n").map((content, i) => ({ n: i + 1, content })),
-    [text],
-  );
+  const allLines = useMemo(() => {
+    const normalized = ANSI_KINDS.has(kind) ? stripAnsi(text ?? "") : (text ?? "");
+    return normalized.split("\n").map((content, i) => ({ n: i + 1, content }));
+  }, [text, kind]);
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return allLines;
