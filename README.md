@@ -69,6 +69,14 @@ You can copy and paste the following prompt into your coding CLI (e.g., Claude C
 
 > Clone the repository https://github.com/CodyChuGit/CLIT-Controller.git, navigate into it, run `./scripts/install.sh`, and then start the dev server with `./scripts/dev.sh`.
 
+### Chrome PWA Install
+
+To run the app in its own standalone window like a native app:
+
+1. Open `http://localhost:5173` in Google Chrome.
+2. Click the **Install** icon (a monitor with a down arrow) on the far right side of the address bar.
+3. The app will install and open in its own window, and you can pin it to your Dock or taskbar.
+
 ## 🧰 Requirements
 
 ### Core App
