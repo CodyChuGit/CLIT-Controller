@@ -5,6 +5,7 @@ import {
   buildSubmission,
   type InputDestination,
   type InputReference,
+  type InputSubmission,
   type SubmitMode,
 } from "../../lib/ioContracts";
 import { loadState, saveState } from "../../persist";
@@ -35,24 +36,29 @@ function newId(): string {
 export default function InputComposer({
   workspaceId,
   destination,
+  context,
   submitMode = "message",
   references = [],
   placeholder,
   contextChips,
   leading,
   busy = false,
+  disabled = false,
   onStop,
   onResult,
   sendTitle = "Send",
 }: {
   workspaceId: string;
   destination: InputDestination;
+  /** Extra context carried in the submission (e.g. the controller's engine pick). */
+  context?: InputSubmission["context"];
   submitMode?: SubmitMode;
   references?: InputReference[];
   placeholder?: string;
   contextChips?: ReactNode;
   leading?: ReactNode;
   busy?: boolean;
+  disabled?: boolean;
   onStop?: () => void;
   onResult?: (result: ChatSendResult) => void;
   sendTitle?: string;
@@ -84,6 +90,7 @@ export default function InputComposer({
       destination,
       text,
       references,
+      context,
       submitMode,
       createdAt: new Date().toISOString(),
     });
@@ -104,7 +111,17 @@ export default function InputComposer({
     } finally {
       setSubmitting(false);
     }
-  }, [value, submitting, workspaceId, destination, references, submitMode, draftKey, onResult]);
+  }, [
+    value,
+    submitting,
+    workspaceId,
+    destination,
+    context,
+    references,
+    submitMode,
+    draftKey,
+    onResult,
+  ]);
 
   return (
     <Composer
@@ -113,6 +130,7 @@ export default function InputComposer({
       onSend={() => void onSend()}
       onStop={onStop}
       busy={busy || submitting}
+      disabled={disabled}
       placeholder={placeholder}
       contextChips={contextChips}
       leading={leading}

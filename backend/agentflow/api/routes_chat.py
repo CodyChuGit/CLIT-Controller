@@ -53,7 +53,8 @@ async def submit(body: InputSubmission):
     if dest.kind == "task":
         return await chat_service.send(ws, text, focus_task_id=dest.taskId)
     if dest.kind == "controller":
-        return await chat_service.send(ws, text)
+        # context.provider carries the controller's engine pick (else routing default).
+        return await chat_service.send(ws, text, provider=body.context.provider)
     raise HTTPException(status_code=400, detail="unknown destination")
 
 

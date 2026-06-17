@@ -4,6 +4,7 @@ import type { PageId } from "./ActivityBar";
 import type {
   Approval,
   ChatMessage,
+  ChatSendResult,
   ChatState,
   CurrentProject,
   GitInfo,
@@ -16,7 +17,8 @@ import { STEP_META, StepChip } from "./Markdown";
 import { ApprovalCard, LiveOutput } from "./TaskViews";
 import CommandPalette, { type PaletteAction } from "./CommandPalette";
 import SmoothStreamingText from "./SmoothStreamingText";
-import Composer, { ComposerChip } from "./Composer";
+import { ComposerChip } from "./Composer";
+import InputComposer from "./input/InputComposer";
 import { Message, PROVIDER_DOT, ProviderMark } from "./conversation/Message";
 import { EmptyState } from "./ui";
 import { useRunStream, useStructuralRevision } from "../stream";
@@ -220,12 +222,10 @@ export default function ChatPanel({
   const [queue, setQueue] = useState<QueueState | null>(null);
   const [running, setRunning] = useState<RunInfo[]>([]);
   const [approvals, setApprovals] = useState<Approval[]>([]);
-  const [input, setInput] = useState("");
   const [provider, setProvider] = useState<string | null>(null);
   const [channel, setChannel] = useState<string>(() => loadState("chatTab", ORCH));
   const [seen, setSeen] = useState<Record<string, number>>({});
   const [notice, setNotice] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef(workspacePath);
@@ -377,27 +377,15 @@ export default function ChatPanel({
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length, pending?.outputTail, liveReply?.stdout, busy, channel]);
 
-  const send = async () => {
-    const message = input.trim();
-    if (!message || sending) return;
-    setSending(true);
-    setNotice(null);
-    try {
-      const res = isOrch
-        ? await api.chatSend(message, provider)
-        : await api.chatDirect(channel, message);
-      if (res.status === "started") {
-        setInput("");
-      } else if (res.message) {
-        setNotice(res.message);
-        if (res.status === "provider_missing") setInput("");
-      }
-      await load();
-    } catch (e) {
-      setNotice(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSending(false);
-    }
+  // After a typed submission resolves: surface non-success status, then refresh so
+  // the user message + pending reply (which streams via the event store) appear.
+  const onSubmitResult = (res: ChatSendResult) => {
+    setNotice(
+      ["error", "busy", "provider_missing", "claude_red"].includes(res.status)
+        ? (res.message ?? res.status)
+        : null,
+    );
+    void load();
   };
 
   // ⌘K / Ctrl+K opens the native action palette.
@@ -740,13 +728,14 @@ export default function ChatPanel({
               {notice}
             </p>
           )}
-          <Composer
-            value={input}
-            onChange={setInput}
-            onSend={() => void send()}
+          <InputComposer
+            workspaceId={workspacePath ?? "workspace"}
+            destination={isOrch ? { kind: "controller" } : { kind: "provider", provider: channel }}
+            context={isOrch ? { provider: selected } : undefined}
+            onResult={onSubmitResult}
             onStop={pending ? () => void api.chatStop(channel).then(load) : undefined}
             busy={!!pending}
-            disabled={!hasWorkspace || sending}
+            disabled={!hasWorkspace}
             placeholder={
               !hasWorkspace
                 ? "Open a workspace first"

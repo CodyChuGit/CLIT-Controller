@@ -46,8 +46,13 @@ primitives ([03-component-system.md](03-component-system.md)). Concrete plan:
    destination. **Fixes the Tasks-"Continue"-ignores-taskId bug end-to-end** (the
    taskId now reaches the backend, scoping the controller to that task) — verified in
    the browser (the POST body carries `destination.taskId`) and by integration tests.
-   Adopted on the Tasks page; ChatPanel adoption (controller + provider channels) is
-   the next increment — InputComposer is ready to drop in.
+   Adopted on the Tasks page **and in ChatPanel** (controller + provider channels):
+   the dock derives the destination from the active channel
+   (controller→`{kind:"controller"}` with the engine pick in `context.provider`;
+   provider tab→`{kind:"provider",provider}`) and gets per-channel drafts for free.
+   All three chat surfaces now share one composer + the typed `/api/chat/submit`
+   contract — browser-verified for each. The controller's old `chatSend`/`chatDirect`
+   branch and its `input`/`sending` state were removed.
 2. **Typed event pipeline** — `event_bus` emits the `OutputEventEnvelope`; the
    stream store validates via `validateOutputEvent` and derives presentation records;
    page-local polling for event-covered state is removed.
