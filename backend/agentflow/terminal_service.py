@@ -182,9 +182,11 @@ class TerminalSession:
         asyncio.create_task(self._watch_exit())
 
         if self.launch:
+            launch = self.launch  # bind non-None value for the closure
+
             async def _kick() -> None:
                 await asyncio.sleep(0.4)  # let the shell print its prompt first
-                self.write((self.launch + "\n").encode())
+                self.write((launch + "\n").encode())
 
             asyncio.create_task(_kick())
 

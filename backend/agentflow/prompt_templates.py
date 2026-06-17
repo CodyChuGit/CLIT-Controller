@@ -73,7 +73,7 @@ def codex_review_prompt(usage: dict, task_rel_dir: str) -> str:
     return _compose(
         usage,
         task_rel_dir,
-        f"""
+        """
 Review current git diff and all files in the task folder.
 Write 07_CODEX_FINAL_REVIEW.md.
 Do not edit production code.

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re as _re
+import time as _time
 from pathlib import Path
 
 from . import paths
@@ -219,8 +221,6 @@ def provider_health(usage: dict, provider: str) -> str:
 # codex caches the API's real rate-limit snapshots in its session files; claude
 # and agy expose nothing headlessly (verified), so they fall back to manual limits.
 
-import time as _time
-
 
 def _extract_rate_limits(text: str):
     import json as _json
@@ -296,8 +296,6 @@ def codex_live_usage():
             }
     return None
 
-
-import re as _re
 
 _CLAUDE_USAGE_RE = _re.compile(
     r"Current (session|week \(all models\)|week \(Sonnet only\)):\s*(\d+)% used(?:\s*[·\u00b7]\s*resets (.+))?"

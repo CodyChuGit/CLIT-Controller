@@ -11,8 +11,6 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__, config, paths, queue_service, state_store
-from .process_runner import add_log_entry
-from .terminal_service import TERMINALS, sweep_orphaned_sessions
 from .api import (
     routes_agents,
     routes_chat,
@@ -25,6 +23,8 @@ from .api import (
     routes_terminals,
     routes_usage,
 )
+from .process_runner import add_log_entry
+from .terminal_service import TERMINALS, sweep_orphaned_sessions
 
 
 @asynccontextmanager

@@ -9,7 +9,7 @@ import stat
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from . import config, paths
 from .process_runner import RUNNER, add_log_entry, now_iso
@@ -226,7 +226,10 @@ async def check_provider(provider_id: str) -> dict:
     """Run the real version/status commands and cache the result."""
     d = dict(_definition(provider_id))
     path = which(provider_id)
-    result = {
+    # Heterogeneous result dict (strings, bools, None, and later list[str] for
+    # modelOptions); annotate as Any-valued so mypy doesn't pin it to the initial
+    # literal's value type.
+    result: dict[str, Any] = {
         "installed": path is not None,
         "executablePath": path,
         "version": None,

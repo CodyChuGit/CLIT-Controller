@@ -1,7 +1,6 @@
 """Regression tests for the security-review fixes (2026-06-17)."""
 
 import pytest
-
 from agentflow import config, policy_service
 from agentflow.redaction import redact
 
@@ -75,10 +74,9 @@ def test_set_workspace_refuses_home_directory():
 # ----------------------------------------------------- SPA static-file confinement
 def test_spa_route_does_not_serve_files_outside_dist():
     """The catch-all must not become an arbitrary file read via `..`."""
-    from fastapi.testclient import TestClient
-
     from agentflow import paths
     from agentflow.app import create_app
+    from fastapi.testclient import TestClient
 
     dist = paths.frontend_dist()
     if not (dist.is_dir() and (dist / "index.html").exists()):

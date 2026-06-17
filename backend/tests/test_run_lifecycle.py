@@ -2,7 +2,6 @@
 the durable run ledger and events must capture start and finish."""
 
 import asyncio
-import os
 import stat
 from pathlib import Path
 

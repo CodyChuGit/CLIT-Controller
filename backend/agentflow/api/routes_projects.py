@@ -8,7 +8,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from .. import config, git_service, paths, state_store, workspace as workspace_service
+from .. import config, git_service, paths, state_store
+from .. import workspace as workspace_service
 from ..models import (
     FileWriteRequest,
     GitCommitRequest,

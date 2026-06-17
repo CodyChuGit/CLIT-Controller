@@ -46,6 +46,6 @@ def test_manual_mode_flags_manual_approval():
 def test_budget_context_header_format():
     header = budget_context_header(usage_with(claude="yellow"))
     assert header.startswith("Budget context:")
-    assert "- Current mode: Balanced" in header
+    assert "- Current traffic control mode: Balanced" in header
     assert "- Claude usage: yellow" in header
     assert "minimize full-file context" in header

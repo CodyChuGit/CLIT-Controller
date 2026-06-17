@@ -6,7 +6,17 @@ import shlex
 from pathlib import Path
 from typing import Optional
 
-from . import config, git_service, paths, policy_service, prompt_templates, queue_service, state_store, task_service, usage_service
+from . import (
+    config,
+    git_service,
+    paths,
+    policy_service,
+    prompt_templates,
+    queue_service,
+    state_store,
+    task_service,
+    usage_service,
+)
 from .agent_commands import build_argv, provider_busy_result
 from .chat_directives import (
     parse_done_directive,

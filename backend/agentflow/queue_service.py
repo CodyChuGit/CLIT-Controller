@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from . import config, paths, provider_probe, state_store, task_service, transitions, usage_service
 from .config import read_json, write_json
@@ -77,11 +77,11 @@ def add_steps(workspace: Path, task_id: str, steps: list[str], source: str = "or
 
     data = load_queue(workspace)
     active = {(i["taskId"], i["step"]) for i in data["items"] if i["status"] in ACTIVE_STATUSES}
-    added = []
+    added: list[dict[str, Any]] = []
     for step in steps:
         if (task_id, step) in active:
             continue
-        item = {
+        item: dict[str, Any] = {
             "id": uuid.uuid4().hex[:8],
             "taskId": task_id,
             "step": step,
@@ -153,7 +153,7 @@ _QUEUE_EVENT_TYPE = {
 }
 
 
-def _apply_status(workspace: Path, item: dict, fields: dict) -> None:
+def _apply_status(workspace: Path, item: dict[str, Any], fields: dict[str, Any]) -> None:
     """Validate + record a queue item's status change (mutates nothing but emits).
 
     Call right before applying ``fields`` to ``item``. A no-op or a non-status update is
@@ -161,7 +161,7 @@ def _apply_status(workspace: Path, item: dict, fields: dict) -> None:
     wedge the queue), and every real change appends a durable ``queue.*`` event.
     """
     to = fields.get("status")
-    frm = item.get("status")
+    frm = item["status"]  # every queue item always carries a status
     if to is None or to == frm:
         return
     if not transitions.is_valid("queue", frm, to):
@@ -210,7 +210,7 @@ def _finalize_running(workspace: Path) -> None:
             continue
         record = RUNNER.runs.get(item.get("runId") or "")
         if record is None:
-            fields = {"status": "failed", "note": "run record lost (backend restarted)", "finishedAt": now_iso()}
+            fields: dict[str, Any] = {"status": "failed", "note": "run record lost (backend restarted)", "finishedAt": now_iso()}
             _apply_status(workspace, item, fields)
             item.update(fields)
             failed_tasks.add(item["taskId"])

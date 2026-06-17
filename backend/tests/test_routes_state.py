@@ -8,10 +8,9 @@ approval→execute hop) without standing up a server.
 import asyncio
 
 import pytest
-from fastapi import HTTPException
-
 from agentflow import chat_service, config, queue_service, state_store, task_service
 from agentflow.api import routes_queue, routes_state
+from fastapi import HTTPException
 
 
 def _ws(tmp_path, monkeypatch):
