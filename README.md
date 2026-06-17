@@ -41,6 +41,8 @@ The goal is simple: **less prompt wrangling, more product shaping**.
 
 ## ⬇️ Install
 
+### Manual Install
+
 Clone the project, then run:
 
 ```bash
@@ -60,6 +62,12 @@ http://localhost:5173
 ```
 
 The install script creates a local Python environment, installs the app backend, and installs the frontend packages. If an assistant is missing, the app shows setup guidance in the Agents view.
+
+### Install via a Coding CLI
+
+You can copy and paste the following prompt into your coding CLI (e.g., Claude Code, Codex or Antigravity) to have it install and run the app for you:
+
+> Clone the repository https://github.com/CodyChuGit/CLIT-Controller.git, navigate into it, run `./scripts/install.sh`, and then start the dev server with `./scripts/dev.sh`.
 
 ## 🧰 Requirements
 
