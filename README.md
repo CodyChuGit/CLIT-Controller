@@ -119,6 +119,21 @@ Each assistant keeps its own official login. CLIT Controller does not ask for or
 - Frontend: React, Vite, TypeScript, Tailwind CSS, xterm, Prism.
 - Dev/test support: pytest.
 
+## 🛠️ Development
+
+One command surface (same locally and in CI — see the [Makefile](Makefile)):
+
+```bash
+make setup       # create .venv, install backend (editable) + frontend deps
+make dev         # backend :8787 + Vite dev server :5180
+make verify      # format-check + lint + typecheck + tests + build (run before pushing)
+make test        # backend (pytest+coverage) + frontend (vitest)
+```
+
+Docs: [Architecture](docs/ARCHITECTURE.md) · [Operations](docs/OPERATIONS.md) ·
+[Security](docs/SECURITY.md) · [Engineering Standards](docs/ENGINEERING_STANDARDS.md) ·
+[Audit](docs/audit/FINAL_REPORT.md). Configuration knobs: [.env.example](.env.example).
+
 ## 🗺️ Roadmap
 
 - **Richer designer task briefs**: clearer intake for goals, references, constraints, acceptance notes, and visual QA.
