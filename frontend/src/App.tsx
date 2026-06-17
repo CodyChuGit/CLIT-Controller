@@ -268,7 +268,13 @@ export default function App() {
           )}
         </main>
 
-        <ChatPanel workspacePath={project?.workspacePath ?? null} />
+        <ChatPanel
+          workspacePath={project?.workspacePath ?? null}
+          project={project}
+          git={git}
+          usage={usage}
+          onNavigate={setPage}
+        />
       </div>
 
       <StatusBar

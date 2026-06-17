@@ -18,7 +18,7 @@ surface should look like it belongs next to the Explorer.
 ## Naming
 
 - Tagline: **Vibe with CLIT Controller**.
-- Use the full name, **Command Line Interface Terminal Controller**, in first mentions,
+- Use the full name, **Command Line Interface Traffic Controller**, in first mentions,
   formal docs, metadata, startup text, and explanatory tooltips.
 - Use **CLIT Controller IDE** in compact UI surfaces such as tab titles, status bars,
   badges, and narrow panel labels.

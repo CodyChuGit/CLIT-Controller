@@ -1,7 +1,7 @@
 # Target Capability
 
 The controller backend is complete when a user can describe work once, then let
-Command Line Interface Terminal Controller (CLIT Controller IDE) route, execute,
+Command Line Interface Traffic Controller (CLIT Controller IDE) route, execute,
 verify, recover, and report the task without manually juggling CLIs or losing
 control of risky operations.
 

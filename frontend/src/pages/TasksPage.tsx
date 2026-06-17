@@ -3,11 +3,11 @@ import { api } from "../api";
 import { Close, FileIcon, Folder, Inbox, Spinner, StopSquare } from "../components/icons";
 import StatusBadge from "../components/StatusBadge";
 import { Markdown } from "../components/Markdown";
-import { CommandCard, ContextSummary } from "../components/TaskViews";
+import { ApprovalCard, CommandCard, ContextSummary } from "../components/TaskViews";
 import { Card, EmptyState } from "../components/ui";
 import { parsePrompt, type BudgetSummary } from "../lib/taskFormat";
 import { loadState, saveState } from "../persist";
-import type { Exchange, QueueState, RunInfo, StepState, TaskDetail, TaskEvent, TaskMeta } from "../types";
+import type { Approval, Exchange, QueueState, RunInfo, StepState, TaskDetail, TaskEvent, TaskMeta } from "../types";
 
 const STEP_ORDER = ["codex_spec", "claude_implement", "gemini_qa", "codex_review", "claude_fix"];
 const SHORT_LABELS: Record<string, string> = {
@@ -458,12 +458,18 @@ export default function TasksPage() {
   const [error, setError] = useState<string | null>(null);
   const [taskFile, setTaskFile] = useState<{ name: string; content: string } | null>(null);
   const [queue, setQueue] = useState<QueueState | null>(null);
+  const [approvals, setApprovals] = useState<Approval[]>([]);
   const fileViewerRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<number | null>(null);
 
   const loadQueue = useCallback(async () => {
     try {
-      setQueue(await api.queue());
+      const [q, appr] = await Promise.all([
+        api.queue(),
+        api.approvals(true).catch(() => ({ approvals: [] as Approval[] })),
+      ]);
+      setQueue(q);
+      setApprovals(appr.approvals);
     } catch {
       /* no workspace or backend away */
     }
@@ -604,6 +610,17 @@ export default function TasksPage() {
     setQueue(res.queue);
   };
 
+  // Durable approval records (policy-held commands), distinct from queue approval.
+  const resolveApproval = async (id: string, approve: boolean) => {
+    try {
+      await (approve ? api.approvalApprove(id) : api.approvalReject(id));
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : String(e));
+    }
+    await loadQueue();
+    if (selectedId) await loadDetail(selectedId);
+  };
+
   const removeItem = async (id: string) => setQueue(await api.queueRemove(id));
 
   const retryItem = async (id: string) => {
@@ -706,6 +723,21 @@ export default function TasksPage() {
                 onRetry={(id) => void retryItem(id)}
                 onSkip={(id) => void skipItem(id)}
               />
+            )}
+
+            {approvals.filter((a) => !a.taskId || a.taskId === detail.task.id).length > 0 && (
+              <div className="space-y-2">
+                {approvals
+                  .filter((a) => !a.taskId || a.taskId === detail.task.id)
+                  .map((a) => (
+                    <ApprovalCard
+                      key={a.id}
+                      approval={a}
+                      onApprove={(id) => void resolveApproval(id, true)}
+                      onReject={(id) => void resolveApproval(id, false)}
+                    />
+                  ))}
+              </div>
             )}
 
             {budgetContext && <ContextSummary budget={budgetContext.budget} repeated={budgetContext.repeated} />}

@@ -1,6 +1,6 @@
 # VS Code-Style Agent Dock And Tasks Tab
 
-Command Line Interface Terminal Controller (CLIT Controller IDE) should mimic the
+Command Line Interface Traffic Controller (CLIT Controller IDE) should mimic the
 useful parts of VS Code agent plugin panels inside its own native right-hand
 dock and Tasks tab. It should not embed VS Code extensions, run a VS Code
 extension host, iframe vendor UI, or depend on real VS Code.

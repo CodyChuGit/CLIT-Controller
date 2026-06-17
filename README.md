@@ -2,7 +2,7 @@
 
 > Vibe with CLIT Controller
 
-**Command Line Interface Terminal Controller (CLIT Controller IDE)** is a local-first traffic control center for CLI coding agents — Codex, Claude Code, and Antigravity — from one clean UI, with Git, the GitHub CLI, and VS Code-style Agent Dock and Tasks tab surfaces.
+**Command Line Interface Traffic Controller (CLIT Controller IDE)** is a local-first traffic control center for CLI coding agents — Codex, Claude Code, and Antigravity — from one clean UI, with Git, the GitHub CLI, and VS Code-style Agent Dock and Tasks tab surfaces.
 
 ## Why it exists
 

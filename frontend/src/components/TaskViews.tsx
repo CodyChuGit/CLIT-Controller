@@ -1,7 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Spinner, Terminal } from "./icons";
 import StatusBadge from "./StatusBadge";
-import type { RunInfo } from "../types";
+import type { Approval, RunInfo } from "../types";
 import {
   describeCommand,
   formatDuration,
@@ -150,6 +150,81 @@ export function OutputView({ text }: { text: string }) {
     <div className="space-y-1.5">
       {hasHighlights && <OutputHighlights summary={summary} />}
       <ClampedLog text={summary.raw} long={summary.long} />
+    </div>
+  );
+}
+
+/** Live, auto-tailing output for an in-flight run — visible progress while a
+ *  command/step is still moving (not a final-only snapshot). Tails the last
+ *  ~2KB and pins the scroll to the bottom as new chunks arrive. */
+export function LiveOutput({ text, className = "" }: { text: string; className?: string }) {
+  const ref = useRef<HTMLPreElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [text]);
+  if (!text) return null;
+  return (
+    <pre
+      ref={ref}
+      className={`max-h-32 overflow-auto whitespace-pre-wrap break-words rounded border border-blue-200 bg-blue-50/50 p-1.5 font-mono text-[10px] leading-relaxed text-neutral-600 dark:border-blue-900 dark:bg-blue-950/30 dark:text-neutral-300 ${className}`}
+    >
+      {text.slice(-2000)}
+    </pre>
+  );
+}
+
+const APPROVAL_KIND_LABEL: Record<string, string> = {
+  command: "command",
+  install: "install",
+  git_remote: "git",
+  deploy: "deploy",
+};
+
+/** A pending approval hold rendered as a compact, actionable card: what the
+ *  controller wants to run, why it needs sign-off, and Approve/Reject. The
+ *  backend stays authoritative — these buttons hit the approval endpoints. */
+export function ApprovalCard({
+  approval,
+  onApprove,
+  onReject,
+  busy = false,
+}: {
+  approval: Approval;
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+  busy?: boolean;
+}) {
+  const pending = approval.status === "pending";
+  return (
+    <div className="rounded-md border border-amber-300 bg-amber-50/70 p-2.5 dark:border-amber-800 dark:bg-amber-950/30">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="rounded border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+          approval · {APPROVAL_KIND_LABEL[approval.kind] ?? approval.kind}
+        </span>
+        {approval.provider && <span className="chip">{approval.provider}</span>}
+        <span className="flex-1" />
+        {!pending && <StatusBadge state={approval.status} />}
+      </div>
+      <div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto rounded bg-neutral-50 px-2 py-1 dark:bg-neutral-950">
+        <span className="text-neutral-400">$</span>
+        <code className="whitespace-pre font-mono text-[10px] text-neutral-700 dark:text-neutral-300">
+          {approval.action}
+        </code>
+      </div>
+      {approval.reason && (
+        <p className="mt-1 text-[11px] leading-snug text-neutral-600 dark:text-neutral-400">{approval.reason}</p>
+      )}
+      {pending && (
+        <div className="mt-2 flex items-center gap-1.5">
+          <button className="btn-primary btn-xs" onClick={() => onApprove(approval.id)} disabled={busy}>
+            Approve
+          </button>
+          <button className="btn-danger btn-xs" onClick={() => onReject(approval.id)} disabled={busy}>
+            Reject
+          </button>
+        </div>
+      )}
     </div>
   );
 }

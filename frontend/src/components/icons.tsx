@@ -181,3 +181,10 @@ export const StopSquare = (p: SVGProps<SVGSVGElement>) => (
     <rect x="7" y="7" width="10" height="10" rx="1.5" />
   </Icon>
 );
+
+/** ⌘ glyph — the command palette. */
+export const Command = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6z" />
+  </Icon>
+);

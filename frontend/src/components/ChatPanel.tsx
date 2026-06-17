@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
-import type { ChatMessage, ChatState, QueueState, RunInfo } from "../types";
+import type { PageId } from "./ActivityBar";
+import type { Approval, ChatMessage, ChatState, CurrentProject, GitInfo, QueueState, RunInfo, Usage } from "../types";
 import DragHandle from "./DragHandle";
 import { Markdown, STEP_META, StepChip, withStepChips } from "./Markdown";
+import { ApprovalCard, LiveOutput } from "./TaskViews";
+import CommandPalette, { type PaletteAction } from "./CommandPalette";
 import { EmptyState } from "./ui";
 import { loadState, saveState } from "../persist";
 import {
@@ -13,11 +16,28 @@ import {
   ChevronRight,
   ClaudeMark,
   Close,
+  Command,
+  Folder,
+  GitBranch,
   OpenAIMark,
   Send,
   Spinner,
   StopSquare,
+  Terminal,
 } from "./icons";
+
+const MODE_LABELS: Record<string, string> = {
+  maximum_quality: "Max Quality",
+  balanced: "Balanced",
+  budget_saver: "Budget Saver",
+  manual_approval: "Manual Approval",
+};
+
+const HEALTH_DOT: Record<string, string> = {
+  green: "bg-emerald-500",
+  yellow: "bg-amber-500",
+  red: "bg-rose-500",
+};
 
 const OPEN_KEY = "agentflow.chatOpen";
 
@@ -140,32 +160,44 @@ function AgentActivity({ queue, running }: { queue: QueueState | null; running: 
       </div>
       <div className="space-y-1.5">
         {orchestrating && (
-          <div className="flex items-center gap-1.5 text-[11px] text-neutral-700 dark:text-neutral-300">
-            <Spinner className="h-3 w-3 text-violet-500" />
-            <span className={`h-2 w-2 rounded-full ${PROVIDER_DOT[orchestrating.provider ?? ""] ?? "bg-neutral-400"}`} aria-hidden="true" />
-            <span className="font-mono">{orchestrating.provider}</span>
-            <span>is deciding the next step… {elapsed(orchestrating.startedAt)}</span>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-[11px] text-neutral-700 dark:text-neutral-300">
+              <Spinner className="h-3 w-3 text-violet-500" />
+              <span className={`h-2 w-2 rounded-full ${PROVIDER_DOT[orchestrating.provider ?? ""] ?? "bg-neutral-400"}`} aria-hidden="true" />
+              <span className="font-mono">{orchestrating.provider}</span>
+              <span>is deciding the next step… {elapsed(orchestrating.startedAt)}</span>
+            </div>
+            {orchestrating.stdout && <LiveOutput text={orchestrating.stdout} />}
           </div>
         )}
-        {items.map((i) => (
-          <div key={i.id} className="flex items-center gap-1.5 text-[11px] text-neutral-700 dark:text-neutral-300">
-            {i.status === "running" ? (
-              <Spinner className="h-3 w-3 text-blue-500" />
-            ) : (
-              <span
-                className={`h-1.5 w-1.5 shrink-0 rounded-full ${i.status === "queued" ? "bg-neutral-400" : "bg-amber-500"}`}
-                aria-hidden="true"
-              />
-            )}
-            <StepChip name={i.step} />
-            <span className="font-mono text-[10px] text-neutral-400">{i.provider}</span>
-            <span className="min-w-0 flex-1 truncate">
-              {i.status === "running" && `working… ${elapsed(i.startedAt)}`}
-              {i.status === "queued" && "waiting"}
-              {(i.status === "blocked" || i.status === "awaiting_approval") && "needs approval (Tasks tab)"}
-            </span>
-          </div>
-        ))}
+        {items.map((i) => {
+          // The live in-memory output of this step's run grows as the CLI emits it.
+          const run = running.find(
+            (r) => r.status === "running" && r.step === i.step && r.taskId === i.taskId,
+          );
+          return (
+            <div key={i.id} className="space-y-1">
+              <div className="flex items-center gap-1.5 text-[11px] text-neutral-700 dark:text-neutral-300">
+                {i.status === "running" ? (
+                  <Spinner className="h-3 w-3 text-blue-500" />
+                ) : (
+                  <span
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${i.status === "queued" ? "bg-neutral-400" : "bg-amber-500"}`}
+                    aria-hidden="true"
+                  />
+                )}
+                <StepChip name={i.step} />
+                <span className="font-mono text-[10px] text-neutral-400">{i.provider}</span>
+                <span className="min-w-0 flex-1 truncate">
+                  {i.status === "running" && `working… ${elapsed(i.startedAt)}`}
+                  {i.status === "queued" && "waiting"}
+                  {(i.status === "blocked" || i.status === "awaiting_approval") && "needs approval"}
+                </span>
+              </div>
+              {run?.stdout && <LiveOutput text={run.stdout} />}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -244,8 +276,20 @@ function EngineSelect({
 const ORCH = "orchestrator";
 const FALLBACK_AGENTS = ["codex", "claude", "antigravity"];
 
-/** Persistent chat dock — the controller plus a direct line to each agent. */
-export default function ChatPanel({ workspacePath }: { workspacePath: string | null }) {
+/** Persistent Agent Dock — the controller plus a direct line to each agent. */
+export default function ChatPanel({
+  workspacePath,
+  project = null,
+  git = null,
+  usage = null,
+  onNavigate,
+}: {
+  workspacePath: string | null;
+  project?: CurrentProject | null;
+  git?: GitInfo | null;
+  usage?: Usage | null;
+  onNavigate?: (page: PageId) => void;
+}) {
   const hasWorkspace = Boolean(workspacePath);
   const [open, setOpen] = useState(() => localStorage.getItem(OPEN_KEY) !== "0");
   const [width, setWidth] = useState(() => loadState("chatW", 384));
@@ -253,12 +297,14 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
   const [data, setData] = useState<ChatState | null>(null);
   const [queue, setQueue] = useState<QueueState | null>(null);
   const [running, setRunning] = useState<RunInfo[]>([]);
+  const [approvals, setApprovals] = useState<Approval[]>([]);
   const [input, setInput] = useState("");
   const [provider, setProvider] = useState<string | null>(null);
   const [channel, setChannel] = useState<string>(() => loadState("chatTab", ORCH));
   const [seen, setSeen] = useState<Record<string, number>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef(workspacePath);
 
@@ -281,6 +327,7 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
     setData(null);
     setQueue(null);
     setRunning([]);
+    setApprovals([]);
     setNotice(null);
     setProvider(null);
     setSeen({});
@@ -290,15 +337,33 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
     const ws = workspacePath;
     if (!ws) return;
     try {
-      const [chat, q, logs] = await Promise.all([api.chat(), api.queue(), api.logs()]);
+      const [chat, q, logs, appr] = await Promise.all([
+        api.chat(),
+        api.queue(),
+        api.logs(),
+        api.approvals(true).catch(() => ({ approvals: [] as Approval[] })),
+      ]);
       if (wsRef.current !== ws) return; // ignore stale responses
       setData(chat);
       setQueue(q);
       setRunning(logs.running);
+      setApprovals(appr.approvals);
     } catch {
       /* backend banner covers outages */
     }
   }, [workspacePath]);
+
+  const resolveApproval = useCallback(
+    async (id: string, approve: boolean) => {
+      try {
+        await (approve ? api.approvalApprove(id) : api.approvalReject(id));
+      } catch (e) {
+        setNotice(e instanceof Error ? e.message : String(e));
+      }
+      await load();
+    },
+    [load],
+  );
 
   const channelMessages = (id: string): ChatMessage[] =>
     id === ORCH ? data?.messages ?? [] : data?.channels?.[id] ?? [];
@@ -309,7 +374,7 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
     data?.pending != null ||
     Object.values(data?.channelPending ?? {}).some((p) => p != null) ||
     (queue?.items ?? []).some((i) => i.status === "running") ||
-    running.some((r) => r.step === "orchestrate");
+    running.length > 0;
 
   // Poll while collapsed too (slowly) — the rail shows unread + activity dots.
   useEffect(() => {
@@ -362,6 +427,39 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
       setSending(false);
     }
   };
+
+  // ⌘K / Ctrl+K opens the native action palette.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const channelIds = [ORCH, ...(data?.providers?.map((p) => p.id) ?? FALLBACK_AGENTS)];
+  const paletteActions = useMemo<PaletteAction[]>(() => {
+    const acts: PaletteAction[] = [];
+    if (onNavigate) {
+      acts.push({ id: "nav-terminals", label: "Open Terminals", hint: "PTY", run: () => onNavigate("terminals") });
+      acts.push({ id: "nav-tasks", label: "Open Tasks", hint: "history", run: () => onNavigate("tasks") });
+      acts.push({ id: "nav-usage", label: "Open Usage — traffic control", run: () => onNavigate("usage") });
+    }
+    for (const a of approvals) {
+      acts.push({ id: `appr-${a.id}`, label: `Approve: ${a.action}`, hint: a.provider ?? "approval", run: () => void resolveApproval(a.id, true) });
+      acts.push({ id: `rej-${a.id}`, label: `Reject: ${a.action}`, hint: a.provider ?? "approval", run: () => void resolveApproval(a.id, false) });
+    }
+    if (pending) acts.push({ id: "stop-resp", label: "Stop response", hint: channel, run: () => void api.chatStop(channel).then(load) });
+    if (running.length > 0) acts.push({ id: "stop-all", label: "Stop all running processes", run: () => void api.stop().then(load) });
+    acts.push({ id: "clear", label: "Clear this chat", hint: isOrch ? "controller" : channel, run: () => void api.chatClear(channel).then(load) });
+    for (const id of channelIds) {
+      if (id !== channel) acts.push({ id: `chan-${id}`, label: `Switch to ${id === ORCH ? "controller" : id}`, hint: id === ORCH ? "controller" : id, run: () => switchTab(id) });
+    }
+    return acts;
+  }, [onNavigate, approvals, pending, running.length, channel, isOrch, channelIds.join(","), resolveApproval, load]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!open) {
     // One icon per channel — opens the dock straight onto that conversation.
@@ -487,6 +585,24 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
         </div>
         <div className="flex shrink-0 items-center gap-0.5 px-1">
           <button
+            onClick={() => setPaletteOpen(true)}
+            title="Command palette (⌘K)"
+            aria-label="Open command palette"
+            className="icon-btn"
+          >
+            <Command className="h-3.5 w-3.5" />
+          </button>
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate("terminals")}
+              title="Open terminals"
+              aria-label="Open terminals"
+              className="icon-btn"
+            >
+              <Terminal className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <button
             onClick={() => {
               const label = isOrch ? "controller" : channel;
               if (window.confirm(`Clear the ${label} chat for this workspace?`)) {
@@ -543,6 +659,16 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
         )}
 
         {isOrch && <AgentActivity queue={queue} running={running} />}
+
+        {isOrch &&
+          approvals.map((a) => (
+            <ApprovalCard
+              key={a.id}
+              approval={a}
+              onApprove={(id) => void resolveApproval(id, true)}
+              onReject={(id) => void resolveApproval(id, false)}
+            />
+          ))}
 
         {pending && (
           <div className="flex flex-col items-start">
@@ -618,7 +744,59 @@ export default function ChatPanel({ workspacePath }: { workspacePath: string | n
           )}
         </div>
       </div>
+
+      {/* dock status footer — mirrors the global status bar density */}
+      <div className="flex h-6 shrink-0 items-center gap-2 overflow-hidden border-t border-neutral-200 bg-surface px-2 text-[10px] text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950">
+        {project?.name && (
+          <span className="flex max-w-[38%] items-center gap-1 truncate font-mono" title={workspacePath ?? undefined}>
+            <Folder className="h-3 w-3 shrink-0" />
+            {project.name}
+          </span>
+        )}
+        {git?.isRepo && (
+          <span className="flex items-center gap-1 font-mono">
+            <GitBranch className="h-3 w-3 shrink-0" />
+            {git.branch}
+            {(git.changedFileCount ?? 0) > 0 && (
+              <span className="tabular-nums text-amber-600 dark:text-amber-400">±{git.changedFileCount}</span>
+            )}
+          </span>
+        )}
+        <span className="flex items-center gap-1">
+          <ProviderMark id={selected} className="h-3 w-3" />
+          <span className="font-mono">{selected}</span>
+        </span>
+        {(queue?.activeCount ?? 0) > 0 && (
+          <span className="flex items-center gap-1">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" aria-hidden="true" />
+            <span className="tabular-nums">{queue!.activeCount} queued</span>
+          </span>
+        )}
+        {running.length > 0 && (
+          <span className="flex items-center gap-1">
+            <Spinner className="h-3 w-3 text-blue-500" />
+            <span className="tabular-nums">{running.length}</span>
+          </span>
+        )}
+        <span className="flex-1" />
+        {usage &&
+          ["codex", "claude", "antigravity"].map((id) =>
+            usage.providers[id] ? (
+              <span
+                key={id}
+                className={`h-1.5 w-1.5 rounded-full ${HEALTH_DOT[usage.providers[id].health] ?? "bg-neutral-400"}`}
+                title={`${id}: ${usage.providers[id].health}`}
+                aria-hidden="true"
+              />
+            ) : null,
+          )}
+        {usage && (
+          <span className="font-mono">{MODE_LABELS[usage.orchestrationMode] ?? usage.orchestrationMode}</span>
+        )}
+      </div>
       </section>
+
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} actions={paletteActions} />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 # Controller Backend Strategy
 
 This docs set defines the path from the current beta backend to a fully functional
-controller backend for Command Line Interface Terminal Controller (CLIT Controller IDE).
+controller backend for Command Line Interface Traffic Controller (CLIT Controller IDE).
 
 The current codebase already has the important primitives:
 
