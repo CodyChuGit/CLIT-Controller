@@ -108,8 +108,16 @@ def orchestrator_consult_prompt(usage: dict, task_state: str, trigger: str, outp
         f"{task_state}\n\n"
         f"Just happened: {trigger}\n\n"
         f"{tail}"
-        "Reply with AT MOST two sentences of reasoning plus ONE of these blocks "
-        "(agentflow-run may accompany another block):\n\n"
+        "Reply with AT MOST two sentences of reasoning, then your decision(s).\n\n"
+        "PREFERRED — emit ONE fenced `agentflow` block of structured JSON decisions "
+        "(version 1; kinds: queue/run/done/needs_user):\n"
+        "```agentflow\n"
+        '{"version":"1","decisions":[{"kind":"queue","taskRef":"<task id>","steps":["codex_spec"]},'
+        '{"kind":"run","command":"npm test"}]}\n'
+        "```\n"
+        "(steps come from: codex_spec, claude_implement, gemini_qa, codex_review, claude_fix; "
+        '`done` and `needs_user` take {"reason":"<one line>"}.)\n\n'
+        "Or use ONE of the legacy single blocks below (agentflow-run may accompany another block):\n\n"
         "Queue the next step(s):\n"
         "```agentflow-queue\n"
         "task: <task id>\n"
@@ -152,7 +160,16 @@ def orchestrator_chat_prompt(usage: dict, workspace_summary: str, transcript: st
         "colored chips. Keep replies under ~120 words unless the user asks for depth. No headings "
         "larger than ###, no walls of text.\n\n"
         "You can create CLITC tasks AND queue work to the agents — the system executes the queue "
-        "automatically, cueing one step per agent at a time, in order. Two fenced blocks are available:\n\n"
+        "automatically, cueing one step per agent at a time, in order.\n\n"
+        "PREFERRED — emit ONE fenced `agentflow` block of structured JSON decisions "
+        "(version 1; kinds: task/queue/run):\n"
+        "```agentflow\n"
+        '{"version":"1","decisions":[{"kind":"task","title":"<short imperative>","goal":"<compact goal>",'
+        '"queueSteps":["codex_spec"]},{"kind":"run","command":"npm run dev"}]}\n'
+        "```\n"
+        "(`queueSteps`/`steps` come from: codex_spec, claude_implement, gemini_qa, codex_review, claude_fix, "
+        'or ["full"]; `queue` takes {"taskRef":"latest","steps":[...]}.)\n\n'
+        "Or use the legacy fenced blocks below.\n\n"
         "Create a task (optionally queueing its steps immediately):\n"
         "```agentflow-task\n"
         "title: <short imperative title>\n"
