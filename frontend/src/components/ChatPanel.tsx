@@ -4,9 +4,11 @@ import type { PageId } from "./ActivityBar";
 import type { Approval, ChatMessage, ChatState, CurrentProject, GitInfo, QueueState, RunInfo, Usage } from "../types";
 import DragHandle from "./DragHandle";
 import { Markdown, STEP_META, StepChip, withStepChips } from "./Markdown";
-import { ApprovalCard, LiveOutput } from "./TaskViews";
+import { ApprovalCard, Disclosure, LiveOutput } from "./TaskViews";
 import CommandPalette, { type PaletteAction } from "./CommandPalette";
 import SmoothStreamingText from "./SmoothStreamingText";
+import Composer, { ComposerChip } from "./Composer";
+import RawDetail from "./RawDetail";
 import { EmptyState } from "./ui";
 import { useRunStream, useStructuralRevision } from "../stream";
 import { loadState, saveState } from "../persist";
@@ -22,9 +24,7 @@ import {
   Folder,
   GitBranch,
   OpenAIMark,
-  Send,
   Spinner,
-  StopSquare,
   Terminal,
 } from "./icons";
 
@@ -98,11 +98,18 @@ function SystemNotice({ msg }: { msg: ChatMessage }) {
           {withStepChips(first)}
         </span>
       </div>
-      {rest.length > 0 && (
-        <pre className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap pl-3 font-mono text-[10px] text-neutral-500 dark:text-neutral-400">
-          {rest.join("\n")}
-        </pre>
-      )}
+      {rest.length > 0 &&
+        (rest.join("\n").length > 400 ? (
+          // Long raw tail → the shared paginated viewer (same component the Tasks
+          // page uses), behind an expander so the notice stays compact.
+          <Disclosure label="View raw" className="mt-1 pl-3">
+            <RawDetail text={rest.join("\n")} kind="log" pageSize={50} />
+          </Disclosure>
+        ) : (
+          <pre className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap pl-3 font-mono text-[10px] text-neutral-500 dark:text-neutral-400">
+            {rest.join("\n")}
+          </pre>
+        ))}
     </div>
   );
 }
@@ -733,56 +740,42 @@ export default function ChatPanel({
             {notice}
           </p>
         )}
-        <div className="flex items-end gap-1.5">
-          {isOrch && (
-            <EngineSelect
-              value={selected}
-              options={data?.providers ?? [{ id: selected, installed: true }]}
-              onChange={setProvider}
-            />
-          )}
-          <textarea
-            className="input max-h-32 min-h-[38px] flex-1 resize-none text-xs"
-            placeholder={
-              !hasWorkspace
-                ? "Open a workspace first"
-                : isOrch
-                  ? "Ask the controller…"
-                  : `Message ${channel} directly…`
-            }
-            value={input}
-            disabled={!hasWorkspace || sending}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void send();
-              }
-            }}
-            rows={Math.min(4, Math.max(1, input.split("\n").length))}
-            aria-label="Chat message"
-          />
-          {pending ? (
-            <button
-              className="btn-danger shrink-0 px-2.5"
-              onClick={() => void api.chatStop(channel).then(load)}
-              title="Stop response"
-              aria-label="Stop response"
-            >
-              <StopSquare className="h-4 w-4" />
-            </button>
-          ) : (
-            <button
-              className="btn-primary shrink-0 px-2.5"
-              onClick={() => void send()}
-              disabled={!hasWorkspace || !input.trim() || sending}
-              title="Send"
-              aria-label="Send message"
-            >
-              <Send className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+        <Composer
+          value={input}
+          onChange={setInput}
+          onSend={() => void send()}
+          onStop={pending ? () => void api.chatStop(channel).then(load) : undefined}
+          busy={!!pending}
+          disabled={!hasWorkspace || sending}
+          placeholder={
+            !hasWorkspace ? "Open a workspace first" : isOrch ? "Ask the controller…" : `Message ${channel} directly…`
+          }
+          leading={
+            isOrch ? (
+              <EngineSelect
+                value={selected}
+                options={data?.providers ?? [{ id: selected, installed: true }]}
+                onChange={setProvider}
+              />
+            ) : undefined
+          }
+          contextChips={
+            isOrch && usage ? (
+              <>
+                <ComposerChip title="Traffic control mode">
+                  {MODE_LABELS[usage.orchestrationMode] ?? usage.orchestrationMode}
+                </ComposerChip>
+                {["codex", "claude", "antigravity"].map((id) =>
+                  usage.providers[id] ? (
+                    <ComposerChip key={id} dot={HEALTH_DOT[usage.providers[id].health] ?? "bg-neutral-400"} mono title={`${id} health`}>
+                      {id}
+                    </ComposerChip>
+                  ) : null,
+                )}
+              </>
+            ) : undefined
+          }
+        />
       </div>
 
       {/* dock status footer — mirrors the global status bar density */}
