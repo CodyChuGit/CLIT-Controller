@@ -43,6 +43,46 @@ class EventBus:
         self._seq = 0
         self._lock = threading.Lock()
 
+    @staticmethod
+    def _build_payload(type_: str, channel: Optional[str], text: Optional[str], data: dict) -> Optional[dict]:
+        """Derive the typed OutputEvent payload (I/O rebuild Plane 2) from an event.
+
+        Built from ALREADY-REDACTED values. Returns a discriminated payload dict for
+        the semantically-typed events, or None for transport-only events (heartbeat)
+        and structural events without a clean typed shape (the legacy fields still
+        carry those). Validated against io_contracts in tests; the frontend derives
+        presentation records from this instead of from `type` string maps."""
+        if type_ in ("chat.delta", "controller.delta"):
+            return {"type": "narrative.delta", "text": text or ""}
+        if type_ in ("run.output", "run.stderr"):
+            return {"type": "command.output", "text": text or ""}
+        if type_ in ("command.started", "run.started"):
+            return {"type": "command.started", "command": str(data.get("command", ""))}
+        if type_ in ("command.finished", "chat.finished"):
+            status = data.get("status", "succeeded")
+            if status not in ("succeeded", "failed", "cancelled", "error"):
+                status = "succeeded"
+            return {
+                "type": "command.completed",
+                "status": status,
+                "exitCode": data.get("exitCode"),
+                "durationMs": data.get("durationMs"),
+            }
+        if type_ == "run.cancelled":
+            return {"type": "cancellation", "runId": data.get("runId")}
+        if type_ == "approval.required":
+            return {
+                "type": "approval.requested",
+                "approvalId": str(data.get("approvalId", "")),
+                "action": str(data.get("action", "")),
+                "reason": str(data.get("reason", "")),
+            }
+        if type_ == "policy.denied":
+            return {"type": "failure", "title": "Command denied", "summary": str(data.get("reason", ""))}
+        if type_ == "task.summary_ready":
+            return {"type": "summary.ready", "kind": str(data.get("kind", "task_summary"))}
+        return None
+
     def publish(
         self,
         workspace: Union[str, Path, None],
@@ -63,6 +103,11 @@ class EventBus:
         """Append one event to the live buffer and return it (with a monotonic id)."""
         red_detail = redact(detail) if detail else ""
         red_delta = redact(text_delta) if text_delta else text_delta
+        # Structured payloads can carry secrets too (e.g. a command with an inline
+        # token); redact them like detail/text_delta (audit P1-02).
+        red_data = redact_data(data) if data else {}
+        # Typed OutputEvent payload (Plane 2), derived from the redacted values.
+        payload = self._build_payload(type_, channel, red_delta, red_data)
         now = _now_iso()
         with self._lock:
             self._seq += 1
@@ -83,9 +128,8 @@ class EventBus:
                 "redacted": True,
                 "truncated": truncated,
                 "detail": red_detail,
-                # Structured payloads can carry secrets too (e.g. a command with an
-                # inline token); redact them like detail/text_delta (audit P1-02).
-                "data": redact_data(data) if data else {},
+                "data": red_data,
+                "payload": payload,
             }
             self._buf.append(event)
         return event

@@ -1,3 +1,4 @@
+import { validatePayload } from "./ioContracts";
 import type { StreamEvent } from "../types";
 
 /* Pillar 5 / P2-14 — validate frames crossing the network trust boundary.
@@ -29,5 +30,6 @@ export function coerceStreamEvent(raw: unknown): StreamEvent | null {
     truncated: r.truncated === true,
     detail: str(r.detail) ?? "",
     data: r.data && typeof r.data === "object" ? (r.data as Record<string, unknown>) : {},
+    payload: validatePayload(r.payload), // typed Plane-2 payload, validated (null if absent/unknown)
   };
 }

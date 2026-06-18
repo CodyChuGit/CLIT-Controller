@@ -122,6 +122,14 @@ export interface OutputEventEnvelope {
   payload: EventPayload;
 }
 
+/** Validate a typed event payload (the discriminated `payload` carried on each
+    live event); null for a missing/unknown payload type (fail-safe). */
+export function validatePayload(raw: unknown): EventPayload | null {
+  if (!raw || typeof raw !== "object") return null;
+  const t = (raw as Record<string, unknown>).type;
+  return typeof t === "string" && PAYLOAD_TYPES.has(t) ? (raw as EventPayload) : null;
+}
+
 /** Validate a typed OutputEvent envelope; null on unsupported version or unknown
     payload type (fail-safe). */
 export function validateOutputEvent(raw: unknown): OutputEventEnvelope | null {

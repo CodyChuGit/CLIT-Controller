@@ -380,6 +380,8 @@ export interface StreamEvent {
   truncated: boolean;
   detail: string;
   data: Record<string, unknown>;
+  /** Typed Plane-2 payload derived by the bus; null for transport-only events. */
+  payload: import("./lib/ioContracts").EventPayload | null;
 }
 
 /** Accumulated, progressively-growing output for one run, assembled from deltas. */
