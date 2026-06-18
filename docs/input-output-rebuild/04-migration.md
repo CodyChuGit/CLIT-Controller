@@ -53,14 +53,22 @@ primitives ([03-component-system.md](03-component-system.md)). Concrete plan:
    All three chat surfaces now share one composer + the typed `/api/chat/submit`
    contract — browser-verified for each. The controller's old `chatSend`/`chatDirect`
    branch and its `input`/`sending` state were removed.
-2. **Typed event pipeline** — `event_bus` emits the `OutputEventEnvelope`; the
-   stream store validates via `validateOutputEvent` and derives presentation records;
-   page-local polling for event-covered state is removed.
-3. **ChatPanel decomposition** — extract polling/queue/approval/command rendering
-   into shared hooks/components; ChatPanel composes them.
-4. **Presentation-record components** — CommandRecord/ToolRecord/SummaryRecord/
-   FailureRecord at compact + detailed density, shared by Agent Dock, Tasks, Logs,
-   and replay.
+2. **Typed event pipeline — DONE (additive).** `event_bus` attaches a typed,
+   discriminated `payload` to each semantic event (legacy flat fields preserved so
+   the live stream is untouched); `coerceStreamEvent` validates it (`validatePayload`,
+   fail-safe) and `lib/presentation.recordFromEvent` derives `PresentationRecord`s
+   from the payload type — not from `type` string maps/prose.
+3. **ChatPanel decomposition — DONE (data layer).** Fetching/polling extracted to
+   `hooks/useDockData.ts` (chat/queue/logs/approvals + visibility-aware timer +
+   event-driven refetch + `busy`); ChatPanel dropped ~220 lines and now composes
+   rendering. Message rendering already uses the shared `conversation/Message`.
+   Remaining: TasksPage still has its own queue/approvals polling (a separate
+   `useDockData`-style extraction).
+4. **Presentation-record components — DONE.** `components/records/RecordView`
+   (CommandRecord/FailureRecord/SummaryRecord) selected by record kind; narrative →
+   `conversation/Message`, approval → the shared `ApprovalCard`. Wiring these into
+   every surface's live render (replacing the bespoke AgentActivity/displayModel
+   card paths) is the remaining incremental adoption.
 
 Each step is independently shippable and verifiable against the running app.
 

@@ -2,10 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import type { PageId } from "./ActivityBar";
 import type {
-  Approval,
   ChatMessage,
   ChatSendResult,
-  ChatState,
   CurrentProject,
   GitInfo,
   QueueState,
@@ -21,7 +19,8 @@ import { ComposerChip } from "./Composer";
 import InputComposer from "./input/InputComposer";
 import { Message, PROVIDER_DOT, ProviderMark } from "./conversation/Message";
 import { EmptyState } from "./ui";
-import { useRunStream, useStructuralRevision } from "../stream";
+import { useRunStream } from "../stream";
+import { useDockData } from "../hooks/useDockData";
 import { loadState, saveState } from "../persist";
 import {
   BeanMark,
@@ -218,17 +217,14 @@ export default function ChatPanel({
   const [open, setOpen] = useState(() => localStorage.getItem(OPEN_KEY) !== "0");
   const [width, setWidth] = useState(() => loadState("chatW", 384));
   const widthRef = useRef(width);
-  const [data, setData] = useState<ChatState | null>(null);
-  const [queue, setQueue] = useState<QueueState | null>(null);
-  const [running, setRunning] = useState<RunInfo[]>([]);
-  const [approvals, setApprovals] = useState<Approval[]>([]);
+  // Data/fetching/polling live in the hook; ChatPanel composes rendering.
+  const { data, queue, running, approvals, busy, reload } = useDockData(workspacePath, open);
   const [provider, setProvider] = useState<string | null>(null);
   const [channel, setChannel] = useState<string>(() => loadState("chatTab", ORCH));
   const [seen, setSeen] = useState<Record<string, number>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const wsRef = useRef(workspacePath);
 
   const isOrch = channel === ORCH;
 
@@ -243,45 +239,12 @@ export default function ChatPanel({
     setNotice(null);
   };
 
-  // Each workspace has its own chat — drop everything from the previous one.
+  // Reset local UI state on workspace change (data/queue/etc. reset in the hook).
   useEffect(() => {
-    wsRef.current = workspacePath;
-    setData(null);
-    setQueue(null);
-    setRunning([]);
-    setApprovals([]);
     setNotice(null);
     setProvider(null);
     setSeen({});
   }, [workspacePath]);
-
-  const load = useCallback(async () => {
-    const ws = workspacePath;
-    if (!ws) return;
-    try {
-      // Collapsed, the dock only renders unread/activity dots from chat state —
-      // skip the queue/logs/approvals payloads (logs can carry KBs of run tails).
-      if (!open) {
-        const chat = await api.chat();
-        if (wsRef.current !== ws) return;
-        setData(chat);
-        return;
-      }
-      const [chat, q, logs, appr] = await Promise.all([
-        api.chat(),
-        api.queue(),
-        api.logs(),
-        api.approvals(true).catch(() => ({ approvals: [] as Approval[] })),
-      ]);
-      if (wsRef.current !== ws) return; // ignore stale responses
-      setData(chat);
-      setQueue(q);
-      setRunning(logs.running);
-      setApprovals(appr.approvals);
-    } catch {
-      /* backend banner covers outages */
-    }
-  }, [workspacePath, open]);
 
   const resolveApproval = useCallback(
     async (id: string, approve: boolean) => {
@@ -290,9 +253,9 @@ export default function ChatPanel({
       } catch (e) {
         setNotice(e instanceof Error ? e.message : String(e));
       }
-      await load();
+      await reload();
     },
-    [load],
+    [reload],
   );
 
   const channelMessages = (id: string): ChatMessage[] =>
@@ -301,58 +264,6 @@ export default function ChatPanel({
   const pending = (isOrch ? data?.pending : data?.channelPending?.[channel]) ?? null;
   // Progressive text for the in-flight reply, streamed from the shared event bus.
   const liveReply = useRunStream(pending?.runId);
-  const streamRev = useStructuralRevision();
-
-  const busy =
-    data?.pending != null ||
-    Object.values(data?.channelPending ?? {}).some((p) => p != null) ||
-    (queue?.items ?? []).some((i) => i.status === "running") ||
-    running.length > 0;
-
-  // Poll while collapsed too (slowly) — the rail shows unread + activity dots.
-  // The dock is always mounted, so pause the timer while the tab is hidden and
-  // refetch once on return, instead of polling a background tab forever.
-  useEffect(() => {
-    if (!hasWorkspace) return;
-    const ms = !open ? 10000 : busy ? 2000 : 6000;
-    let id: number | undefined;
-    const start = () => {
-      if (id === undefined) id = window.setInterval(load, ms);
-    };
-    const stop = () => {
-      if (id !== undefined) {
-        window.clearInterval(id);
-        id = undefined;
-      }
-    };
-    const onVisibility = () => {
-      if (document.hidden) {
-        stop();
-      } else {
-        void load();
-        start();
-      }
-    };
-    void load();
-    if (!document.hidden) start();
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      stop();
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-    // NOTE: streamRev is deliberately NOT a dependency here. It bumps on every
-    // structural stream event; including it tore down and recreated the interval
-    // + visibility listener on each event, firing an immediate multi-request
-    // load() per event — a fetch storm during active orchestration. The
-    // event-driven refetch lives in its own effect below.
-  }, [open, hasWorkspace, load, busy]);
-
-  // Refetch immediately when a structural event (chat.finished, queue.changed,
-  // approval.*, …) arrives over the stream — without disturbing the poll timer.
-  useEffect(() => {
-    if (!hasWorkspace || streamRev === 0) return;
-    void load();
-  }, [streamRev, hasWorkspace, load]);
 
   // The active tab is always caught up; other tabs flag replies that arrived meanwhile.
   useEffect(() => {
@@ -385,7 +296,7 @@ export default function ChatPanel({
         ? (res.message ?? res.status)
         : null,
     );
-    void load();
+    void reload();
   };
 
   // ⌘K / Ctrl+K opens the native action palette.
@@ -441,19 +352,19 @@ export default function ChatPanel({
         id: "stop-resp",
         label: "Stop response",
         hint: channel,
-        run: () => void api.chatStop(channel).then(load),
+        run: () => void api.chatStop(channel).then(reload),
       });
     if (running.length > 0)
       acts.push({
         id: "stop-all",
         label: "Stop all running processes",
-        run: () => void api.stop().then(load),
+        run: () => void api.stop().then(reload),
       });
     acts.push({
       id: "clear",
       label: "Clear this chat",
       hint: isOrch ? "controller" : channel,
-      run: () => void api.chatClear(channel).then(load),
+      run: () => void api.chatClear(channel).then(reload),
     });
     for (const id of channelIds) {
       if (id !== channel)
@@ -474,7 +385,7 @@ export default function ChatPanel({
     isOrch,
     channelIds.join(","),
     resolveApproval,
-    load,
+    reload,
   ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!open) {
@@ -631,7 +542,7 @@ export default function ChatPanel({
               onClick={() => {
                 const label = isOrch ? "controller" : channel;
                 if (window.confirm(`Clear the ${label} chat for this workspace?`)) {
-                  void api.chatClear(channel).then(load);
+                  void api.chatClear(channel).then(reload);
                 }
               }}
               title="Clear this chat"
@@ -733,7 +644,7 @@ export default function ChatPanel({
             destination={isOrch ? { kind: "controller" } : { kind: "provider", provider: channel }}
             context={isOrch ? { provider: selected } : undefined}
             onResult={onSubmitResult}
-            onStop={pending ? () => void api.chatStop(channel).then(load) : undefined}
+            onStop={pending ? () => void api.chatStop(channel).then(reload) : undefined}
             busy={!!pending}
             disabled={!hasWorkspace}
             placeholder={
