@@ -13,6 +13,7 @@ import asyncio
 import fcntl
 import os
 import pty
+import shlex
 import signal
 import struct
 import subprocess
@@ -135,12 +136,28 @@ def sweep_orphaned_sessions() -> int:
 
 
 class TerminalSession:
-    """One PTY + child process, fanning output out to any connected clients."""
+    """One PTY + child process, fanning output out to any connected clients.
 
-    def __init__(self, key: str, cwd: str, launch: Optional[str]) -> None:
+    Besides raw PTY bytes, the session broadcasts small ``dict`` metadata items
+    (state transitions) through the same client queues; the WS route serializes
+    them as JSON text frames while bytes stay binary — so the UI can tell "PTY
+    up but the CLI is still launching" apart from "dead box"."""
+
+    def __init__(
+        self,
+        key: str,
+        cwd: str,
+        launch: Optional[str],
+        provider: Optional[str] = None,
+        executable_path: Optional[str] = None,
+    ) -> None:
         self.key = key
         self.cwd = cwd
         self.launch = launch  # command auto-run once at startup, or None
+        self.provider = provider
+        self.executable_path = executable_path
+        self.state = "launching"  # launching -> ready -> closed
+        self.exit_code: Optional[int] = None
         self.master_fd: int = -1
         self.proc: Optional[asyncio.subprocess.Process] = None
         self.buffer = bytearray()
@@ -149,6 +166,24 @@ class TerminalSession:
         self.cols = 80
         self.exited = False
         self._pidfile: Optional[Path] = None
+        self._launch_written = launch is None  # readiness counts output after the CLI launch
+
+    def current_meta(self) -> dict:
+        meta = {
+            "type": "meta",
+            "state": self.state,
+            "provider": self.provider,
+            "executablePath": self.executable_path,
+        }
+        if self.state == "closed":
+            meta["exitCode"] = self.exit_code
+            meta["reason"] = "pty_closed"
+        return meta
+
+    def _set_state(self, state: str) -> None:
+        if self.state != state:
+            self.state = state
+            self._broadcast(self.current_meta())
 
     async def start(self) -> None:
         loop = asyncio.get_running_loop()
@@ -187,6 +222,7 @@ class TerminalSession:
             async def _kick() -> None:
                 await asyncio.sleep(0.4)  # let the shell print its prompt first
                 self.write((launch + "\n").encode())
+                self._launch_written = True
 
             asyncio.create_task(_kick())
 
@@ -228,6 +264,11 @@ class TerminalSession:
         if not data:  # EOF — the child closed the pty
             self._detach_reader()
             return
+        # ponytail: "ready" = first PTY output after the CLI launch was submitted —
+        # a round-trip heuristic, not TUI introspection; auth/init text still shows
+        # in the terminal itself. Upgrade path: classify known auth/error patterns.
+        if self.state == "launching" and self._launch_written:
+            self._set_state("ready")
         self.buffer += data
         excess = len(self.buffer) - SCROLLBACK_BYTES
         if excess > 0:
@@ -245,6 +286,7 @@ class TerminalSession:
     async def _watch_exit(self) -> None:
         if self.proc is not None:
             await self.proc.wait()
+            self.exit_code = self.proc.returncode
         self.exited = True
         _clear_session_file(self._pidfile)
         self._detach_reader()
@@ -261,6 +303,7 @@ class TerminalSession:
         note = b"\r\n\x1b[2m[session ended \xe2\x80\x94 reconnect to restart]\x1b[0m\r\n"
         self.buffer += note
         self._broadcast(bytes(note))
+        self._set_state("closed")
         self._broadcast(CLOSED)
 
     async def terminate(self) -> None:
@@ -300,6 +343,7 @@ class TerminalSession:
                     pass
         self.exited = True
         _clear_session_file(self._pidfile)
+        self._set_state("closed")
         self._broadcast(CLOSED)
 
 
@@ -307,11 +351,18 @@ class TerminalManager:
     def __init__(self) -> None:
         self.sessions: dict[str, TerminalSession] = {}
 
-    async def get_or_create(self, key: str, cwd: str, launch: Optional[str]) -> TerminalSession:
+    async def get_or_create(
+        self,
+        key: str,
+        cwd: str,
+        launch: Optional[str],
+        provider: Optional[str] = None,
+        executable_path: Optional[str] = None,
+    ) -> TerminalSession:
         session = self.sessions.get(key)
         if session is not None and not session.exited:
             return session
-        session = TerminalSession(key, cwd, launch)
+        session = TerminalSession(key, cwd, launch, provider=provider, executable_path=executable_path)
         await session.start()
         self.sessions[key] = session
         return session
@@ -339,9 +390,13 @@ def session_key(workspace: Path, provider: str) -> str:
 # the TUI stuck in a busy state that won't take input. Launch the bare CLI and
 # let the user type once it's ready.
 def launch_command(provider: str) -> Optional[str]:
-    """The bare CLI command to auto-run for a provider, or None if not installed."""
+    """The bare CLI command to auto-run for a provider, or None if not installed.
+
+    Uses the RESOLVED executable path (quoted — user-bin paths can contain spaces)
+    rather than the basename, so launch does not depend on the child shell's PATH
+    happening to include the install dir (revamp Workstream 3)."""
     found = which(provider)
-    return os.path.basename(found) if found else None
+    return shlex.quote(found) if found else None
 
 
 TERMINALS = TerminalManager()

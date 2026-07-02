@@ -8,7 +8,7 @@
    It caches only the built app shell + hashed static assets so the window opens
    fast and offline; everything dynamic is network-only. */
 
-const CACHE = "clitc-shell-v6";
+const CACHE = "clitc-shell-v7";
 const SHELL = [
   "/",
   "/index.html",

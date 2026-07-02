@@ -56,3 +56,34 @@ def test_ws_missing_origin_is_allowed():
     with client.websocket_connect("/api/terminals/codex/ws") as ws:
         msg = ws.receive_bytes()
         assert b"No workspace" in msg
+
+
+def test_diagnostics_unknown_provider_is_404():
+    r = _client().get("/api/terminals/bogus/diagnostics")
+    assert r.status_code == 404
+
+
+def test_diagnostics_missing_executable(monkeypatch):
+    from agentflow.api import routes_terminals
+
+    monkeypatch.setattr(routes_terminals, "which", lambda provider: None)
+    r = _client().get("/api/terminals/antigravity/diagnostics")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["provider"] == "antigravity"
+    assert body["installed"] is False
+    assert body["executablePath"] is None
+    assert body["sessionState"] == "missing"
+    assert body["suggestedAction"]  # install hint tells the user what to do
+
+
+def test_diagnostics_installed_no_session(monkeypatch):
+    from agentflow.api import routes_terminals
+
+    monkeypatch.setattr(routes_terminals, "which", lambda provider: "/Users/me/.local/bin/agy")
+    r = _client().get("/api/terminals/antigravity/diagnostics")
+    body = r.json()
+    assert body["installed"] is True
+    assert body["executablePath"] == "/Users/me/.local/bin/agy"
+    # No workspace selected in the hermetic test env → no session either way.
+    assert body["sessionState"] in ("none", "missing")

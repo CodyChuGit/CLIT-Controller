@@ -94,9 +94,11 @@ export default function RawDetail({
   const gutterWidth = `${Math.max(2, String(allLines.length).length)}ch`;
 
   return (
-    <div className={`rounded-md border border-neutral-200 dark:border-neutral-800 ${className}`}>
+    <div
+      className={`overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-800 ${className}`}
+    >
       {/* controls */}
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-neutral-200 px-2 py-1 dark:border-neutral-800">
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-neutral-200 bg-neutral-100/60 px-2 py-1 dark:border-neutral-800 dark:bg-neutral-900/60">
         {label && <span className="section-title">{label}</span>}
         <span className="font-mono text-[10px] text-neutral-400">
           {query ? `${filtered.length}/${allLines.length}` : allLines.length} ln

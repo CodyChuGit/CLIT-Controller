@@ -18,8 +18,12 @@ import SmoothStreamingText from "./SmoothStreamingText";
 import { ComposerChip } from "./Composer";
 import InputComposer from "./input/InputComposer";
 import { Message, PROVIDER_DOT, ProviderMark } from "./conversation/Message";
+import TerminalPane from "./TerminalPane";
+import TimelineCard from "./TimelineCard";
 import { EmptyState } from "./ui";
-import { useRunStream } from "../stream";
+import { useRecentEvents, useRunStream } from "../stream";
+import { cardFromStreamEvent } from "../lib/displayModel";
+import { stripResultSentinel } from "../lib/narrative";
 import { useDockData } from "../hooks/useDockData";
 import { loadState, saveState } from "../persist";
 import {
@@ -63,6 +67,37 @@ function elapsed(startedAt?: string): string {
 
 const ACTIVE = ["queued", "awaiting_approval", "blocked", "running"];
 
+/** Live output for one run, read from the shared event store only — never from
+ *  polled log snapshots (revamp Workstream 1 data rule). */
+function LiveRunStream({ runId }: { runId: string | null | undefined }) {
+  const stream = useRunStream(runId);
+  const text = stripResultSentinel(stream?.stdout ?? "");
+  if (!text) return null;
+  return <LiveOutput text={text} active={stream?.status === "running"} />;
+}
+
+/** The most recent structural stream events (queue/task/approval/command/run
+ *  transitions) as compact cards — the dock's "what just happened" strip. */
+function DockEventCards() {
+  const events = useRecentEvents();
+  const cards = events
+    .slice(-40)
+    .map(cardFromStreamEvent)
+    .filter((c): c is NonNullable<typeof c> => c !== null)
+    .slice(-6);
+  if (cards.length === 0) return null;
+  return (
+    <div className="space-y-1 rounded-md border border-neutral-200 bg-surface px-2.5 py-2 dark:border-neutral-800 dark:bg-neutral-950/60">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+        Activity
+      </div>
+      {cards.map((c) => (
+        <TimelineCard key={c.id} card={c} density="compact" />
+      ))}
+    </div>
+  );
+}
+
 function AgentActivity({ queue, running }: { queue: QueueState | null; running: RunInfo[] }) {
   const items = (queue?.items ?? []).filter((i) => ACTIVE.includes(i.status));
   const orchestrating = running.find((r) => r.step === "orchestrate");
@@ -84,11 +119,12 @@ function AgentActivity({ queue, running }: { queue: QueueState | null; running: 
               <span className="font-mono">{orchestrating.provider}</span>
               <span>is deciding the next step… {elapsed(orchestrating.startedAt)}</span>
             </div>
-            {orchestrating.stdout && <LiveOutput text={orchestrating.stdout} />}
+            <LiveRunStream runId={orchestrating.id} />
           </div>
         )}
         {items.map((i) => {
-          // The live in-memory output of this step's run grows as the CLI emits it.
+          // Which run belongs to this step comes from the structural snapshot;
+          // the live text itself streams from the shared event store.
           const run = running.find(
             (r) => r.status === "running" && r.step === i.step && r.taskId === i.taskId,
           );
@@ -111,7 +147,7 @@ function AgentActivity({ queue, running }: { queue: QueueState | null; running: 
                   {(i.status === "blocked" || i.status === "awaiting_approval") && "needs approval"}
                 </span>
               </div>
-              {run?.stdout && <LiveOutput text={run.stdout} />}
+              <LiveRunStream runId={run?.id ?? i.runId} />
             </div>
           );
         })}
@@ -224,6 +260,7 @@ export default function ChatPanel({
   const [seen, setSeen] = useState<Record<string, number>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [termOpen, setTermOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const isOrch = channel === ORCH;
@@ -262,8 +299,12 @@ export default function ChatPanel({
     id === ORCH ? (data?.messages ?? []) : (data?.channels?.[id] ?? []);
   const messages = channelMessages(channel);
   const pending = (isOrch ? data?.pending : data?.channelPending?.[channel]) ?? null;
-  // Progressive text for the in-flight reply, streamed from the shared event bus.
+  // Progressive text for the in-flight reply, streamed from the shared event bus
+  // ONLY (streamStore has its own polling fallback on the same bus) — never from
+  // the pending.outputTail snapshot. Hide the deterministic result block so its
+  // JSON never flashes mid-stream.
   const liveReply = useRunStream(pending?.runId);
+  const liveText = stripResultSentinel(liveReply?.stdout ?? "");
 
   // The active tab is always caught up; other tabs flag replies that arrived meanwhile.
   useEffect(() => {
@@ -286,7 +327,7 @@ export default function ChatPanel({
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages.length, pending?.outputTail, liveReply?.stdout, busy, channel]);
+  }, [messages.length, liveReply?.stdout, busy, channel]);
 
   // After a typed submission resolves: surface non-success status, then refresh so
   // the user message + pending reply (which streams via the event store) appear.
@@ -528,16 +569,15 @@ export default function ChatPanel({
             >
               <Command className="h-3.5 w-3.5" />
             </button>
-            {onNavigate && (
-              <button
-                onClick={() => onNavigate("terminals")}
-                title="Open terminals"
-                aria-label="Open terminals"
-                className="icon-btn"
-              >
-                <Terminal className="h-3.5 w-3.5" />
-              </button>
-            )}
+            <button
+              onClick={() => setTermOpen((v) => !v)}
+              title={termOpen ? "Close terminal drawer" : "Open terminal drawer"}
+              aria-label={termOpen ? "Close terminal drawer" : "Open terminal drawer"}
+              aria-pressed={termOpen}
+              className={`icon-btn ${termOpen ? "text-accent" : ""}`}
+            >
+              <Terminal className="h-3.5 w-3.5" />
+            </button>
             <button
               onClick={() => {
                 const label = isOrch ? "controller" : channel;
@@ -601,6 +641,8 @@ export default function ChatPanel({
 
           {isOrch && <AgentActivity queue={queue} running={running} />}
 
+          {isOrch && <DockEventCards />}
+
           {isOrch &&
             approvals.map((a) => (
               <ApprovalCard
@@ -618,19 +660,21 @@ export default function ChatPanel({
                 <ProviderMark id={isOrch ? selected : channel} className="h-3 w-3" />
                 thinking…
               </span>
-              {(liveReply?.stdout || pending.outputTail) && (
+              {liveText && (
                 <pre className="max-h-36 w-full overflow-auto whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50/60 p-2 font-mono text-[10px] leading-relaxed text-neutral-600 dark:border-blue-900 dark:bg-blue-950/30 dark:text-neutral-300">
-                  <SmoothStreamingText
-                    text={liveReply?.stdout || pending.outputTail || ""}
-                    active
-                    mode="mono"
-                    maxChars={6000}
-                  />
+                  <SmoothStreamingText text={liveText} active mode="mono" maxChars={6000} />
                 </pre>
               )}
             </div>
           )}
         </div>
+
+        {/* provider terminal drawer — a real PTY without leaving the dock */}
+        {termOpen && hasWorkspace && (
+          <div className="flex h-64 shrink-0 flex-col">
+            <TerminalPane provider={isOrch ? selected : channel} compact />
+          </div>
+        )}
 
         {/* notice + input */}
         <div className="shrink-0 border-t border-neutral-200 p-2.5 dark:border-neutral-800">

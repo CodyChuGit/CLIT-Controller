@@ -51,9 +51,9 @@ const HEALTH_DOT: Record<string, string> = {
  *  collapse to one row with a "repeated N times" note. */
 export function ContextSummary({ budget, repeated }: { budget: BudgetSummary; repeated: number }) {
   return (
-    <div className="rounded-md border border-neutral-200 bg-neutral-50/70 px-2.5 py-1.5 dark:border-neutral-800 dark:bg-neutral-900/40">
+    <div className="rounded-lg border border-neutral-200 bg-neutral-50/70 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900/40">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-neutral-500">
-        <span className="font-semibold uppercase tracking-wide text-neutral-400">Context</span>
+        <span className="section-title">Context</span>
         {budget.mode && (
           <span className="font-medium text-neutral-600 dark:text-neutral-300">{budget.mode}</span>
         )}
@@ -212,16 +212,16 @@ export function ApprovalCard({
 }) {
   const pending = approval.status === "pending";
   return (
-    <div className="rounded-md border border-amber-300 bg-amber-50/70 p-2.5 dark:border-amber-800 dark:bg-amber-950/30">
+    <div className="card border-l-2 border-l-amber-400 bg-amber-50/70 p-3 dark:bg-amber-950/30">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+        <span className="rounded border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
           approval · {APPROVAL_KIND_LABEL[approval.kind] ?? approval.kind}
         </span>
         {approval.provider && <span className="chip">{approval.provider}</span>}
         <span className="flex-1" />
         {!pending && <StatusBadge state={approval.status} />}
       </div>
-      <div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto rounded bg-neutral-50 px-2 py-1 dark:bg-neutral-950">
+      <div className="mt-2 flex items-center gap-1.5 overflow-x-auto rounded-md bg-neutral-50 px-2.5 py-1.5 dark:bg-neutral-950">
         <span className="text-neutral-400">$</span>
         <code className="whitespace-pre font-mono text-[10px] text-neutral-700 dark:text-neutral-300">
           {approval.action}
@@ -274,7 +274,7 @@ export function CommandCard({ run }: { run: RunInfo }) {
   const accent = CARD_STATUS[run.status]?.ring ?? "border-l-neutral-300 dark:border-l-neutral-700";
 
   return (
-    <div className={`card border-l-2 ${accent} p-2.5`}>
+    <div className={`card border-l-2 ${accent} p-3`}>
       <div className="flex flex-wrap items-center gap-2">
         <Terminal className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
         <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
@@ -292,7 +292,7 @@ export function CommandCard({ run }: { run: RunInfo }) {
         {duration && <span className="font-mono text-[10px] text-neutral-400">{duration}</span>}
       </div>
 
-      <div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto rounded bg-neutral-50 px-2 py-1 dark:bg-neutral-950">
+      <div className="mt-2 flex items-center gap-1.5 overflow-x-auto rounded-md bg-neutral-50 px-2.5 py-1.5 dark:bg-neutral-950">
         <span className="text-neutral-400">$</span>
         <code className="whitespace-pre font-mono text-[10px] text-neutral-700 dark:text-neutral-300">
           {run.commandPreview}

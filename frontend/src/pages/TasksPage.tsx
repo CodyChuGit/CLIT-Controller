@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
-import { Close, FileIcon, Folder, Inbox, StopSquare } from "../components/icons";
+import { Close, FileIcon, Folder, Inbox, Spinner, StopSquare } from "../components/icons";
 import StatusBadge from "../components/StatusBadge";
-import { ApprovalCard, CommandCard, ContextSummary } from "../components/TaskViews";
+import { ApprovalCard, CommandCard, ContextSummary, LiveOutput } from "../components/TaskViews";
 import TimelineCard from "../components/TimelineCard";
 import RawDetail from "../components/RawDetail";
 import { ComposerChip } from "../components/Composer";
 import InputComposer from "../components/input/InputComposer";
 import { Card, EmptyState } from "../components/ui";
-import { useStructuralRevision } from "../stream";
+import { useQueueApprovals } from "../hooks/useQueueApprovals";
+import { useRunStream, useStructuralRevision } from "../stream";
+import { stripResultSentinel } from "../lib/narrative";
 import { loadState, saveState } from "../persist";
-import TaskFlowChart from "./tasks/TaskFlowChart";
+import TaskDispatchMap from "./tasks/TaskDispatchMap";
 import StepChat from "./tasks/StepChat";
 import { HandoffLog, QueueStrip, StateCard } from "./tasks/TaskStatusPanels";
 import {
@@ -21,7 +23,27 @@ import {
   taskCommandRuns,
   taskFileKind,
 } from "./tasks/taskPageModel";
-import type { Approval, Exchange, QueueState, TaskDetail, TaskMeta } from "../types";
+import type { Exchange, TaskDetail, TaskMeta } from "../types";
+
+/** The controller's reply to a task-scoped continue, streamed locally from the
+ *  shared event store — task review stays in the task context instead of
+ *  bouncing to the dock (revamp Workstream 4). */
+function ContinueReplyStream({ runId }: { runId: string | null }) {
+  const stream = useRunStream(runId);
+  if (!runId || !stream) return null;
+  const text = stripResultSentinel(stream.stdout);
+  const running = stream.status === "running";
+  if (!text && !running) return null;
+  return (
+    <div className="mt-2">
+      <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium text-neutral-400">
+        {running && <Spinner className="h-3 w-3 text-blue-500" />}
+        <span>controller {running ? "replying…" : "replied"}</span>
+      </div>
+      {text && <LiveOutput text={text} active={running} className="max-h-48" />}
+    </div>
+  );
+}
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<TaskMeta[]>([]);
@@ -32,30 +54,12 @@ export default function TasksPage() {
   const [error, setError] = useState<string | null>(null);
   const [taskFile, setTaskFile] = useState<{ name: string; content: string } | null>(null);
   const [diffFile, setDiffFile] = useState<{ name: string; diff: string } | null>(null);
-  const [queue, setQueue] = useState<QueueState | null>(null);
-  const [approvals, setApprovals] = useState<Approval[]>([]);
+  const [continueRunId, setContinueRunId] = useState<string | null>(null);
+  // Queue + approvals fetching/polling live in the shared hook (no page-local owner).
+  const { queue, setQueue, approvals, reload: loadQueue } = useQueueApprovals();
   const streamRev = useStructuralRevision();
   const fileViewerRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<number | null>(null);
-
-  const loadQueue = useCallback(async () => {
-    try {
-      const [q, appr] = await Promise.all([
-        api.queue(),
-        api.approvals(true).catch(() => ({ approvals: [] as Approval[] })),
-      ]);
-      setQueue(q);
-      setApprovals(appr.approvals);
-    } catch {
-      /* no workspace or backend away */
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadQueue();
-    const id = window.setInterval(loadQueue, 3000);
-    return () => window.clearInterval(id);
-  }, [loadQueue, streamRev]);
 
   const loadTasks = useCallback(async () => {
     try {
@@ -106,6 +110,7 @@ export default function TasksPage() {
       saveState("lastTask", selectedId);
       setTaskFile(null);
       setDiffFile(null);
+      setContinueRunId(null);
       void loadDetail(selectedId);
     } else {
       setDetail(null);
@@ -306,10 +311,11 @@ export default function TasksPage() {
 
         {detail && (
           <>
-            <TaskFlowChart
+            <TaskDispatchMap
               detail={detail}
               queue={queue}
-              onSelect={(step) =>
+              approvals={approvals}
+              onSelectStep={(step) =>
                 document
                   .getElementById(`step-${step}`)
                   ?.scrollIntoView({ behavior: "smooth", block: "center" })
@@ -348,7 +354,7 @@ export default function TasksPage() {
               </div>
             )}
 
-            <Card title="Continue task" pad>
+            <Card title="Continue task" pad className="border-l-2 border-l-blue-400">
               <InputComposer
                 workspaceId="workspace"
                 destination={{ kind: "task", taskId: detail.task.id, intent: "continue" }}
@@ -358,9 +364,9 @@ export default function TasksPage() {
                   if (["error", "busy", "provider_missing", "claude_red"].includes(res.status)) {
                     setNotice(res.message ?? res.status);
                   } else {
-                    setNotice(
-                      "Sent — the reply streams in the controller dock, scoped to this task.",
-                    );
+                    setNotice(null);
+                    // The reply streams right here, scoped to this task.
+                    setContinueRunId(res.runId ?? null);
                   }
                 }}
                 contextChips={
@@ -372,6 +378,7 @@ export default function TasksPage() {
                   </>
                 }
               />
+              <ContinueReplyStream runId={continueRunId} />
             </Card>
 
             {budgetContext && (
@@ -393,7 +400,7 @@ export default function TasksPage() {
             </div>
 
             {changedFiles.length > 0 && (
-              <div className="card border-l-2 border-l-violet-400 p-2.5">
+              <div className="card border-l-2 border-l-violet-400 p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-violet-500" aria-hidden="true" />
                   <span className="text-xs font-semibold">Diff</span>
@@ -401,7 +408,7 @@ export default function TasksPage() {
                     {changedFiles.length} file{changedFiles.length === 1 ? "" : "s"}
                   </span>
                 </div>
-                <div className="mt-1.5 flex flex-wrap gap-1">
+                <div className="mt-2 flex flex-wrap gap-1">
                   {changedFiles.map((file) => (
                     <button
                       key={file}

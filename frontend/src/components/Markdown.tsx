@@ -1,5 +1,7 @@
 import { Fragment, useState, type ReactNode } from "react";
 
+import ArtifactChip from "./ArtifactChip";
+
 /* Shared compact-markdown renderer. Agent replies (chat bubbles AND task step
    outputs) are markdown prose: headings, bullets, numbered lists, tables,
    **bold**, `code`, fenced code blocks, and CLITC directive blocks. This
@@ -101,9 +103,38 @@ function parseSegments(content: string): Segment[] {
   return segments;
 }
 
-/** Minimal inline markdown: **bold** and `code`, plus colored step chips. */
-function renderInline(text: string): ReactNode[] {
-  return text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) => {
+/** A markdown link `[text](url)`. http(s) → a real anchor; a file path → the same
+ *  chip the step header uses (basename only, `.md` stripped), so a reply reads
+ *  "02_CODEX_IMPLEMENTATION_PLAN" instead of dumping the whole absolute path.
+ *  Clickable to open when a handler is wired in. */
+function MdLink({
+  text,
+  url,
+  onOpenFile,
+}: {
+  text: string;
+  url: string;
+  onOpenFile?: (name: string) => void;
+}) {
+  if (/^https?:\/\//i.test(url)) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="break-words text-blue-600 underline-offset-2 hover:underline dark:text-blue-400"
+      >
+        {text}
+      </a>
+    );
+  }
+  const name = (url.split("/").pop() || text).trim();
+  return <ArtifactChip name={name} onOpen={onOpenFile} />;
+}
+
+/** Minimal inline markdown: links, **bold** and `code`, plus colored step chips. */
+function renderInline(text: string, onOpenFile?: (name: string) => void): ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g).map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       return <strong key={i}>{withStepChips(part.slice(2, -2))}</strong>;
     }
@@ -120,11 +151,15 @@ function renderInline(text: string): ReactNode[] {
         </code>
       );
     }
+    if (part.startsWith("[") && part.includes("](") && part.endsWith(")")) {
+      const m = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(part);
+      if (m) return <MdLink key={i} text={m[1]} url={m[2]} onOpenFile={onOpenFile} />;
+    }
     return <Fragment key={i}>{withStepChips(part)}</Fragment>;
   });
 }
 
-function MdTable({ rows }: { rows: string[] }) {
+function MdTable({ rows, onOpenFile }: { rows: string[]; onOpenFile?: (name: string) => void }) {
   const parse = (r: string) =>
     r
       .replace(/^\|/, "")
@@ -143,7 +178,7 @@ function MdTable({ rows }: { rows: string[] }) {
           <tr className="border-b border-neutral-200 bg-neutral-50 text-left dark:border-neutral-700 dark:bg-neutral-900/60">
             {header.map((h, i) => (
               <th key={i} className="px-2 py-1 font-semibold">
-                {renderInline(h)}
+                {renderInline(h, onOpenFile)}
               </th>
             ))}
           </tr>
@@ -156,7 +191,7 @@ function MdTable({ rows }: { rows: string[] }) {
             >
               {row.map((cell, j) => (
                 <td key={j} className="px-2 py-1 align-top">
-                  {renderInline(cell)}
+                  {renderInline(cell, onOpenFile)}
                 </td>
               ))}
             </tr>
@@ -167,7 +202,7 @@ function MdTable({ rows }: { rows: string[] }) {
   );
 }
 
-function TextBlock({ text }: { text: string }) {
+function TextBlock({ text, onOpenFile }: { text: string; onOpenFile?: (name: string) => void }) {
   const lines = text.split("\n");
   const out: ReactNode[] = [];
   let i = 0;
@@ -180,7 +215,7 @@ function TextBlock({ text }: { text: string }) {
         tbl.push(lines[i].trim());
         i++;
       }
-      out.push(<MdTable key={key++} rows={tbl} />);
+      out.push(<MdTable key={key++} rows={tbl} onOpenFile={onOpenFile} />);
       continue;
     }
     if (!trimmed) {
@@ -188,14 +223,16 @@ function TextBlock({ text }: { text: string }) {
     } else if (/^#{1,4}\s/.test(trimmed)) {
       out.push(
         <div key={key++} className="pt-1 text-xs font-semibold">
-          {renderInline(trimmed.replace(/^#{1,4}\s/, ""))}
+          {renderInline(trimmed.replace(/^#{1,4}\s/, ""), onOpenFile)}
         </div>,
       );
     } else if (/^[-*]\s+/.test(trimmed)) {
       out.push(
         <div key={key++} className="flex gap-1.5 pl-1">
           <span className="text-accent-subtle">•</span>
-          <span className="min-w-0 flex-1">{renderInline(trimmed.replace(/^[-*]\s+/, ""))}</span>
+          <span className="min-w-0 flex-1">
+            {renderInline(trimmed.replace(/^[-*]\s+/, ""), onOpenFile)}
+          </span>
         </div>,
       );
     } else if (/^\d+\.\s+/.test(trimmed)) {
@@ -203,11 +240,13 @@ function TextBlock({ text }: { text: string }) {
       out.push(
         <div key={key++} className="flex gap-1.5 pl-1">
           <span className="font-semibold tabular-nums text-accent-subtle">{num}.</span>
-          <span className="min-w-0 flex-1">{renderInline(trimmed.replace(/^\d+\.\s+/, ""))}</span>
+          <span className="min-w-0 flex-1">
+            {renderInline(trimmed.replace(/^\d+\.\s+/, ""), onOpenFile)}
+          </span>
         </div>,
       );
     } else {
-      out.push(<div key={key++}>{renderInline(lines[i])}</div>);
+      out.push(<div key={key++}>{renderInline(lines[i], onOpenFile)}</div>);
     }
     i++;
   }
@@ -294,15 +333,21 @@ function DirectiveCard({ lang, code }: { lang: string; code: string }) {
 export function Markdown({
   content,
   fade = "from-white to-transparent dark:from-neutral-800",
+  onOpenFile,
 }: {
   content: string;
   fade?: string;
+  /** When wired, file-path links render as clickable artifact chips. */
+  onOpenFile?: (name: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const long = content.length > COLLAPSE_CHARS;
   const segments = parseSegments(content);
+  // Own the prose scale here so every surface (dock, task steps, …) renders agent
+  // replies at the same compact size + leading instead of inheriting the parent's
+  // (which left task-step replies at the 16px browser default).
   return (
-    <div>
+    <div className="text-xs leading-relaxed">
       <div className={long && !expanded ? "relative max-h-40 overflow-hidden" : ""}>
         {segments.map((seg, i) =>
           seg.kind === "code" ? (
@@ -314,7 +359,7 @@ export function Markdown({
               </pre>
             )
           ) : (
-            <TextBlock key={i} text={seg.text.trim()} />
+            <TextBlock key={i} text={seg.text.trim()} onOpenFile={onOpenFile} />
           ),
         )}
         {long && !expanded && (

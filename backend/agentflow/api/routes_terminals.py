@@ -1,19 +1,22 @@
 """Live CLI terminals over WebSocket.
 
-Output (server → client) is sent as raw binary frames. Control (client → server)
-is sent as JSON text frames: {"type": "input", "data": "..."},
-{"type": "resize", "rows": N, "cols": N}, or {"type": "kill"}."""
+Output (server → client) is sent as raw binary frames; session lifecycle
+metadata (launching/ready/closed) is sent as JSON text frames of the shape
+{"type": "meta", "state": ..., "provider": ..., "executablePath": ...}.
+Control (client → server) is sent as JSON text frames:
+{"type": "input", "data": "..."}, {"type": "resize", "rows": N, "cols": N},
+or {"type": "kill"}."""
 
 from __future__ import annotations
 
 import asyncio
 import json
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
 from .. import config
 from ..origins import is_allowed_origin
-from ..provider_probe import AGENT_PROVIDER_IDS, which
+from ..provider_probe import AGENT_PROVIDER_IDS, _definition, which
 from ..terminal_service import CLOSED, TERMINALS, launch_command, session_key
 
 router = APIRouter()
@@ -30,6 +33,48 @@ def terminals_status():
     return {
         "providers": AGENT_PROVIDER_IDS,
         "installed": {pid: which(pid) is not None for pid in AGENT_PROVIDER_IDS},
+    }
+
+
+@router.get("/{provider}/diagnostics")
+def terminal_diagnostics(provider: str):
+    """Why the pane is (or isn't) alive: resolved executable, session lifecycle
+    state, and what to do about a failure — so the UI never shows a dead box
+    with no explanation (revamp Workstream 3)."""
+    if provider not in AGENT_PROVIDER_IDS:
+        raise HTTPException(status_code=404, detail=f"unknown provider: {provider}")
+    workspace = config.get_current_workspace()
+    path = which(provider)
+    session = TERMINALS.sessions.get(session_key(workspace, provider)) if workspace else None
+
+    last_error = None
+    if session is not None and session.exited:
+        state = "closed"
+        if session.exit_code not in (0, None):
+            last_error = f"session exited with code {session.exit_code}"
+    elif session is not None:
+        state = session.state  # launching | ready
+    elif path is None:
+        state = "missing"
+    else:
+        state = "none"  # installed, no session yet
+
+    suggested = None
+    if path is None:
+        suggested = _definition(provider).get("installHint")
+    elif workspace is None:
+        suggested = "Pick a workspace in Explorer first."
+    elif state == "closed":
+        suggested = "Restart the session."
+
+    return {
+        "provider": provider,
+        "installed": path is not None,
+        "executablePath": path,
+        "workspace": str(workspace) if workspace else None,
+        "sessionState": state,
+        "lastLaunchError": last_error,
+        "suggestedAction": suggested,
     }
 
 
@@ -61,7 +106,13 @@ async def terminal_ws(ws: WebSocket, provider: str) -> None:
         return
 
     key = session_key(workspace, provider)
-    session = await TERMINALS.get_or_create(key, str(workspace), launch_command(provider))
+    session = await TERMINALS.get_or_create(
+        key,
+        str(workspace),
+        launch_command(provider),
+        provider=provider,
+        executable_path=which(provider),
+    )
 
     queue: asyncio.Queue = asyncio.Queue(maxsize=2000)
     # Snapshot the scrollback and register for live output in one synchronous
@@ -73,6 +124,9 @@ async def terminal_ws(ws: WebSocket, provider: str) -> None:
     session.clients.add(queue)
     if snapshot:
         await ws.send_bytes(snapshot)
+    # Replay the current lifecycle state so a (re)connecting client knows whether
+    # the CLI is still launching, ready, or already closed.
+    await ws.send_text(json.dumps(session.current_meta()))
 
     async def pump() -> None:
         while True:
@@ -80,7 +134,12 @@ async def terminal_ws(ws: WebSocket, provider: str) -> None:
             if item is CLOSED:
                 return
             try:
-                await ws.send_bytes(item)
+                # dict items are lifecycle metadata → JSON text frames; raw PTY
+                # bytes stay binary for xterm.
+                if isinstance(item, dict):
+                    await ws.send_text(json.dumps(item))
+                else:
+                    await ws.send_bytes(item)
             except (WebSocketDisconnect, RuntimeError):
                 return
 

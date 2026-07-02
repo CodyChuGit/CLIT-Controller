@@ -18,6 +18,7 @@ running it; this index routes you to the right document by task.
 |----------|----------------|
 | [FEATURE_STATUS.md](FEATURE_STATUS.md) | What is implemented / partial / mocked / experimental / planned, with evidence. |
 | [GLOSSARY.md](GLOSSARY.md) | Project-specific terms (controller, provider, directive, contract, …). |
+| [cli-interface-mythos-revamp.md](cli-interface-mythos-revamp.md) | Major CLI interface refactor brief for the Agent Dock, controller backend, Antigravity terminal, and Tasks workbench. |
 
 ## Engineering
 

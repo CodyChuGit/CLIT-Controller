@@ -25,6 +25,7 @@ import type {
   Settings,
   TaskDetail,
   TaskMeta,
+  TerminalDiagnostics,
   TerminalsStatus,
   Tree,
   Usage,
@@ -133,6 +134,8 @@ export const api = {
 
   // terminals (live PTY sessions are over WebSocket; these are control/metadata)
   terminalsStatus: () => get<TerminalsStatus>("/terminals/status"),
+  terminalDiagnostics: (provider: string) =>
+    get<TerminalDiagnostics>(`/terminals/${encodeURIComponent(provider)}/diagnostics`),
   terminalKill: (provider: string) =>
     post<{ ok: boolean }>(`/terminals/${encodeURIComponent(provider)}/kill`),
 

@@ -273,6 +273,18 @@ export interface TerminalsStatus {
   installed: Record<string, boolean>;
 }
 
+/** Why a terminal pane is (or isn't) alive: executable resolution, session
+ *  lifecycle, and the suggested fix — GET /api/terminals/{provider}/diagnostics. */
+export interface TerminalDiagnostics {
+  provider: string;
+  installed: boolean;
+  executablePath: string | null;
+  workspace: string | null;
+  sessionState: "none" | "missing" | "launching" | "ready" | "closed";
+  lastLaunchError: string | null;
+  suggestedAction: string | null;
+}
+
 export interface Settings {
   routing: RoutingConfig;
   commandTemplates: Record<string, string>;

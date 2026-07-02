@@ -1,4 +1,5 @@
 import type { ChatMessage } from "../../types";
+import { stripResultSentinel } from "../../lib/narrative";
 import { AntigravityMark, ClaudeMark, OpenAIMark } from "../icons";
 import { Markdown, withStepChips } from "../Markdown";
 import RawDetail from "../RawDetail";
@@ -124,7 +125,7 @@ export function Message({ msg, direct = false }: { msg: ChatMessage; direct?: bo
         {mine ? (
           <span className="whitespace-pre-wrap">{msg.content}</span>
         ) : (
-          <Markdown content={msg.content} />
+          <Markdown content={stripResultSentinel(msg.content)} />
         )}
       </div>
     </div>

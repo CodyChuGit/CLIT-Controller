@@ -54,7 +54,7 @@ export default function TimelineCard({
   }
 
   return (
-    <div className={`card border-l-2 ${style.accent} p-2.5`}>
+    <div className={`card border-l-2 ${style.accent} p-3`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className={`h-2 w-2 rounded-full ${style.dot}`} aria-hidden="true" />
         <span className={`text-xs font-semibold ${SEVERITY_TEXT[d.severity]}`}>{d.title}</span>

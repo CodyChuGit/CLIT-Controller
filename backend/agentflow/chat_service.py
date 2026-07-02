@@ -8,24 +8,18 @@ from typing import Optional
 
 from . import (
     config,
-    git_service,
+    controller_protocol,
     paths,
     policy_service,
     prompt_templates,
-    queue_service,
     state_store,
     task_service,
     usage_service,
 )
 from .agent_commands import build_argv, provider_busy_result
-from .chat_directives import (
-    parse_done_directive,
-    parse_needs_user_directive,
-    parse_queue_directive,
-    parse_run_directives,
-    parse_task_directive,
-    strip_action_blocks,
-)
+from .chat_directives import strip_action_blocks
+from .controller import context as controller_context
+from .controller import engine as controller_engine
 from .process_runner import AGENT_RUN_TIMEOUT, RUNNER, RunRecord, add_log_entry, now_iso
 from .provider_probe import AGENT_PROVIDER_IDS, resolve_executable
 from .redaction import redact
@@ -42,6 +36,25 @@ ORCHESTRATOR_CHANNEL = "orchestrator"
 
 def _pkey(workspace: Path, channel: str) -> str:
     return f"{workspace}::{channel}"
+
+
+def _controller_display(out: str) -> str:
+    """The human-readable narrative stored for the controller's chat bubble.
+
+    The controller's raw stdout ends with a deterministic ``CLITC_RESULT_V1`` block
+    (Plane 3) that must never render as prose. Strip every action block (the v1
+    result + legacy directives); when the controller emitted ONLY a result block and
+    no surrounding prose, fall back to the block's own ``message`` so the turn still
+    shows a clean one-line summary instead of leaking JSON (or showing nothing)."""
+    prose = strip_action_blocks(out)
+    if prose:
+        return prose
+    result, _failure, _meta = controller_protocol.parse_controller_result(out)
+    if result is not None and (result.message.summary or result.message.details):
+        lines = [result.message.summary] if result.message.summary else []
+        lines.extend(f"- {d}" for d in result.message.details)
+        return "\n".join(line for line in lines if line).strip()
+    return ""
 
 
 MAX_CONSULTS_PER_TASK = 6
@@ -185,24 +198,6 @@ async def execute_run_directive(
     )
 
 
-def _slug(task_id: str) -> str:
-    """Human part of a task id: 20260612-201312-create-simple-calendar-app → create-simple-calendar-app."""
-    parts = task_id.split("-", 2)
-    return parts[2] if len(parts) == 3 else task_id
-
-
-def _resolve_task_ref(workspace: Path, ref: str) -> Optional[str]:
-    tasks = task_service.list_tasks(workspace)
-    if not tasks:
-        return None
-    if ref.lower() in ("latest", "last", "newest"):
-        return tasks[0]["id"]
-    for t in tasks:
-        if t["id"] == ref or t["id"].endswith(ref) or ref in t["id"]:
-            return t["id"]
-    return None
-
-
 def _chat_file(workspace: Path) -> Path:
     return paths.workspace_app_dir(workspace) / "chat.json"
 
@@ -279,24 +274,9 @@ def _provider_busy(provider: str) -> Optional[dict]:
     return provider_busy_result(provider, record.id, record.step)
 
 
-async def _workspace_summary(workspace: Path) -> str:
-    git = await git_service.git_info(workspace)
-    if git.get("isRepo"):
-        git_line = f"branch {git.get('branch')}, {git.get('changedFileCount', 0)} changed files"
-    else:
-        git_line = "not a git repository"
-    tasks = task_service.list_tasks(workspace)[:5]
-    task_lines = "".join(f"\n- {t['id']}: {t['title']} ({t['status']})" for t in tasks) or " none yet"
-    # The controller must see what each agent actually did, not just task names.
-    detail = "\n\n".join(task_service.task_state_summary(workspace, t["id"]) for t in tasks[:2])
-    live_line = usage_service.live_summary_line()
-    return (
-        f"Workspace: {workspace} ({git_line})\n"
-        f"{queue_service.summary_line(workspace)}\n"
-        + (f"{live_line}\n" if live_line else "")
-        + f"Recent CLITC tasks:{task_lines}"
-        + (f"\n\nCurrent task state (per agent):\n{detail}" if detail else "")
-    )
+# Prompt-context builders live in the controller package (Workstream 2 extraction).
+_workspace_summary = controller_context.workspace_summary
+_focus_task_brief = controller_context.focus_task_brief
 
 
 def _transcript(workspace: Path, channel: str = ORCHESTRATOR_CHANNEL) -> str:
@@ -310,21 +290,6 @@ def _transcript(workspace: Path, channel: str = ORCHESTRATOR_CHANNEL) -> str:
             content = content[:REPLAY_CLIP_CHARS] + " …[clipped]"
         lines.append(f"{m['role']}: {content}")
     return "\n".join(lines)
-
-
-def _focus_task_brief(workspace: Path, task_id: str) -> str:
-    """Explicit one-block context for a task-scoped submission (Input plane). Keeps
-    the user's stored message clean while telling the controller which task to
-    continue — context is structured prompt input, never buried in the user text."""
-    try:
-        meta = task_service._load_meta(workspace, task_id)
-    except FileNotFoundError:
-        return f"Focused task: {task_id} (not found)."
-    return (
-        f"FOCUSED TASK (continue this task): {meta.get('id', task_id)} — "
-        f"{meta.get('title', '(untitled)')} [status: {meta.get('status', 'unknown')}]. "
-        f"Goal: {meta.get('goal', '')}".strip()
-    )
 
 
 async def send(
@@ -391,59 +356,27 @@ async def send(
             )
             out = record.stdout.strip()
             if record.status == "succeeded" and out:
-                append_message(workspace, "assistant", out, provider=provider, durationMs=record.duration_ms)
-                # The controller can create tasks and queue steps via fenced blocks.
-                directive = parse_task_directive(out)
-                if directive is not None:
-                    title, goal, queue_steps = directive
-                    try:
-                        meta = task_service.create_task(workspace, title, goal, orchestrated=True)
-                        # Auto-start the task. If the controller named no steps,
-                        # default to the planning step so a task the user hands
-                        # over always begins running on its own — the closed loop
-                        # then consults the controller for what to do next.
-                        steps_to_queue = queue_steps or ["codex_spec"]
-                        queue_service.add_steps(workspace, meta["id"], steps_to_queue, source="orchestrator")
-                        note = f"Created \u201c{title}\u201d · queued {', '.join(steps_to_queue)}"
-                        append_message(workspace, "system", note, provider=provider)
-                        add_log_entry(
-                            "chat",
-                            f"controller created task {meta['id']}: {title}",
-                            provider=provider,
-                            task_id=meta["id"],
-                        )
-                    except Exception as exc:  # noqa: BLE001 — never break the chat loop
-                        append_message(workspace, "system", f"Could not create the task: {exc}", provider=provider)
-
-                queue_directive = parse_queue_directive(out)
-                if queue_directive is not None:
-                    ref, steps = queue_directive
-                    try:
-                        task_id = _resolve_task_ref(workspace, ref)
-                        if task_id is None:
-                            append_message(
-                                workspace,
-                                "system",
-                                f"Couldn\u2019t queue steps — no task matches `{ref}`.",
-                                provider=provider,
-                            )
-                        else:
-                            task_service.set_orchestrated(workspace, task_id)
-                            queue_service.add_steps(workspace, task_id, steps, source="orchestrator")
-                            append_message(
-                                workspace,
-                                "system",
-                                f"Queued {', '.join(steps)} · {_slug(task_id)}",
-                                provider=provider,
-                            )
-                    except Exception as exc:  # noqa: BLE001
-                        append_message(workspace, "system", f"Could not queue steps: {exc}", provider=provider)
-
-                for cmd in parse_run_directives(out):
-                    try:
-                        await execute_run_directive(workspace, cmd, provider)
-                    except Exception as exc:  # noqa: BLE001
-                        append_message(workspace, "system", f"`{cmd}` failed: {exc}", provider=provider)
+                # Store the display-clean narrative — the raw CLITC_RESULT_V1 / legacy
+                # blocks are parsed below but must never render as prose in the bubble.
+                display = _controller_display(out)
+                if display:
+                    append_message(
+                        workspace, "assistant", display, provider=provider, durationMs=record.duration_ms
+                    )
+                # CLITC_RESULT_V1 is the primary mutation path (Workstream 2): a valid
+                # block drives exactly one validated action; an invalid block is a
+                # typed no-action failure; legacy directives are a warned fallback.
+                try:
+                    await controller_engine.apply_controller_output(
+                        workspace,
+                        out,
+                        provider=provider,
+                        source="controller_chat",
+                        run_id=record.id,
+                        task_id=focus_task_id,
+                    )
+                except Exception as exc:  # noqa: BLE001 — never break the chat loop
+                    append_message(workspace, "system", f"Controller action failed: {exc}", provider=provider)
             elif record.status == "cancelled":
                 append_message(workspace, "system", "Response stopped.", provider=provider)
             else:
@@ -652,77 +585,18 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
                 )
                 return
 
-            from . import queue_service  # local import: queue_service ↔ chat_service
-
-            queued = parse_queue_directive(out)
-            done_reason = parse_done_directive(out)
-            user_reason = parse_needs_user_directive(out)
-            commands = parse_run_directives(out)
-            reasoning = strip_action_blocks(out)[:240]
-
-            for cmd in commands:
-                try:
-                    await execute_run_directive(workspace, cmd, provider, task_id=task_id)
-                except Exception as exc:  # noqa: BLE001
-                    append_message(workspace, "system", f"`{cmd}` failed: {exc}", provider=provider)
-
-            if queued is not None:
-                _ref, steps = queued
-                queue_service.add_steps(workspace, task_id, steps, source="orchestrator")
-                task_service._add_event(
-                    workspace,
-                    task_id,
-                    "consult",
-                    f"controller decision: queue {', '.join(steps)}" + (f" — {reasoning}" if reasoning else ""),
-                    provider=provider,
-                )
-                append_message(
-                    workspace,
-                    "system",
-                    f"Reviewed {trigger.split(' via ')[0]} → queued {', '.join(steps)}",
-                    provider=provider,
-                )
-            elif done_reason is not None:
-                meta2 = task_service._load_meta(workspace, task_id)
-                meta2["status"] = "done"
-                meta2["orchestratorVerdict"] = {"verdict": "done", "reason": done_reason, "at": now_iso()}
-                task_service._save_meta(workspace, meta2)
-                task_service._add_event(
-                    workspace,
-                    task_id,
-                    "done",
-                    f"controller declared the task complete: {done_reason}",
-                    provider=provider,
-                )
-                state_store.append_event(
-                    workspace,
-                    "task.summary_ready",
-                    done_reason,
-                    task_id=task_id,
-                    provider=provider,
-                    data={"status": "done", "verdict": "done"},
-                )
-                append_message(
-                    workspace,
-                    "system",
-                    f"\u201c{_slug(task_id)}\u201d complete — {done_reason}",
-                    provider=provider,
-                )
-            elif user_reason is not None:
-                task_service._add_event(
-                    workspace,
-                    task_id,
-                    "needs_user",
-                    f"controller needs your decision: {user_reason}",
-                    provider=provider,
-                )
-                append_message(
-                    workspace,
-                    "system",
-                    f"Needs your input — {user_reason}",
-                    provider=provider,
-                )
-            elif not commands:
+            # Same engine as controller chat: CLITC_RESULT_V1 first, typed failure
+            # on an invalid block (no mutation), warned legacy fallback otherwise.
+            turn = await controller_engine.apply_controller_output(
+                workspace,
+                out,
+                provider=provider,
+                source="consult",
+                run_id=record.id,
+                task_id=task_id,
+            )
+            if turn["status"] == "no_action":
+                reasoning = strip_action_blocks(out)[:240]
                 task_service._add_event(
                     workspace,
                     task_id,
@@ -739,7 +613,7 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
                     task_id=task_id,
                     provider=provider,
                     step="orchestrate",
-                    data={"runId": record.id},
+                    data={"runId": record.id, **turn},
                 )
             add_log_entry(
                 "orchestrate",

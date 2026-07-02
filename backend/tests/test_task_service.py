@@ -92,3 +92,59 @@ def test_step_exchanges_rebuilt_from_log_files(tmp_path):
     assert spec[0]["output"] == "spec output"
     assert "[REDACTED]" in spec[0]["prompt"] and "sk-secret" not in spec[0]["prompt"]
     assert ex["claude_implement"][0]["output"] == ""
+
+
+# A run .log file as written by process_runner._write_log_file.
+def _log_file(stdout: str, stderr: str = "", status: str = "succeeded", exit_code: int = 0) -> str:
+    return (
+        "# Command Line Interface Terminal Controller run abc123\n"
+        "# command: /opt/homebrew/bin/claude -p 'Budget context: ... big prompt'\n"
+        "# cwd: /tmp/ws\n"
+        f"# status: {status}  exit: {exit_code}  duration_ms: 100\n"
+        f"\n--- STDOUT ---\n{stdout}\n"
+        f"\n--- STDERR ---\n{stderr}\n"
+    )
+
+
+def test_extract_log_reply_strips_scaffolding():
+    out = task_service._extract_log_reply(_log_file("Wrote 04_CLAUDE_IMPLEMENTATION_SUMMARY.md."))
+    assert out == "Wrote 04_CLAUDE_IMPLEMENTATION_SUMMARY.md."
+    # The metadata header, echoed command/prompt, and banners are gone.
+    assert "Command Line Interface Terminal Controller run" not in out
+    assert "Budget context" not in out
+    assert "--- STDOUT ---" not in out
+
+
+def test_extract_log_reply_empty_on_cancelled_run():
+    # A cancelled run (exit 143) has empty stdout/stderr — the reply must be empty,
+    # not the log scaffolding the user was seeing.
+    assert task_service._extract_log_reply(_log_file("", status="cancelled", exit_code=143)) == ""
+
+
+def test_extract_log_reply_falls_back_to_stderr():
+    out = task_service._extract_log_reply(_log_file("", stderr="boom: command failed"))
+    assert out == "boom: command failed"
+
+
+def test_extract_log_reply_passes_through_unknown_format():
+    # A log not in the banner format (legacy/plain) is returned as-is, not dropped.
+    assert task_service._extract_log_reply("plain output") == "plain output"
+
+
+def test_step_exchanges_returns_reply_not_log_scaffolding(tmp_path):
+    from agentflow import paths
+
+    ws = make_workspace(tmp_path)
+    meta = task_service.create_task(ws, "T", "g")
+    logs = paths.task_logs_dir(ws, meta["id"])
+    logs.mkdir(parents=True, exist_ok=True)
+    (logs / "20260101-120000-claude_implement.prompt.txt").write_text("Implement it.", encoding="utf-8")
+    (logs / "20260101-120000-claude_implement.log").write_text(
+        _log_file("Implemented the scheduler integration."), encoding="utf-8"
+    )
+
+    ex = task_service.step_exchanges(ws, meta["id"])
+    out = ex["claude_implement"][0]["output"]
+    assert out == "Implemented the scheduler integration."
+    assert "Command Line Interface Terminal Controller run" not in out
+    assert "Budget context" not in out

@@ -247,6 +247,28 @@ def read_task_file(workspace: Path, task_id: str, name: str) -> dict:
     return {"name": name, "content": redact(content)}
 
 
+def _extract_log_reply(log_text: str) -> str:
+    """Pull just the agent's stdout out of a run ``.log`` file.
+
+    The log file (``process_runner._write_log_file``) wraps the reply in
+    scaffolding: a ``# Command Line Interface Terminal Controller run`` metadata
+    header, the echoed command/prompt, and ``--- STDOUT ---`` / ``--- STDERR ---``
+    banners. A step's chat reply must show the *reply*, not that scaffolding, so we
+    return only the STDOUT section — falling back to STDERR when stdout is empty
+    (e.g. a cancelled run) and to the raw text if the file isn't in the log format."""
+    out_marker = "--- STDOUT ---\n"
+    err_marker = "\n--- STDERR ---"
+    i = log_text.find(out_marker)
+    if i == -1:
+        return log_text.strip()
+    rest = log_text[i + len(out_marker) :]
+    j = rest.find(err_marker)
+    stdout = (rest if j == -1 else rest[:j]).strip()
+    if stdout:
+        return stdout
+    return rest[j + len(err_marker) :].strip() if j != -1 else ""
+
+
 def step_exchanges(workspace: Path, task_id: str) -> dict[str, list[dict]]:
     """Archived prompt → output pairs per step, rebuilt from the task's logs dir
     (survives backend restarts; in-memory run records do not)."""
@@ -269,7 +291,7 @@ def step_exchanges(workspace: Path, task_id: str) -> dict[str, list[dict]]:
         log_file = logs_dir / f"{stem}.log"
         if log_file.is_file():
             try:
-                output = log_file.read_text(encoding="utf-8", errors="replace")
+                output = _extract_log_reply(log_file.read_text(encoding="utf-8", errors="replace"))
             except OSError:
                 output = ""
         out.setdefault(step, []).append(

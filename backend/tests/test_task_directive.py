@@ -1,4 +1,4 @@
-from agentflow.chat_service import parse_queue_directive, parse_task_directive
+from agentflow.chat_directives import parse_queue_directive, parse_task_directive
 from agentflow.task_service import FULL_SEQUENCE
 
 
@@ -50,7 +50,7 @@ def test_queue_directive_parses_and_validates():
 
 
 def test_done_and_needs_user_directives():
-    from agentflow.chat_service import parse_done_directive, parse_needs_user_directive
+    from agentflow.chat_directives import parse_done_directive, parse_needs_user_directive
 
     assert parse_done_directive("```agentflow-done\nreason: QA passed, review clean\n```") == "QA passed, review clean"
     assert parse_done_directive("nothing here") is None
@@ -59,7 +59,7 @@ def test_done_and_needs_user_directives():
 
 
 def test_run_directives_parse_and_cap():
-    from agentflow.chat_service import parse_run_directives
+    from agentflow.chat_directives import parse_run_directives
 
     text = "Starting it now.\n```agentflow-run\ncommand: npm run dev\n```\n```agentflow-run\ncommand: git push\n```"
     assert parse_run_directives(text) == ["npm run dev", "git push"]
