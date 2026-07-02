@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import ActivityBar, { type PageId } from "./components/ActivityBar";
-import ChatPanel from "./components/ChatPanel";
+import AgentDock from "./components/dock/AgentDock";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import StatusBar from "./components/StatusBar";
 import { loadState, saveState } from "./persist";
@@ -303,8 +303,8 @@ export default function App() {
             )}
           </main>
 
-          <ErrorBoundary label="the chat panel">
-            <ChatPanel
+          <ErrorBoundary label="the agent dock">
+            <AgentDock
               workspacePath={project?.workspacePath ?? null}
               project={project}
               git={git}

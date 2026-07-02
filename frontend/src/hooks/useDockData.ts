@@ -4,8 +4,8 @@ import { api } from "../api";
 import { useStructuralRevision } from "../stream";
 import type { Approval, ChatState, QueueState, RunInfo } from "../types";
 
-/* The Agent Dock's data layer, extracted from ChatPanel so the component composes
-   rendering rather than owning fetching/polling (I/O rebuild — ChatPanel
+/* The Agent Dock's data layer (see components/dock/AgentDock) — the components compose
+   rendering rather than owning fetching/polling (I/O rebuild — dock
    decomposition). Owns chat/queue/logs/approvals loading, the visibility-aware
    poll timer (paused when hidden / collapsed-light), workspace reset, and the
    event-driven refetch. Returns derived `busy` and a `reload`. */

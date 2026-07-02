@@ -6,8 +6,8 @@ import RawDetail from "../RawDetail";
 import { Disclosure } from "../TaskViews";
 
 /* Pillar 4 — the single, canonical chat-message renderer shared by every
-   chat-like surface (Agent Dock / ChatPanel, task replay / StepChat, and any
-   future conversation view). Extracted from ChatPanel so no surface owns a
+   chat-like surface (Agent Dock transcript, task replay / StepChat, and any
+   future conversation view). Extracted from the dock so no surface owns a
    competing message renderer. Surface-specific layout composes these primitives;
    it does not re-implement message presentation. */
 
