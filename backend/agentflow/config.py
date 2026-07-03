@@ -28,7 +28,10 @@ DEFAULT_COMMAND_TEMPLATES = {
     "codex": "codex exec --skip-git-repo-check --sandbox workspace-write {model} {prompt}",
     # acceptEdits: claude may write/edit files without interactive approval (required in
     # headless -p mode); shell commands still follow normal permission rules.
-    "claude": "claude -p --permission-mode acceptEdits {model} {prompt}",
+    # stream-json (+ required --verbose): plain -p buffers everything until exit, so
+    # the dock showed nothing live; JSONL streams as work happens and is normalized
+    # back to readable text by stream_normalizer before anything downstream sees it.
+    "claude": "claude -p --permission-mode acceptEdits --verbose --output-format stream-json {model} {prompt}",
     # --sandbox: agy's own terminal-restriction sandbox keeps it inside the workspace.
     "antigravity": "agy --sandbox {model} -p {prompt}",
 }
@@ -36,7 +39,11 @@ DEFAULT_COMMAND_TEMPLATES = {
 # Previous defaults we upgrade automatically when seen in stored config.
 _STALE_TEMPLATES = {
     "codex": {"codex exec {prompt}", "codex exec {model} {prompt}"},
-    "claude": {"claude -p {prompt}", "claude -p {model} {prompt}"},
+    "claude": {
+        "claude -p {prompt}",
+        "claude -p {model} {prompt}",
+        "claude -p --permission-mode acceptEdits {model} {prompt}",
+    },
     "antigravity": {"antigravity {prompt}", "antigravity -p {prompt}", "agy -p {prompt}", "agy {model} -p {prompt}"},
 }
 

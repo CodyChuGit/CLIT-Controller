@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { Close, FileIcon, Folder, Inbox, Spinner, StopSquare } from "../components/icons";
 import StatusBadge from "../components/StatusBadge";
-import { ApprovalCard, CommandCard, ContextSummary, LiveOutput } from "../components/TaskViews";
+import { ApprovalCard, CommandCard, ContextSummary } from "../components/TaskViews";
+import LiveActivityFeed from "../components/LiveActivityFeed";
 import TimelineCard from "../components/TimelineCard";
 import RawDetail from "../components/RawDetail";
 import { ComposerChip } from "../components/Composer";
@@ -10,7 +11,6 @@ import InputComposer from "../components/input/InputComposer";
 import { Card, EmptyState } from "../components/ui";
 import { useQueueApprovals } from "../hooks/useQueueApprovals";
 import { useRunStream, useStructuralRevision } from "../stream";
-import { stripResultSentinel } from "../lib/narrative";
 import { loadState, saveState } from "../persist";
 import TaskDispatchMap from "./tasks/TaskDispatchMap";
 import StepChat from "./tasks/StepChat";
@@ -31,16 +31,19 @@ import type { Exchange, TaskDetail, TaskMeta } from "../types";
 function ContinueReplyStream({ runId }: { runId: string | null }) {
   const stream = useRunStream(runId);
   if (!runId || !stream) return null;
-  const text = stripResultSentinel(stream.stdout);
   const running = stream.status === "running";
-  if (!text && !running) return null;
   return (
     <div className="mt-2">
       <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium text-neutral-400">
         {running && <Spinner className="h-3 w-3 text-blue-500" />}
-        <span>controller {running ? "replying…" : "replied"}</span>
+        <span>controller {running ? "working…" : "replied"}</span>
       </div>
-      {text && <LiveOutput text={text} active={running} className="max-h-48" />}
+      <LiveActivityFeed
+        provider={stream.provider}
+        stdout={stream.stdout}
+        stderr={stream.stderr}
+        active={running}
+      />
     </div>
   );
 }

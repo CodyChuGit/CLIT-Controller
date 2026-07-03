@@ -1,13 +1,11 @@
 import { useEffect, useRef } from "react";
 import { STEP_META, StepChip } from "../Markdown";
-import SmoothStreamingText from "../SmoothStreamingText";
 import { ApprovalCard } from "../TaskViews";
 import TimelineCard from "../TimelineCard";
 import { Message, PROVIDER_DOT, ProviderMark } from "../conversation/Message";
 import { BeanMark, ChatBubble, Spinner } from "../icons";
 import { EmptyState } from "../ui";
 import { cardFromStreamEvent } from "../../lib/displayModel";
-import { stripResultSentinel } from "../../lib/narrative";
 import { useRecentEvents, useRunStream } from "../../stream";
 import type { Approval, ChatMessage, ChatPending, QueueState, RunInfo } from "../../types";
 import AgentDockLiveRun from "./AgentDockLiveRun";
@@ -135,17 +133,14 @@ export default function AgentDockTranscript({
   onResolveApproval: (id: string, approve: boolean) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  // Progressive text for the in-flight reply, streamed from the shared event bus
-  // ONLY (streamStore has its own polling fallback on the same bus) — never from
-  // the pending.outputTail snapshot. Hide the deterministic result block so its
-  // JSON never flashes mid-stream.
+  // Subscribed only to keep the transcript pinned to the bottom while the
+  // in-flight reply streams; AgentDockLiveRun renders the text itself.
   const liveReply = useRunStream(pending?.runId);
-  const liveText = stripResultSentinel(liveReply?.stdout ?? "");
 
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages.length, liveReply?.stdout, busy, channel]);
+  }, [messages.length, liveReply?.stdout, liveReply?.stderr, busy, channel]);
 
   return (
     <div ref={scrollRef} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-3">
@@ -194,17 +189,15 @@ export default function AgentDockTranscript({
         ))}
 
       {pending && (
-        <div className="flex flex-col items-start">
-          <span className="mb-0.5 flex items-center gap-1.5 px-1 text-[10px] text-neutral-400">
+        <div className="flex w-full flex-col items-start gap-1">
+          <span className="flex items-center gap-1.5 px-1 text-[10px] text-neutral-400">
             <Spinner className="h-3 w-3" />
             <ProviderMark id={isOrch ? selected : channel} className="h-3 w-3" />
-            thinking…
+            <span className="font-mono">{isOrch ? selected : channel}</span> is working…
           </span>
-          {liveText && (
-            <pre className="max-h-36 w-full overflow-auto whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50/60 p-2 font-mono text-[10px] leading-relaxed text-neutral-600 dark:border-blue-900 dark:bg-blue-950/30 dark:text-neutral-300">
-              <SmoothStreamingText text={liveText} active mode="mono" maxChars={6000} />
-            </pre>
-          )}
+          {/* The real activity — narration, commands, results — streamed from the
+              shared event store; never a cached tail behind a "thinking" label. */}
+          <AgentDockLiveRun runId={pending.runId} provider={isOrch ? selected : channel} />
         </div>
       )}
     </div>

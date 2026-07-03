@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import ArtifactChip from "../../components/ArtifactChip";
+import LiveActivityFeed from "../../components/LiveActivityFeed";
 import { Markdown } from "../../components/Markdown";
 import RawDetail from "../../components/RawDetail";
-import SmoothStreamingText from "../../components/SmoothStreamingText";
 import StatusBadge from "../../components/StatusBadge";
 import { Disclosure } from "../../components/TaskViews";
 import { Spinner } from "../../components/icons";
@@ -89,7 +89,7 @@ export default function StepChat({
   // Active text comes from the shared event store only — never the polled
   // run-snapshot's stdout (revamp Workstream 1 data rule).
   const stream = useRunStream(liveRun?.id);
-  const liveText = stream?.stdout ?? "";
+  const liveText = (stream?.stdout ?? "") + (stream?.stderr ?? "");
   const involved = state.status !== "idle" || exchanges.length > 0;
   const color = STEP_COLOR[step];
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -218,17 +218,21 @@ export default function StepChat({
         )}
         {liveRun && (
           <div className="flex justify-start">
-            <div className="max-w-[94%] rounded-xl rounded-bl-sm border border-blue-200 bg-white px-3 py-2 dark:border-blue-900 dark:bg-neutral-900">
+            <div className="w-full max-w-[94%] rounded-xl rounded-bl-sm border border-blue-200 bg-white px-3 py-2 dark:border-blue-900 dark:bg-neutral-900">
               <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium text-blue-500">
                 <Spinner className="h-3 w-3" />
                 <span className="font-mono">{liveRun.provider}</span>
                 <span>working…</span>
               </div>
-              {liveText && (
-                <pre className="max-h-28 overflow-hidden whitespace-pre-wrap break-words font-mono text-[10px] leading-relaxed text-neutral-500">
-                  <SmoothStreamingText text={liveText} active mode="mono" maxChars={1200} />
-                </pre>
-              )}
+              {/* The agent's actual activity — narration, commands, results —
+                  parsed from the live stream, not a raw log tail. */}
+              <LiveActivityFeed
+                provider={liveRun.provider}
+                stdout={stream?.stdout ?? ""}
+                stderr={stream?.stderr ?? ""}
+                active
+                className="border-0 bg-transparent px-0 py-0 dark:bg-transparent"
+              />
             </div>
           </div>
         )}

@@ -1,10 +1,8 @@
+import { LiveRunActivity } from "../../components/LiveActivityFeed";
 import { StepChip } from "../../components/Markdown";
 import StatusBadge from "../../components/StatusBadge";
-import { LiveOutput } from "../../components/TaskViews";
 import { ProviderMark } from "../../components/conversation/Message";
 import { BeanMark, Spinner, Terminal } from "../../components/icons";
-import { stripResultSentinel } from "../../lib/narrative";
-import { useRunStream } from "../../stream";
 import { QUEUE_ACTIVE, STEP_ORDER, taskCommandRuns } from "./taskPageModel";
 import type { Approval, QueueState, TaskDetail } from "../../types";
 
@@ -22,12 +20,9 @@ const LANES: { id: string; label: string; role: string }[] = [
   { id: "local", label: "Local tools", role: "shell · git · tests" },
 ];
 
-/** Live output for one run from the shared event store only. */
+/** Live activity for one run from the shared event store only. */
 function LaneLiveStream({ runId }: { runId: string | null | undefined }) {
-  const stream = useRunStream(runId);
-  const text = stripResultSentinel(stream?.stdout ?? "");
-  if (!text) return null;
-  return <LiveOutput text={text} active={stream?.status === "running"} className="mt-1" />;
+  return <LiveRunActivity runId={runId} className="mt-1" />;
 }
 
 function laneStatusRank(status: string): number {

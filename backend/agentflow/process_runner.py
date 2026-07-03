@@ -70,6 +70,9 @@ class RunRecord:
     workspace: Optional[str] = None
     queue_item_id: Optional[str] = None
     stream_kind: str = "run"  # run | command | chat | controller
+    # Optional stdout normalizer (e.g. claude stream-json → readable text); every
+    # consumer of stdout — deltas, chat bubbles, logs — sees the normalized text.
+    normalizer: Optional[object] = field(default=None, repr=False)
     seq: int = 0  # per-run monotonic sequence for ordering
     headroom_applied: bool = False  # routed through the Headroom proxy (Pillar 1)
     _start_monotonic: float = field(default_factory=time.monotonic)
@@ -301,11 +304,12 @@ class ProcessRunner:
         captured = 0
         carry = ""  # held tail (unredacted) so a secret is never split across deltas
         streaming = bool(record.workspace)
-        while True:
-            chunk = await stream.read(4096)
-            if not chunk:
-                break
-            text = chunk.decode("utf-8", errors="replace")
+        # Providers whose stdout is machine-framed (claude stream-json) get a
+        # normalizer; it holds partial lines itself and returns readable text.
+        norm = record.normalizer if channel == "stdout" else None
+
+        def _ingest(text: str) -> None:
+            nonlocal captured, carry
             captured += len(text)
             if captured <= MAX_CAPTURE_CHARS:
                 parts.append(text)
@@ -317,6 +321,20 @@ class ProcessRunner:
                 emit, carry = _split_emittable(carry)
                 if emit:
                     self._emit(record, self._delta_type(record, channel), channel=channel, text_delta=emit)
+
+        while True:
+            chunk = await stream.read(4096)
+            if not chunk:
+                break
+            text = chunk.decode("utf-8", errors="replace")
+            if norm is not None:
+                text = norm.feed(text)  # type: ignore[attr-defined]
+            if text:
+                _ingest(text)
+        if norm is not None:
+            tail = norm.flush()  # type: ignore[attr-defined]
+            if tail:
+                _ingest(tail)
         if streaming and carry:
             self._emit(record, self._delta_type(record, channel), channel=channel, text_delta=carry)
 
@@ -398,6 +416,8 @@ class ProcessRunner:
         lifecycle) to the event bus. Quick probes/git omit it and stay silent.
         Pass ``max_runtime`` (seconds) to arm a watchdog that cancels a wedged run.
         """
+        from .stream_normalizer import normalizer_for  # local: avoid import cycle
+
         record = self._new_record(
             argv,
             cwd,
@@ -408,6 +428,7 @@ class ProcessRunner:
             workspace=str(workspace) if workspace else None,
             queue_item_id=queue_item_id,
             stream_kind=stream_kind,
+            normalizer=normalizer_for(provider, argv),
         )
         # Children must not inherit OUR port assignment: dev servers honor PORT and
         # would bind on top of the CLITC backend, hijacking localhost:8787.
