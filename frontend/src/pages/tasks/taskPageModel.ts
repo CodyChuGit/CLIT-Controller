@@ -12,7 +12,7 @@ export const STEP_ORDER = [
 
 export const SHORT_LABELS: Record<string, string> = {
   codex_spec: "Spec",
-  claude_implement: "Implement",
+  claude_implement: "Impl",
   gemini_qa: "QA",
   codex_review: "Review",
   claude_fix: "Fix",

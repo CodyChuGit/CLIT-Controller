@@ -21,7 +21,9 @@ export const STEP_META: Record<string, { label: string; chip: string; dot: strin
     dot: "bg-sky-500",
   },
   claude_implement: {
-    label: "Implement",
+    // "Impl", not "Implement": the widest chip dictated each row's wrap
+    // behavior — uniform short labels keep every pill row apples-to-apples.
+    label: "Impl",
     chip: "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300",
     dot: "bg-indigo-500",
   },

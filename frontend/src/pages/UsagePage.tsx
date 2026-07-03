@@ -7,6 +7,28 @@ import { Loading, PageShell } from "../components/ui";
 import UsageHealthBadge from "../components/UsageHealthBadge";
 import type { Health, LiveProviderUsage, OrchestrationMode, Recommendation, Usage } from "../types";
 
+/* Each CLI names its quota windows differently (claude: session/week,
+   codex: 5h/7d) and describes resets differently (absolute vs relative).
+   Normalize both so every provider row reads apples-to-apples. */
+const WINDOW_LABELS: Record<string, string> = {
+  "5h": "session",
+  five_hour: "session",
+  "7d": "week",
+  seven_day: "week",
+};
+
+/** Absolute reset moment, matching claude's own copy: "Jul 3 at 3pm". */
+function resetDate(resetsAt: number | null): string {
+  if (!resetsAt) return "";
+  const d = new Date(resetsAt * 1000);
+  const mon = d.toLocaleString(undefined, { month: "short" });
+  const ampm = d.getHours() >= 12 ? "pm" : "am";
+  const h = d.getHours() % 12 || 12;
+  const min = d.getMinutes();
+  return `${mon} ${d.getDate()} at ${h}${min ? `:${String(min).padStart(2, "0")}` : ""}${ampm}`;
+}
+
+/** Relative countdown — hover detail only. */
 function epochResets(resetsAt: number | null): string {
   if (!resetsAt) return "";
   const ms = resetsAt * 1000 - Date.now();
@@ -50,7 +72,7 @@ function QuotaCell({ liveData, loading }: { liveData?: LiveProviderUsage; loadin
         return (
           <div key={w.label} className="flex items-center gap-2.5 text-[11px]">
             <span className="w-16 shrink-0 truncate text-right font-mono text-[10px] text-neutral-400">
-              {w.label}
+              {WINDOW_LABELS[w.label] ?? w.label}
             </span>
             <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
               <div
@@ -71,9 +93,10 @@ function QuotaCell({ liveData, loading }: { liveData?: LiveProviderUsage; loadin
             </span>
             <span
               className="w-28 shrink-0 truncate text-right tabular-nums text-neutral-400"
-              title={w.resetsText ?? undefined}
+              title={epochResets(w.resetsAt) || (w.resetsText ?? undefined)}
             >
-              {(w.resetsText ?? epochResets(w.resetsAt)).replace(/\s*\(.*$/, "")}
+              {/* absolute date in the column (relative countdown on hover) */}
+              {(resetDate(w.resetsAt) || w.resetsText || "").replace(/\s*\(.*$/, "")}
             </span>
           </div>
         );

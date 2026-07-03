@@ -71,7 +71,9 @@ export default function AgentDockTabs({
                 <span className="absolute inset-x-0 top-0 h-0.5 bg-accent" aria-hidden="true" />
               )}
               {tab.controller ? (
-                <BeanMark className="h-4 w-4 text-accent-subtle" />
+                // White (near-black in light mode), not accent blue — the
+                // controller mark reads as its own thing next to the brand logos.
+                <BeanMark className="h-4 w-4 text-neutral-800 dark:text-white" />
               ) : (
                 <span
                   className={`${tab.pending ? "animate-pulse" : ""} ${tab.installed ? "" : "opacity-40"}`}

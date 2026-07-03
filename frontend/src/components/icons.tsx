@@ -154,7 +154,9 @@ export const AntigravityMark = (p: SVGProps<SVGSVGElement>) => (
 /** Smooth bean mark for compact controller/channel UI. */
 export const BeanMark = ({ className = "h-4 w-4", ...rest }: SVGProps<SVGSVGElement>) => (
   <svg
-    viewBox="0 0 512 512"
+    // Tight viewBox around the glyph (not the original 512 canvas) so the bean
+    // renders at the same visual size as the provider brand marks beside it.
+    viewBox="76 76 360 360"
     fill="none"
     stroke="currentColor"
     strokeLinecap="round"
