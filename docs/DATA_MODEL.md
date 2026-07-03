@@ -28,6 +28,7 @@ Workspace state lives under `<workspace>/.agentflow/`.
 | `queue.json` | Execution queue. |
 | `usage.json` | Workspace usage counters and provider health. |
 | `logs.json` | Global visible log entries. |
+| `context/<id>.json` | Redacted Context Intelligence optimization report. |
 | `tasks/<task_id>/` | Task artifacts, task metadata, prompt/output logs. |
 
 ## Task Folder
@@ -137,6 +138,30 @@ Stores approval records:
 - resolver
 
 Approvals survive restart and can be listed through `/api/approvals`.
+
+### `context/<id>.json`
+
+Stores a redacted Context Intelligence `OptimizationReport` under
+`<workspace>/.agentflow/context/<id>.json`.
+
+Fields:
+
+- id
+- kind
+- createdAt
+- task
+- policyLevel
+- selectedFiles with reasons and scores
+- rejectedCandidates
+- gitChangedFiles
+- sectionOrder
+- tokenUsage with tokensBefore, tokensAfter, counter, savingsPct
+- compression
+- digest
+- promptPreview
+- benchmark
+
+Everything is passed through `redaction.redact_data` before persisting.
 
 ## Atomic Writes And Migrations
 

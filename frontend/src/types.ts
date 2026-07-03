@@ -290,6 +290,56 @@ export interface HeadroomStatus {
   tokensSaved: number;
 }
 
+export interface ContextSelectedFile {
+  path: string;
+  excerpt: string;
+  reasons: string[];
+  score: number;
+  excerptTruncated: boolean;
+}
+
+export interface ContextRejectedCandidate {
+  path: string;
+  score: number;
+  reason: string;
+}
+
+export interface ContextTokenUsage {
+  tokensBefore: number;
+  tokensAfter: number;
+  counter: string;
+  savingsPct: number;
+}
+
+export interface ContextCompressionEntry {
+  section: string;
+  compressor: string;
+  charsBefore: number;
+  charsAfter: number;
+  applied: boolean;
+}
+
+export interface ContextDigest {
+  text: string;
+  sources: string[];
+}
+
+export interface ContextReport {
+  id: string;
+  kind: string;
+  createdAt: string;
+  task: string;
+  policyLevel: string;
+  selectedFiles: ContextSelectedFile[];
+  rejectedCandidates: ContextRejectedCandidate[];
+  gitChangedFiles: string[];
+  sectionOrder: string[];
+  tokenUsage: ContextTokenUsage;
+  compression: ContextCompressionEntry[];
+  digest: ContextDigest;
+  promptPreview: string;
+}
+
 export type PonytailLevel = "off" | "lite" | "full" | "ultra";
 
 export interface Settings {

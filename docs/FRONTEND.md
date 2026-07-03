@@ -41,6 +41,12 @@ The two live paths are:
 - `EventStreamProvider` in `stream.tsx` for SSE/polling events
 - `TerminalPane` for provider PTY WebSockets
 
+## Context Intelligence
+
+The Settings page includes `frontend/src/components/ContextIntelligencePanel.tsx`.
+It calls `api.contextPreview(task, maxTokens?)` for `POST /api/context/preview`
+and exposes `api.contextReport(id)` for `GET /api/context/reports/{id}`.
+
 ## Event Store
 
 `stream.tsx` is the only workspace event owner.

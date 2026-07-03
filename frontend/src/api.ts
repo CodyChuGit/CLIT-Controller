@@ -4,6 +4,7 @@ import type {
   ChatSendResult,
   ChatState,
   CurrentProject,
+  ContextReport,
   EventsResponse,
   Exchange,
   FileContent,
@@ -89,6 +90,14 @@ export const api = {
     headroom?: { enabled?: boolean; minChars?: number };
     ponytail?: { level: string };
   }) => post<Settings>("/projects/settings", body),
+
+  // context intelligence
+  contextPreview: (task: string, maxTokens?: number) =>
+    post<ContextReport>(
+      "/context/preview",
+      maxTokens === undefined ? { task } : { task, maxTokens },
+    ),
+  contextReport: (id: string) => get<ContextReport>(`/context/reports/${encodeURIComponent(id)}`),
 
   // agents
   agents: () => get<Provider[]>("/agents"),

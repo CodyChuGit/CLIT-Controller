@@ -60,6 +60,24 @@ Workspace-scoped routes require a current workspace unless noted.
 - `{kind: "provider", provider: "claude"}`
 - `{kind: "task", taskId: "...", intent: "continue"}`
 
+## Context
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| POST | `/api/context/preview` | Persisted, redacted `OptimizationReport` for one task preview. |
+| POST | `/api/context/benchmark` | `OptimizationReport` comparing `naive`, `ranked`, and `ranked_compressed`. |
+| GET | `/api/context/reports/{report_id}` | Stored context report. |
+
+`/api/context/preview` accepts `{"task": str, "maxTokens": int|null}` and
+returns a persisted, redacted `OptimizationReport` with `kind: "preview"`.
+
+`/api/context/benchmark` accepts `{"task": str}` and returns an
+`OptimizationReport` with `kind: "benchmark"`.
+
+Report ids must match `^[A-Za-z0-9_-]+$`; malformed ids return 400 before
+filesystem access. Missing reports return 404. Context routes return 409 when
+no workspace is selected.
+
 ## Tasks
 
 | Method | Path | Purpose |

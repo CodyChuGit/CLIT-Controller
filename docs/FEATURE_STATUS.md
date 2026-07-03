@@ -15,6 +15,7 @@ Historical notes were removed; this document describes the working app.
 | Controller chat | Runs through the selected controller CLI and streams live output. Default controller role is `claude`. |
 | Direct provider terminals | Provider tabs use real PTY sessions through xterm.js, with lifecycle diagnostics. |
 | Typed input route | `/api/chat/submit` dispatches explicit controller/provider/task destinations from `InputSubmission`. |
+| Context Intelligence | Shipped Phase 1 preview/benchmark APIs with tests; live-prompt wiring is a later phase. |
 | Controller protocol | `CLITC_RESULT_V1` is the primary action protocol; invalid result blocks mutate no state. |
 | Legacy directive fallback | `agentflow-*` directives are still honored only when no `CLITC_RESULT_V1` block is present, with a compatibility event. |
 | Controller actions | answer, create task, queue steps, run command, request approval, request user, retry, reroute, complete task, cancel. |

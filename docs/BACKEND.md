@@ -155,6 +155,32 @@ It is fail-open and only routes `claude` and `codex`.
 `ponytail.py` injects output-discipline instructions into agent prompts with
 levels `off`, `lite`, `full`, and `ultra`.
 
+## Context Intelligence
+
+`backend/agentflow/context_intelligence/` is a Phase 1 preview/benchmark
+package. It builds typed Pydantic v2 context packages and optimization reports
+without wiring into live prompts; `chat_service.py` and `prompt_templates.py`
+are untouched by this path.
+
+Package responsibilities:
+
+- `behavior.py` reads Ponytail and exposes the current policy block.
+- `repo_map.py` builds a bounded repo map through `workspace.py`.
+- `file_ranker.py` selects files with scores/reasons and records rejected
+  candidates.
+- `git_context.py` reads branch, changed files, and diffs through
+  `git_service.py`.
+- `log_context.py` reads only `process_runner` log entries and run records;
+  PTY scrollback is never used.
+- `memory.py` builds a digest from controller chat and task state.
+- `compression.py` defines the compression interface with exactly two
+  implementations: `SimpleDeterministicCompressor` and `HeadroomCompressor`,
+  which wraps `headroom_service.py`.
+- `metrics.py` counts tokens through Headroom and fails open to `len(text) // 4`.
+- `prompt_builder.py` renders the locked 10-section order used by reports.
+- `reports.py` persists redacted reports under
+  `<workspace>/.agentflow/context/`.
+
 ## Backend Tests
 
 Run targeted tests:

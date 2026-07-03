@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import ContextIntelligencePanel from "../components/ContextIntelligencePanel";
 import { Card, PageShell } from "../components/ui";
 import type { HeadroomStatus, PonytailLevel, RoutingConfig, Settings } from "../types";
 
@@ -177,6 +178,8 @@ export default function SettingsPage() {
           </div>
         </div>
       </Card>
+
+      <ContextIntelligencePanel />
 
       <Card title="Command templates" pad>
         <p className="mb-3 text-xs text-neutral-500">
