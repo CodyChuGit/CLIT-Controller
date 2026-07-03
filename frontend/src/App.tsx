@@ -7,23 +7,13 @@ import StatusBar from "./components/StatusBar";
 import { loadState, saveState } from "./persist";
 import { EventStreamProvider } from "./stream";
 
-const PAGE_IDS: PageId[] = [
-  "projects",
-  "agents",
-  "tasks",
-  "terminals",
-  "preview",
-  "usage",
-  "logs",
-  "settings",
-];
+const PAGE_IDS: PageId[] = ["projects", "agents", "tasks", "preview", "usage", "logs", "settings"];
 import AgentsPage from "./pages/AgentsPage";
 import LogsPage from "./pages/LogsPage";
 import PreviewPage from "./pages/PreviewPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import SettingsPage from "./pages/SettingsPage";
 import TasksPage from "./pages/TasksPage";
-import TerminalsPage from "./pages/TerminalsPage";
 import UsagePage from "./pages/UsagePage";
 import type { CurrentProject, EditorFile, GitInfo, Usage } from "./types";
 
@@ -294,7 +284,6 @@ export default function App() {
                 )}
                 {page === "agents" && <AgentsPage />}
                 {page === "tasks" && <TasksPage />}
-                {page === "terminals" && <TerminalsPage />}
                 {page === "preview" && <PreviewPage />}
                 {page === "usage" && <UsagePage />}
                 {page === "logs" && <LogsPage />}

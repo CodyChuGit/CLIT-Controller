@@ -48,10 +48,7 @@ function ActivityRow({ item, live }: { item: ActivityItem; live: boolean }) {
           </code>
         </div>
         {item.detail && (
-          <div
-            className="truncate pl-3 font-mono text-[9px] text-neutral-400"
-            title={item.detail}
-          >
+          <div className="truncate pl-3 font-mono text-[9px] text-neutral-400" title={item.detail}>
             {item.detail.split("\n")[0]}
           </div>
         )}

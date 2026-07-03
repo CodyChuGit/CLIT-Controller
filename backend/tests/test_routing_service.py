@@ -49,3 +49,20 @@ def test_budget_context_header_format():
     assert "- Current traffic control mode: Balanced" in header
     assert "- Claude usage: yellow" in header
     assert "minimize full-file context" in header
+
+
+def test_orchestrator_role_migrates_off_antigravity(tmp_path):
+    """The controller is Claude now: old configs pinning orchestrator=antigravity
+    (the previous default) upgrade on load; antigravity keeps QA/tool duty only."""
+    from agentflow import config
+
+    config.ensure_workspace(tmp_path)
+    config.set_workspace_setting(
+        tmp_path,
+        "routing",
+        {"orchestrator": "antigravity", "pm": "codex", "engineer": "claude", "qa": "antigravity"},
+    )
+    routing = config.get_workspace_routing(tmp_path)
+    assert routing["orchestrator"] == "claude"
+    assert routing["qa"] == "antigravity"  # QA/tool role untouched
+    assert config.DEFAULT_ROUTING["orchestrator"] == "claude"

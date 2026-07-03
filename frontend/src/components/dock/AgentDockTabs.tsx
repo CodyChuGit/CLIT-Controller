@@ -12,13 +12,15 @@ export interface DockTab {
   unread: boolean;
 }
 
-/** The dock tab strip: controller + a direct line to each agent, with
- *  unread/running state, plus the right-side dock controls (palette, terminal
- *  drawer, clear, collapse). Pure presentation — AgentDock owns the state. */
+/** The dock tab strip: the controller command center + one live terminal per
+ *  agent, plus the right-side dock controls (palette, engine-terminal drawer,
+ *  clear, collapse). Pure presentation — AgentDock owns the state. */
 export default function AgentDockTabs({
   tabs,
   channel,
   termOpen,
+  showTerminalToggle = true,
+  showClear = true,
   onSwitch,
   onOpenPalette,
   onToggleTerminal,
@@ -28,6 +30,9 @@ export default function AgentDockTabs({
   tabs: DockTab[];
   channel: string;
   termOpen: boolean;
+  /** controller tab only — agent tabs ARE terminals. */
+  showTerminalToggle?: boolean;
+  showClear?: boolean;
   onSwitch: (id: string) => void;
   onOpenPalette: () => void;
   onToggleTerminal: () => void;
@@ -54,7 +59,7 @@ export default function AgentDockTabs({
                   ? `${tab.id} is not installed`
                   : tab.controller
                     ? "Controller — creates tasks and cues the agents"
-                    : `Direct chat with ${tab.id} — no traffic control`
+                    : `${tab.id} terminal — live CLI session`
               }
               className={`focusable relative flex shrink-0 cursor-pointer items-center gap-1.5 border-r border-neutral-200 px-2.5 text-[11px] transition-colors duration-150 dark:border-neutral-800 ${
                 active
@@ -96,19 +101,33 @@ export default function AgentDockTabs({
         >
           <Command className="h-3.5 w-3.5" />
         </button>
+        {showTerminalToggle && (
+          <button
+            onClick={onToggleTerminal}
+            title={termOpen ? "Close engine terminal" : "Open engine terminal"}
+            aria-label={termOpen ? "Close engine terminal" : "Open engine terminal"}
+            aria-pressed={termOpen}
+            className={`icon-btn ${termOpen ? "text-accent" : ""}`}
+          >
+            <Terminal className="h-3.5 w-3.5" />
+          </button>
+        )}
+        {showClear && (
+          <button
+            onClick={onClear}
+            title="Clear this chat"
+            aria-label="Clear this chat"
+            className="icon-btn"
+          >
+            <Close className="h-3.5 w-3.5" />
+          </button>
+        )}
         <button
-          onClick={onToggleTerminal}
-          title={termOpen ? "Close terminal drawer" : "Open terminal drawer"}
-          aria-label={termOpen ? "Close terminal drawer" : "Open terminal drawer"}
-          aria-pressed={termOpen}
-          className={`icon-btn ${termOpen ? "text-accent" : ""}`}
+          onClick={onCollapse}
+          title="Collapse chat"
+          aria-label="Collapse chat"
+          className="icon-btn"
         >
-          <Terminal className="h-3.5 w-3.5" />
-        </button>
-        <button onClick={onClear} title="Clear this chat" aria-label="Clear this chat" className="icon-btn">
-          <Close className="h-3.5 w-3.5" />
-        </button>
-        <button onClick={onCollapse} title="Collapse chat" aria-label="Collapse chat" className="icon-btn">
           <ChevronRight className="h-3.5 w-3.5" />
         </button>
       </div>

@@ -252,8 +252,7 @@ def test_chat_send_executes_v1_action_end_to_end(tmp_path, monkeypatch):
         '"action":{"type":"queue_steps","taskId":"latest","steps":["claude_implement"]}}'
     )
     script.write_text(
-        "#!/bin/sh\n"
-        'printf \'Narrative first.\\n\\n<<<CLITC_RESULT_V1\\n%s\\nCLITC_RESULT_V1>>>\\n\' ' + f"'{body}'\n"
+        "#!/bin/sh\nprintf 'Narrative first.\\n\\n<<<CLITC_RESULT_V1\\n%s\\nCLITC_RESULT_V1>>>\\n' " + f"'{body}'\n"
     )
     script.chmod(0o755)
 

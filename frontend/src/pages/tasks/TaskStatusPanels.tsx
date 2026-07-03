@@ -89,14 +89,14 @@ export function QueueStrip({
       {items.map((item) => (
         <div
           key={item.id}
-          className="flex items-center gap-2 border-b border-neutral-100 px-3 py-2 last:border-0 dark:border-neutral-800/60"
+          className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-neutral-100 px-3 py-2 last:border-0 dark:border-neutral-800/60"
         >
           {item.status === "running" ? (
             <Spinner className="h-3 w-3 shrink-0 text-blue-500" />
           ) : (
             <StatusBadge state={item.status} />
           )}
-          <span className="text-xs font-medium">{item.label}</span>
+          <span className="min-w-0 truncate text-xs font-medium">{item.label}</span>
           <span className="chip">{item.provider}</span>
           {item.note && (
             <span
@@ -106,8 +106,9 @@ export function QueueStrip({
               {item.note}
             </span>
           )}
-          <span className="flex-1" />
-          <div className="flex shrink-0 items-center gap-1">
+          {/* ml-auto (not a flex-1 spacer) keeps the actions right-biased even
+              when the row wraps them onto their own line */}
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             {(item.status === "blocked" || item.status === "awaiting_approval") && (
               <button className="btn-primary btn-xs" onClick={() => onApprove(item.id)}>
                 Approve

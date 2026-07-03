@@ -169,7 +169,7 @@ class TerminalSession:
         self._launch_written = launch is None  # readiness counts output after the CLI launch
 
     def current_meta(self) -> dict:
-        meta = {
+        meta: dict[str, object] = {
             "type": "meta",
             "state": self.state,
             "provider": self.provider,

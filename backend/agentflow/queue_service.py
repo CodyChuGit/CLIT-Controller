@@ -474,7 +474,7 @@ async def _process_consults(workspace: Path, manual: bool) -> None:
     if chat_service.pending_state(workspace) is not None:
         return  # the user is mid-conversation with the controller — wait
     routing = config.get_workspace_routing(workspace)
-    controller = routing.get("orchestrator", "antigravity")
+    controller = routing.get("orchestrator", "claude")
     busy = {r.provider for r in RUNNER.running_runs() if r.provider}
     if controller in busy or any(r.step == "orchestrate" for r in RUNNER.running_runs()):
         return

@@ -16,7 +16,19 @@ from typing import Optional
 
 from .. import queue_service, state_store, task_service
 from ..chat_directives import _normalize_steps
-from ..controller_protocol import ControllerAction
+from ..controller_protocol import (
+    AnswerAction,
+    CancelAction,
+    CompleteTaskAction,
+    ControllerAction,
+    CreateTaskAction,
+    QueueStepsAction,
+    RequestApprovalAction,
+    RequestUserAction,
+    RerouteAction,
+    RetryAction,
+    RunCommandAction,
+)
 from ..process_runner import RUNNER, now_iso
 
 RETRYABLE = ("failed", "blocked", "skipped", "cancelled")
@@ -76,10 +88,10 @@ async def execute(
     reserved for programmer errors; expected failures come back ok=False."""
     kind = action.type
 
-    if kind == "answer":
+    if isinstance(action, AnswerAction):
         return Outcome(kind, True, "answered", mutated=False)
 
-    if kind == "create_task":
+    if isinstance(action, CreateTaskAction):
         meta = task_service.create_task(workspace, action.title[:200], action.goal, orchestrated=True)
         # Default to the planning step so a handed-over task always starts running;
         # the closed loop then consults the controller for what to do next.
@@ -89,20 +101,24 @@ async def execute(
         _message(workspace, provider, note)
         return Outcome(kind, True, note, mutated=True)
 
-    if kind == "queue_steps":
+    if isinstance(action, QueueStepsAction):
         tid = resolve_task(workspace, action.taskId, task_id)
-        steps = _normalize_steps(action.steps)
-        if tid is None or steps is None:
-            note = f"Couldn’t queue steps — no task matches `{action.taskId}`." if tid is None else "No valid steps to queue."
+        valid_steps = _normalize_steps(action.steps)
+        if tid is None or valid_steps is None:
+            note = (
+                f"Couldn’t queue steps — no task matches `{action.taskId}`."
+                if tid is None
+                else "No valid steps to queue."
+            )
             _message(workspace, provider, note)
             return Outcome(kind, False, note, mutated=False)
         task_service.set_orchestrated(workspace, tid)
-        queue_service.add_steps(workspace, tid, steps, source="orchestrator")
-        note = f"Queued {', '.join(steps)} · {_slug(tid)}"
+        queue_service.add_steps(workspace, tid, valid_steps, source="orchestrator")
+        note = f"Queued {', '.join(valid_steps)} · {_slug(tid)}"
         _message(workspace, provider, note)
         return Outcome(kind, True, note, mutated=True)
 
-    if kind == "run_command":
+    if isinstance(action, RunCommandAction):
         from .. import chat_service  # lazy
 
         # Policy classification, approval gating and workspace confinement all
@@ -110,7 +126,7 @@ async def execute(
         await chat_service.execute_run_directive(workspace, action.command, provider, task_id=task_id)
         return Outcome(kind, True, f"ran `{action.command}` (policy-gated)", mutated=True)
 
-    if kind == "request_approval":
+    if isinstance(action, RequestApprovalAction):
         state_store.create_approval(
             workspace,
             action=action.command,
@@ -126,13 +142,15 @@ async def execute(
             _task_event(workspace, task_id, "approval_required", note, provider=provider)
         return Outcome(kind, True, note, mutated=True)
 
-    if kind == "request_user":
+    if isinstance(action, RequestUserAction):
         if task_id:
-            _task_event(workspace, task_id, "needs_user", f"controller needs your decision: {action.reason}", provider=provider)
+            _task_event(
+                workspace, task_id, "needs_user", f"controller needs your decision: {action.reason}", provider=provider
+            )
         _message(workspace, provider, f"Needs your input — {action.reason}")
         return Outcome(kind, True, action.reason, mutated=bool(task_id))
 
-    if kind == "retry":
+    if isinstance(action, RetryAction):
         tid = resolve_task(workspace, action.taskId, task_id)
         data = queue_service.load_queue(workspace)
         candidates = [
@@ -147,11 +165,15 @@ async def execute(
         item = candidates[-1]
         res = queue_service.retry_item(workspace, item["id"])
         ok = res.get("status") == "ok"
-        note = f"Retrying {item['label']} ({item['provider']})" if ok else f"Retry failed: {res.get('message', res.get('status'))}"
+        note = (
+            f"Retrying {item['label']} ({item['provider']})"
+            if ok
+            else f"Retry failed: {res.get('message', res.get('status'))}"
+        )
         _message(workspace, provider, note)
         return Outcome(kind, ok, note, mutated=ok)
 
-    if kind == "reroute":
+    if isinstance(action, RerouteAction):
         tid = resolve_task(workspace, action.taskId, task_id)
         data = queue_service.load_queue(workspace)
         candidates = [
@@ -171,7 +193,7 @@ async def execute(
         _message(workspace, provider, note)
         return Outcome(kind, ok, note, mutated=ok)
 
-    if kind == "complete_task":
+    if isinstance(action, CompleteTaskAction):
         tid = resolve_task(workspace, action.taskId, task_id)
         if tid is None:
             note = "Couldn’t complete — no task in scope."
@@ -195,7 +217,7 @@ async def execute(
         _message(workspace, provider, note)
         return Outcome(kind, True, note, mutated=True)
 
-    if kind == "cancel":
+    if isinstance(action, CancelAction):
         if action.runId:
             ok = await RUNNER.cancel(action.runId)
             stopped = [action.runId] if ok else []

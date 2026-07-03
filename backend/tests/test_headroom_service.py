@@ -106,3 +106,87 @@ def test_process_runner_runs_direct_when_disabled(tmp_path, monkeypatch):
     # ambient ANTHROPIC_BASE_URL the operator already had (fail-open / no override).
     assert "8799" not in rec.stdout
     assert rec.headroom_applied is False
+
+
+# ------------------------------------------------- managed proxy (primary path)
+
+
+def test_enabled_by_default():
+    # Headroom is the PRIMARY token-reduction layer: on by default (hermetic test
+    # home has no config), still fail-open when not installed/reachable.
+    assert headroom_service.settings()["enabled"] is True
+
+
+def _no_proxy_running(monkeypatch):
+    monkeypatch.setattr(headroom_service, "settings", lambda: ENABLED)
+    monkeypatch.setattr(headroom_service, "proxy_reachable", lambda url=None: False)
+    monkeypatch.setattr(headroom_service, "_proxy_run_id", None)
+
+
+def test_ensure_proxy_no_spawn_when_not_installed(monkeypatch):
+    _no_proxy_running(monkeypatch)
+    monkeypatch.setattr(headroom_service, "executable", lambda: None)
+    calls: list = []
+
+    async def fake_start(*a, **k):
+        calls.append(a)
+
+    monkeypatch.setattr("agentflow.process_runner.RUNNER.start", fake_start)
+    st = asyncio.run(headroom_service.ensure_proxy())
+    assert calls == []  # fail-open: agents run direct
+    assert st["managed"] is False
+
+
+def test_ensure_proxy_spawns_with_savings_profile(monkeypatch, tmp_path):
+    from agentflow.process_runner import RunRecord
+
+    _no_proxy_running(monkeypatch)
+    monkeypatch.setattr(headroom_service, "executable", lambda: "/fake/bin/headroom")
+
+    async def fake_profile_env(binary, profile):
+        assert profile == "agent-90"
+        return {"HEADROOM_PROFILE": profile}
+
+    monkeypatch.setattr(headroom_service, "_savings_profile_env", fake_profile_env)
+    started: dict = {}
+
+    async def fake_start(argv, cwd, **kwargs):
+        started["argv"] = argv
+        started["extra_env"] = kwargs.get("extra_env")
+        return RunRecord(id="hr1", argv=argv, cwd=str(cwd)), None
+
+    monkeypatch.setattr("agentflow.process_runner.RUNNER.start", fake_start)
+    asyncio.run(headroom_service.ensure_proxy())
+    assert started["argv"] == ["/fake/bin/headroom", "proxy", "--port", "8799"]
+    assert started["extra_env"] == {"HEADROOM_PROFILE": "agent-90"}
+    assert headroom_service._proxy_run_id == "hr1"
+    monkeypatch.setattr(headroom_service, "_proxy_run_id", None)  # cleanup
+
+
+def test_ensure_proxy_skips_when_already_reachable(monkeypatch):
+    _no_proxy_running(monkeypatch)
+    monkeypatch.setattr(headroom_service, "proxy_reachable", lambda url=None: True)
+    calls: list = []
+
+    async def fake_start(*a, **k):
+        calls.append(a)
+
+    monkeypatch.setattr("agentflow.process_runner.RUNNER.start", fake_start)
+    asyncio.run(headroom_service.ensure_proxy())
+    assert calls == []  # a user-run proxy is respected, not duplicated
+
+
+def test_savings_profile_env_parses_export_lines(monkeypatch):
+    from agentflow.process_runner import RunRecord
+
+    record = RunRecord(id="p", argv=["headroom"], cwd=".")
+    record.status = "succeeded"
+    record.exit_code = 0
+    record.stdout_parts = ["export HEADROOM_MODE='aggressive'\nexport HEADROOM_GUARD=0.9\nnot an export\n"]
+
+    async def fake_run_and_wait(*a, **k):
+        return record
+
+    monkeypatch.setattr("agentflow.process_runner.RUNNER.run_and_wait", fake_run_and_wait)
+    env = asyncio.run(headroom_service._savings_profile_env("headroom", "agent-90"))
+    assert env == {"HEADROOM_MODE": "aggressive", "HEADROOM_GUARD": "0.9"}

@@ -409,6 +409,7 @@ class ProcessRunner:
         queue_item_id: Optional[str] = None,
         stream_kind: str = "run",
         max_runtime: Optional[float] = None,
+        extra_env: Optional[dict[str, str]] = None,
     ) -> tuple[RunRecord, asyncio.Task]:
         """Start a process and return immediately; output is consumed in the background.
 
@@ -440,6 +441,8 @@ class ProcessRunner:
         if hr_env:
             child_env.update(hr_env)
             record.headroom_applied = True
+        if extra_env:
+            child_env.update(extra_env)
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv,

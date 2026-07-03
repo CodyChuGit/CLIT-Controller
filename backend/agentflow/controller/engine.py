@@ -146,8 +146,7 @@ async def apply_controller_output(
     state_store.append_event(
         workspace,
         "controller.turn_completed",
-        f"{source} turn via {provider}: {turn['status']}"
-        + (f" ({turn['actionType']})" if turn["actionType"] else ""),
+        f"{source} turn via {provider}: {turn['status']}" + (f" ({turn['actionType']})" if turn["actionType"] else ""),
         task_id=task_id,
         provider=provider,
         step="orchestrate" if source == "consult" else "chat",

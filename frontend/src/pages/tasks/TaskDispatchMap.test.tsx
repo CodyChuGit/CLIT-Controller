@@ -83,8 +83,9 @@ describe("task dispatch map", () => {
     const { container } = render(
       <TaskDispatchMap detail={detail()} queue={queue} approvals={[]} onSelectStep={() => {}} />,
     );
-    // gemini_qa is awaiting approval via the queue overlay, not its idle step state.
-    expect(container.textContent).toContain("awaiting approval");
+    // gemini_qa is awaiting approval via the queue overlay, not its idle step
+    // state — shown with the terse pill copy.
+    expect(container.textContent).toContain("approval");
   });
 
   it("surfaces pending approvals in the controller lane", () => {

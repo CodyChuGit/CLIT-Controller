@@ -266,13 +266,6 @@ export interface LogsResponse {
   running: RunInfo[];
 }
 
-/** Metadata for the live Terminals tab; the sessions themselves stream over
- *  WebSocket. `installed` says whether each CLI was found on PATH. */
-export interface TerminalsStatus {
-  providers: string[];
-  installed: Record<string, boolean>;
-}
-
 /** Why a terminal pane is (or isn't) alive: executable resolution, session
  *  lifecycle, and the suggested fix — GET /api/terminals/{provider}/diagnostics. */
 export interface TerminalDiagnostics {
@@ -285,10 +278,27 @@ export interface TerminalDiagnostics {
   suggestedAction: string | null;
 }
 
+/** Headroom (input-side token compression proxy) status — Pillar 1. */
+export interface HeadroomStatus {
+  enabled: boolean;
+  installed: boolean;
+  executablePath: string | null;
+  proxyUrl: string;
+  savingsProfile: string;
+  reachable: boolean;
+  /** true when CLITC itself started and owns the proxy process. */
+  managed: boolean;
+  routedProviders: string[];
+}
+
+export type PonytailLevel = "off" | "lite" | "full" | "ultra";
+
 export interface Settings {
   routing: RoutingConfig;
   commandTemplates: Record<string, string>;
   models: Record<string, string>;
+  headroom: HeadroomStatus;
+  ponytail: { level: PonytailLevel };
   workspacePath: string | null;
   globalConfigPath: string;
   workspaceConfigPath: string | null;

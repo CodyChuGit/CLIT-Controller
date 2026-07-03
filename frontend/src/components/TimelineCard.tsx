@@ -34,7 +34,7 @@ export default function TimelineCard({
             {time}
           </span>
         )}
-        <div className="min-w-0 flex-1 text-xs leading-5 text-neutral-700 dark:text-neutral-300">
+        <div className="min-w-0 flex-1 break-words text-xs leading-5 text-neutral-700 dark:text-neutral-300">
           <span className={`mr-1.5 font-medium ${SEVERITY_TEXT[d.severity]}`}>{d.title}</span>
           {d.step && <StepChip name={d.step} />}
           {d.provider && (
@@ -69,7 +69,10 @@ export default function TimelineCard({
       {d.summary && d.summary.bullets.length > 0 && (
         <ul className="mt-1.5 space-y-0.5">
           {d.summary.bullets.slice(0, 5).map((b, i) => (
-            <li key={i} className="text-xs leading-snug text-neutral-700 dark:text-neutral-300">
+            <li
+              key={i}
+              className="break-words text-xs leading-snug text-neutral-700 dark:text-neutral-300"
+            >
               {b}
             </li>
           ))}

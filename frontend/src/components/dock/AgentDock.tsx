@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api";
 import type { PageId } from "../ActivityBar";
-import type {
-  ChatMessage,
-  ChatSendResult,
-  CurrentProject,
-  GitInfo,
-  Usage,
-} from "../../types";
+import type { ChatMessage, ChatSendResult, CurrentProject, GitInfo, Usage } from "../../types";
 import CommandPalette, { type PaletteAction } from "../CommandPalette";
 import DragHandle from "../DragHandle";
+import TerminalPane from "../TerminalPane";
 import { ProviderMark } from "../conversation/Message";
 import { BeanMark } from "../icons";
 import { useDockData } from "../../hooks/useDockData";
@@ -29,6 +24,8 @@ import AgentDockTranscript from "./AgentDockTranscript";
 const OPEN_KEY = "agentflow.chatOpen";
 const ORCH = "orchestrator";
 const FALLBACK_AGENTS = ["codex", "claude", "antigravity"];
+const TERM_MIN_W = 600; // ≈80 mono columns — the classic terminal minimum
+const MAX_W = 900;
 
 export default function AgentDock({
   workspacePath,
@@ -139,12 +136,6 @@ export default function AgentDock({
     const acts: PaletteAction[] = [];
     if (onNavigate) {
       acts.push({
-        id: "nav-terminals",
-        label: "Open Terminals",
-        hint: "PTY",
-        run: () => onNavigate("terminals"),
-      });
-      acts.push({
         id: "nav-tasks",
         label: "Open Tasks",
         hint: "history",
@@ -170,7 +161,7 @@ export default function AgentDock({
         run: () => void resolveApproval(a.id, false),
       });
     }
-    if (pending)
+    if (pending && isOrch)
       acts.push({
         id: "stop-resp",
         label: "Stop response",
@@ -183,12 +174,13 @@ export default function AgentDock({
         label: "Stop all running processes",
         run: () => void api.stop().then(reload),
       });
-    acts.push({
-      id: "clear",
-      label: "Clear this chat",
-      hint: isOrch ? "controller" : channel,
-      run: () => void api.chatClear(channel).then(reload),
-    });
+    if (isOrch)
+      acts.push({
+        id: "clear",
+        label: "Clear this chat",
+        hint: "controller",
+        run: () => void api.chatClear(channel).then(reload),
+      });
     for (const id of channelIds) {
       if (id !== channel)
         acts.push({
@@ -242,8 +234,8 @@ export default function AgentDock({
                 switchTab(id);
                 toggle(true);
               }}
-              title={`Chat with ${id}`}
-              aria-label={`Open ${id} chat`}
+              title={`${id} terminal`}
+              aria-label={`Open ${id} terminal`}
               className="focusable relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors duration-150 hover:bg-neutral-100 dark:hover:bg-neutral-800"
             >
               <span className={chPending ? "animate-pulse" : ""}>
@@ -266,7 +258,7 @@ export default function AgentDock({
     data?.providers.find((p) => p.id === data.defaultProvider && p.installed)?.id ??
     data?.providers.find((p) => p.installed)?.id ??
     data?.defaultProvider ??
-    "antigravity";
+    "claude";
   const selected = provider ?? fallback;
 
   const tabs: DockTab[] = channelIds.map((id) => ({
@@ -277,20 +269,27 @@ export default function AgentDock({
     unread: hasUnread(id),
   }));
 
+  // A PTY needs ~80 mono columns (≈600px at the pane's 12px font) or TUIs like
+  // agy reflow into garbage. The whole dock — controller tab included — keeps
+  // that same minimum so the toolbar doesn't jump between tabs. Guarded so it
+  // never overflows a small window.
+  const minWidth = Math.min(TERM_MIN_W, Math.max(300, window.innerWidth - 240));
+  const shownWidth = Math.max(width, minWidth);
+
   return (
     <div className="flex shrink-0">
       <DragHandle
         orientation="vertical"
         label="Resize controller panel"
         onMove={(x) => {
-          const w = Math.min(640, Math.max(300, window.innerWidth - x));
+          const w = Math.min(MAX_W, Math.max(minWidth, window.innerWidth - x));
           widthRef.current = w;
           setWidth(w);
         }}
         onDone={() => saveState("chatW", widthRef.current)}
       />
       <section
-        style={{ width }}
+        style={{ width: shownWidth }}
         className="flex shrink-0 flex-col border-l border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
         aria-label="Agent chat"
       >
@@ -298,50 +297,62 @@ export default function AgentDock({
           tabs={tabs}
           channel={channel}
           termOpen={termOpen}
+          showTerminalToggle={isOrch}
+          showClear={isOrch}
           onSwitch={switchTab}
           onOpenPalette={() => setPaletteOpen(true)}
           onToggleTerminal={() => setTermOpen((v) => !v)}
           onClear={() => {
-            const label = isOrch ? "controller" : channel;
-            if (window.confirm(`Clear the ${label} chat for this workspace?`)) {
+            if (window.confirm("Clear the controller chat for this workspace?")) {
               void api.chatClear(channel).then(reload);
             }
           }}
           onCollapse={() => toggle(false)}
         />
 
-        <AgentDockTranscript
-          hasWorkspace={hasWorkspace}
-          loaded={data !== null}
-          messages={messages}
-          isOrch={isOrch}
-          channel={channel}
-          selected={selected}
-          queue={queue}
-          running={running}
-          approvals={approvals}
-          pending={pending}
-          busy={busy}
-          onResolveApproval={(id, approve) => void resolveApproval(id, approve)}
-        />
+        {isOrch ? (
+          <>
+            <AgentDockTranscript
+              hasWorkspace={hasWorkspace}
+              loaded={data !== null}
+              messages={messages}
+              isOrch={isOrch}
+              channel={channel}
+              selected={selected}
+              queue={queue}
+              running={running}
+              approvals={approvals}
+              pending={pending}
+              busy={busy}
+              onResolveApproval={(id, approve) => void resolveApproval(id, approve)}
+            />
 
-        {termOpen && hasWorkspace && (
-          <AgentDockTerminalDrawer provider={isOrch ? selected : channel} />
+            {/* engine terminal drawer — the controller CLI's PTY, on demand */}
+            {termOpen && hasWorkspace && <AgentDockTerminalDrawer provider={selected} />}
+
+            <AgentDockComposer
+              workspacePath={workspacePath}
+              isOrch={isOrch}
+              channel={channel}
+              selected={selected}
+              providers={data?.providers}
+              usage={usage}
+              pending={!!pending}
+              notice={notice}
+              onProviderChange={setProvider}
+              onResult={onSubmitResult}
+              onStop={() => void api.chatStop(channel).then(reload)}
+            />
+          </>
+        ) : hasWorkspace ? (
+          // Agent tabs ARE the terminals: one live PTY per agent, right here —
+          // no separate Terminals page showing the same sessions in another style.
+          <TerminalPane key={channel} provider={channel} compact />
+        ) : (
+          <div className="flex min-h-0 flex-1 items-center justify-center text-xs text-neutral-400">
+            Open a workspace to start.
+          </div>
         )}
-
-        <AgentDockComposer
-          workspacePath={workspacePath}
-          isOrch={isOrch}
-          channel={channel}
-          selected={selected}
-          providers={data?.providers}
-          usage={usage}
-          pending={!!pending}
-          notice={notice}
-          onProviderChange={setProvider}
-          onResult={onSubmitResult}
-          onStop={() => void api.chatStop(channel).then(reload)}
-        />
 
         <AgentDockFooter
           project={project}

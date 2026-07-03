@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from . import controller_protocol
+from . import controller_protocol, ponytail
 from .routing_service import budget_context_header
 
 TASK_FILES = [
@@ -19,11 +19,15 @@ TASK_FILES = [
 
 
 def _compose(usage: dict, task_rel_dir: str, body: str) -> str:
+    # Ponytail rides in every step prompt (output-side token reduction — the
+    # agents write less code and shorter docs). Headroom compresses the input
+    # side; together they are the token-management strategy (Pillar 1).
+    pony = ponytail.block()
     return (
         f"{budget_context_header(usage)}\n\n"
         f"Task folder: {task_rel_dir}/\n"
         "All numbered markdown files mentioned below live in the task folder.\n\n"
-        f"{body.strip()}"
+        f"{body.strip()}" + (f"\n\n{pony}" if pony else "")
     )
 
 
@@ -105,7 +109,8 @@ def orchestrator_consult_prompt(usage: dict, task_state: str, trigger: str, outp
         "(CLIT Controller IDE), supervising a task whose step just "
         "finished. Decide the next action based on what the task ACTUALLY needs — you are not bound "
         "to a fixed pipeline. Skip steps that add no value; pick the agent that fits the work: "
-        "codex (specs/plans/reviews), claude (implementation/bug fixing), antigravity (QA/broad checks).\n\n"
+        "codex (specs/plans/reviews), claude (implementation/bug fixing), antigravity (tool runner: "
+        "QA checks, local file access, running dev servers/commands, monitoring — never routing).\n\n"
         f"{task_state}\n\n"
         f"Just happened: {trigger}\n\n"
         f"{tail}"
@@ -123,7 +128,9 @@ def orchestrator_chat_prompt(usage: dict, workspace_summary: str, transcript: st
         "You are the controller model for Command Line Interface Terminal Controller "
         "(CLIT Controller IDE), a local cockpit that routes coding work "
         "between CLI agents: codex (specs/plans/reviews), claude (implementation/bug fixing), "
-        "antigravity (QA/broad checks; successor to the sunset Gemini CLI), plus free local git checks.\n\n"
+        "antigravity (the tool runner: tool calling, local file access, running QA/dev "
+        "servers/commands, activity monitoring; successor to the sunset Gemini CLI), "
+        "plus free local git checks.\n\n"
         f"{workspace_summary}\n\n"
         "Your job: help the user plan work, decide routing, draft task goals, and interpret agent results. "
         "Be compact and concrete — prefer specific next actions in CLITC (create a task, run a step "
@@ -135,7 +142,12 @@ def orchestrator_chat_prompt(usage: dict, workspace_summary: str, transcript: st
         "(codex_spec, claude_implement, gemini_qa, codex_review, claude_fix) — the UI renders them as "
         "colored chips. Keep replies under ~120 words unless the user asks for depth. No headings "
         "larger than ###, no walls of text.\n\n"
-        "You can create CLITC tasks AND queue work to the agents — the system executes the queue "
+        + (
+            (ponytail.block("lite") + " Apply this ladder to the task goals and plans you draft.\n\n")
+            if ponytail.level() != "off"
+            else ""
+        )
+        + "You can create CLITC tasks AND queue work to the agents — the system executes the queue "
         "automatically, cueing one step per agent at a time, in order. Default to starting a task with "
         "`codex_spec` (the planning step) and queueing only that first step; CLITC reports back after it "
         "finishes so you decide the next one. Skip straight to `claude_implement` only for a truly trivial "

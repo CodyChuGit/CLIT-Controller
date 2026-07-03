@@ -94,13 +94,21 @@ describe("parseLiveActivity — claude (normalized ⏺/⎿ markers)", () => {
 
 describe("parseLiveActivity — generic / fallback", () => {
   it("plain narration (agy) is a single streaming text item", () => {
-    const items = parseLiveActivity("antigravity", "I will examine the workspace.\nI will check files.\n", "");
+    const items = parseLiveActivity(
+      "antigravity",
+      "I will examine the workspace.\nI will check files.\n",
+      "",
+    );
     expect(items).toHaveLength(1);
     expect(items[0].kind).toBe("text");
   });
 
   it("surfaces stderr when stdout is silent (auth errors, crashes)", () => {
-    const items = parseLiveActivity("antigravity", "", "Error: not logged in\nRun `agy login` first\n");
+    const items = parseLiveActivity(
+      "antigravity",
+      "",
+      "Error: not logged in\nRun `agy login` first\n",
+    );
     expect(items).toHaveLength(1);
     expect(items[0].kind).toBe("meta");
     expect(items[0].text).toContain("not logged in");

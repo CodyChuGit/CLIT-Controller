@@ -26,7 +26,6 @@ import type {
   TaskDetail,
   TaskMeta,
   TerminalDiagnostics,
-  TerminalsStatus,
   Tree,
   Usage,
 } from "./types";
@@ -84,11 +83,12 @@ export const api = {
     post<{ ok: boolean; output: string }>("/projects/git/commit", { message }),
   openWorkspaceFolder: () => post<{ ok: boolean }>("/projects/open-folder"),
   settings: () => get<Settings>("/projects/settings"),
-  saveSettings: (routing: RoutingConfig | null, commandTemplates: Record<string, string> | null) =>
-    post<Settings>("/projects/settings", {
-      routing: routing ?? undefined,
-      commandTemplates: commandTemplates ?? undefined,
-    }),
+  saveSettings: (body: {
+    routing?: RoutingConfig;
+    commandTemplates?: Record<string, string>;
+    headroom?: { enabled?: boolean; proxyUrl?: string; savingsProfile?: string };
+    ponytail?: { level: string };
+  }) => post<Settings>("/projects/settings", body),
 
   // agents
   agents: () => get<Provider[]>("/agents"),
@@ -133,7 +133,6 @@ export const api = {
   clearLogView: () => post<{ ok: boolean }>("/logs/clear-view"),
 
   // terminals (live PTY sessions are over WebSocket; these are control/metadata)
-  terminalsStatus: () => get<TerminalsStatus>("/terminals/status"),
   terminalDiagnostics: (provider: string) =>
     get<TerminalDiagnostics>(`/terminals/${encodeURIComponent(provider)}/diagnostics`),
   terminalKill: (provider: string) =>

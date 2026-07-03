@@ -67,7 +67,7 @@ class ProviderLimitRequest(BaseModel):
 
 
 class RoutingConfig(BaseModel):
-    orchestrator: str = "antigravity"
+    orchestrator: str = "claude"
     pm: str = "codex"
     engineer: str = "claude"
     qa: str = "antigravity"
@@ -78,6 +78,7 @@ class SettingsUpdateRequest(BaseModel):
     commandTemplates: Optional[dict[str, str]] = None
     models: Optional[dict[str, str]] = None
     headroom: Optional[dict] = None  # Pillar 1: {enabled, proxyUrl, savingsProfile}
+    ponytail: Optional[dict] = None  # Pillar 1 output side: {level: off|lite|full|ultra}
 
 
 class AgentModelRequest(BaseModel):

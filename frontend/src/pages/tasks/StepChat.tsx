@@ -105,15 +105,16 @@ export default function StepChat({
       id={`step-${step}`}
     >
       <div
-        className={`flex items-center gap-2 border-b border-neutral-200/70 px-3 py-2 dark:border-neutral-800 ${color.tint}`}
+        className={`flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-neutral-200/70 px-3 py-2 dark:border-neutral-800 ${color.tint}`}
       >
-        <span className={`h-2 w-2 rounded-full ${color.dot}`} aria-hidden="true" />
-        <span className="text-xs font-semibold">{SHORT_LABELS[step]}</span>
-        <span className="font-mono text-[10px] text-neutral-400">{preview?.provider}</span>
+        <span className={`h-2 w-2 shrink-0 rounded-full ${color.dot}`} aria-hidden="true" />
+        <span className="shrink-0 text-xs font-semibold">{SHORT_LABELS[step]}</span>
+        <span className="min-w-0 truncate font-mono text-[10px] text-neutral-400">
+          {preview?.provider}
+        </span>
         {state.status !== "idle" && <StatusBadge state={state.status} />}
-        <span className="flex-1" />
         <button
-          className="btn-secondary btn-xs"
+          className="btn-secondary btn-xs ml-auto"
           onClick={onRun}
           disabled={state.status === "running"}
         >

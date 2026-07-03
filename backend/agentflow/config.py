@@ -11,7 +11,10 @@ from typing import Any, Optional
 from . import paths
 
 DEFAULT_ROUTING = {
-    "orchestrator": "antigravity",
+    # Claude runs traffic control — routing decisions need the strongest model.
+    # Antigravity is the hands: tool calling, local file access, running QA/dev
+    # servers/commands, and activity monitoring — never the router.
+    "orchestrator": "claude",
     "pm": "codex",
     "engineer": "claude",
     "qa": "antigravity",
@@ -48,9 +51,17 @@ _STALE_TEMPLATES = {
 }
 
 
-def _migrate_gemini(routing: dict) -> dict:
-    """Gemini CLI is sunset; Antigravity CLI replaced it. Map old configs forward."""
-    return {role: ("antigravity" if provider == "gemini" else provider) for role, provider in routing.items()}
+def _migrate_routing(routing: dict) -> dict:
+    """Map old configs forward: the sunset Gemini CLI became Antigravity, and the
+    controller role moved off Antigravity to Claude (Gemini isn't the router —
+    it does tool running / QA / monitoring only)."""
+    routing = {role: ("antigravity" if provider == "gemini" else provider) for role, provider in routing.items()}
+    if routing.get("orchestrator") == "antigravity":
+        routing["orchestrator"] = "claude"
+    return routing
+
+
+_migrate_gemini = _migrate_routing  # historical alias
 
 
 def read_json(path: Path, default: Any = None) -> Any:
@@ -122,10 +133,13 @@ def update_settings(
     command_templates: Optional[dict] = None,
     models: Optional[dict] = None,
     headroom: Optional[dict] = None,
+    ponytail: Optional[dict] = None,
 ) -> dict:
     cfg = load_global_config()
     if headroom is not None:
         cfg["headroom"] = {**(cfg.get("headroom") or {}), **headroom}
+    if ponytail is not None:
+        cfg["ponytail"] = {**(cfg.get("ponytail") or {}), **ponytail}
     if routing:
         cfg["routing"] = {**cfg["routing"], **routing}
         ws = get_current_workspace()

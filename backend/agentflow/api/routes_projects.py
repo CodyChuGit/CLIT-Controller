@@ -8,7 +8,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from .. import config, git_service, headroom_service, paths, state_store
+from .. import config, git_service, headroom_service, paths, ponytail, state_store
 from .. import workspace as workspace_service
 from ..models import (
     FileWriteRequest,
@@ -151,6 +151,7 @@ def get_settings():
         "commandTemplates": cfg["commandTemplates"],
         "models": cfg["models"],
         "headroom": headroom_service.status(),
+        "ponytail": {"level": ponytail.level()},
         "workspacePath": str(ws) if ws else None,
         "globalConfigPath": str(paths.global_config_file()),
         "workspaceConfigPath": str(paths.workspace_config_file(ws)) if ws else None,
@@ -159,12 +160,20 @@ def get_settings():
 
 
 @router.post("/settings")
-def save_settings(body: SettingsUpdateRequest):
+async def save_settings(body: SettingsUpdateRequest):
     config.update_settings(
         routing=body.routing.model_dump() if body.routing else None,
         command_templates=body.commandTemplates,
         models=body.models,
         headroom=body.headroom,
+        ponytail=body.ponytail,
     )
-    add_log_entry("system", "settings updated (routing/command templates/models/headroom)")
+    # Token reduction is CLITC-managed: enabling Headroom starts the proxy,
+    # disabling stops OUR managed one (a user-run proxy is left alone).
+    if body.headroom is not None:
+        if headroom_service.is_enabled():
+            await headroom_service.ensure_proxy()
+        else:
+            await headroom_service.stop_proxy()
+    add_log_entry("system", "settings updated (routing/templates/models/headroom/ponytail)")
     return get_settings()

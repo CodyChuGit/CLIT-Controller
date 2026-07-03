@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from . import __version__, config, paths, queue_service, state_store
+from . import __version__, config, headroom_service, paths, queue_service, state_store
 from .api import (
     routes_agents,
     routes_chat,
@@ -77,9 +77,15 @@ async def _lifespan(app: FastAPI):
     except Exception as exc:  # noqa: BLE001 — cleanup must never block startup
         add_log_entry("system", f"terminal cleanup failed: {exc}", status="error")
 
+    # Headroom is the primary token-reduction layer: start the managed proxy in
+    # the background when enabled+installed. Fire-and-forget — fail-open means
+    # agents run direct until (unless) it comes up; never blocks startup.
+    headroom_task = asyncio.create_task(headroom_service.ensure_proxy())
+
     # The dispatcher cues queued steps to agents for as long as the app runs.
     dispatcher = asyncio.create_task(queue_service.dispatcher_loop())
     yield
+    headroom_task.cancel()
     dispatcher.cancel()
     # Cancel in-flight agent/dev-server runs so their detached process groups don't
     # outlive the backend (esp. a preview server holding a port) — audit P1-04.

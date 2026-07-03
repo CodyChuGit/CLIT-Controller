@@ -76,7 +76,9 @@ export default function TaskDispatchMap({
   const commands = taskCommandRuns(detail).slice(-3);
 
   return (
-    <div className="grid gap-2 lg:grid-cols-5">
+    // auto-fit: lanes wrap to as many columns as actually fit (the dock can
+    // take half the window) instead of cramming five 150px columns.
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-2">
       {LANES.map((lane) => {
         const items = stepItems
           .filter((s) => s.provider === lane.id)
@@ -92,16 +94,18 @@ export default function TaskDispatchMap({
           >
             <div className="flex items-center gap-1.5 border-b border-neutral-100 pb-1.5 dark:border-neutral-800/60">
               {lane.id === "controller" ? (
-                <BeanMark className="h-3.5 w-3.5 text-accent-subtle" />
+                <BeanMark className="h-3.5 w-3.5 shrink-0 text-accent-subtle" />
               ) : lane.id === "local" ? (
-                <Terminal className="h-3.5 w-3.5 text-neutral-400" />
+                <Terminal className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
               ) : (
-                <ProviderMark id={lane.id} className="h-3.5 w-3.5" />
+                <ProviderMark id={lane.id} className="h-3.5 w-3.5 shrink-0" />
               )}
-              <span className="text-[11px] font-semibold">{lane.label}</span>
-              {active && <Spinner className="h-3 w-3 text-blue-500" />}
-              <span className="flex-1" />
-              <span className="truncate text-[9px] text-neutral-400" title={lane.role}>
+              <span className="shrink-0 text-[11px] font-semibold">{lane.label}</span>
+              {active && <Spinner className="h-3 w-3 shrink-0 text-blue-500" />}
+              <span
+                className="min-w-0 flex-1 truncate text-right text-[9px] text-neutral-400"
+                title={lane.role}
+              >
                 {lane.role}
               </span>
             </div>
@@ -124,9 +128,13 @@ export default function TaskDispatchMap({
                     </div>
                   )}
                   {verdict && (
-                    <div className="text-[10px] leading-snug text-neutral-500" title={verdict.detail}>
+                    <div
+                      className="text-[10px] leading-snug text-neutral-500"
+                      title={verdict.detail}
+                    >
                       <StatusBadge state={verdict.type === "done" ? "done" : "needs_user"} />
-                      <span className="ml-1 line-clamp-2">{verdict.detail}</span>
+                      {/* line-clamp needs a block box; on an inline span it does nothing */}
+                      <div className="mt-0.5 line-clamp-2 break-words">{verdict.detail}</div>
                     </div>
                   )}
                   {(task.consults ?? 0) > 0 && (
@@ -171,25 +179,22 @@ export default function TaskDispatchMap({
               ) : (
                 items.map((s) => (
                   <div key={s.step} className="min-w-0">
+                    {/* wrap, don't overflow — pills flow left and wrapped lines
+                        stay left-aligned, so stacking reads as one clean
+                        left-biased column (no left/right zigzag) */}
                     <button
                       onClick={() => onSelectStep(s.step)}
-                      className="focusable flex w-full cursor-pointer items-center gap-1.5 rounded px-0.5 py-0.5 text-left transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
+                      className="focusable flex w-full cursor-pointer flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded px-0.5 py-0.5 text-left transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
                       title={`${s.step} — ${s.status.replace(/_/g, " ")}`}
                     >
-                      {s.status === "running" ? (
+                      {s.status === "running" && (
                         <Spinner className="h-3 w-3 shrink-0 text-blue-500" />
-                      ) : (
-                        <StepChip name={s.step} />
                       )}
-                      {s.status === "running" && <StepChip name={s.step} />}
-                      <span className="flex-1" />
+                      <StepChip name={s.step} />
+                      {/* artifact tally rides inside the status pill ("done · 3")
+                          so it can't wrap onto a second row by itself */}
                       {s.status !== "idle" && s.status !== "running" && (
-                        <StatusBadge state={s.status} />
-                      )}
-                      {s.artifacts > 0 && (
-                        <span className="rounded bg-violet-50 px-1 font-mono text-[9px] text-violet-600 dark:bg-violet-950/40 dark:text-violet-300">
-                          {s.artifacts}
-                        </span>
+                        <StatusBadge state={s.status} count={s.artifacts} />
                       )}
                     </button>
                     {s.status === "running" && <LaneLiveStream runId={s.runId} />}

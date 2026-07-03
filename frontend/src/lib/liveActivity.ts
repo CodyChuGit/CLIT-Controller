@@ -135,7 +135,12 @@ function parseMarkedText(stdout: string): ActivityItem[] {
   for (const raw of stripAnsi(stripResultSentinel(stdout)).split("\n")) {
     if (raw.startsWith(TOOL_MARKER)) {
       current = pushTrimmed(items, current);
-      lastTool = { kind: "tool", label: raw.slice(TOOL_MARKER.length).trim(), status: "running", text: "" };
+      lastTool = {
+        kind: "tool",
+        label: raw.slice(TOOL_MARKER.length).trim(),
+        status: "running",
+        text: "",
+      };
       items.push(lastTool);
       continue;
     }

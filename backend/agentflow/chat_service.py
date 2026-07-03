@@ -303,7 +303,7 @@ async def send(
         return {"status": "busy", "message": "A response is already in progress. Stop it or wait."}
 
     routing = config.get_workspace_routing(workspace)
-    provider = provider or routing.get("orchestrator", "antigravity")
+    provider = provider or routing.get("orchestrator", "claude")
     # Validate before anything reaches a command template / subprocess launch: an
     # unknown provider would otherwise fall through to a fallback template and be
     # executed as a binary (audit P2-11). Mirrors send_direct.
@@ -360,9 +360,7 @@ async def send(
                 # blocks are parsed below but must never render as prose in the bubble.
                 display = _controller_display(out)
                 if display:
-                    append_message(
-                        workspace, "assistant", display, provider=provider, durationMs=record.duration_ms
-                    )
+                    append_message(workspace, "assistant", display, provider=provider, durationMs=record.duration_ms)
                 # CLITC_RESULT_V1 is the primary mutation path (Workstream 2): a valid
                 # block drives exactly one validated action; an invalid block is a
                 # typed no-action failure; legacy directives are a warned fallback.
@@ -526,7 +524,7 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
         return {"status": "consult_limit"}
 
     routing = config.get_workspace_routing(workspace)
-    provider = routing.get("orchestrator", "antigravity")
+    provider = routing.get("orchestrator", "claude")
     usage = usage_service.ensure_usage(workspace)
     template = config.get_command_templates().get(provider, f"{provider} {{prompt}}")
     busy = _provider_busy(provider)
@@ -657,6 +655,6 @@ def chat_state(workspace: Path) -> dict:
         "pending": pending_state(workspace),
         "channels": {pid: data.get("channels", {}).get(pid, []) for pid in AGENT_PROVIDER_IDS},
         "channelPending": {pid: pending_state(workspace, pid) for pid in AGENT_PROVIDER_IDS},
-        "defaultProvider": routing.get("orchestrator", "antigravity"),
+        "defaultProvider": routing.get("orchestrator", "claude"),
         "providers": provider_options(),
     }
