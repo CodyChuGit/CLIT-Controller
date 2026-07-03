@@ -55,6 +55,7 @@ export default function TerminalPane({
   const meta = META[provider] ?? { name: provider, icon: null };
   const mountRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const termRef = useRef<Terminal | null>(null);
   const reconnectTimer = useRef<number | null>(null);
   const [diag, setDiag] = useState<TerminalDiagnostics | null>(null);
   const [lifecycle, setLifecycle] = useState<Lifecycle>("resolving");
@@ -95,6 +96,11 @@ export default function TerminalPane({
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(el);
+    termRef.current = term;
+    // Focus immediately: without this the pane renders a live prompt that
+    // silently drops every keystroke until the user happens to click exactly
+    // on xterm's own screen element ("the terminal is broken").
+    term.focus();
 
     const doFit = () => {
       try {
@@ -166,6 +172,7 @@ export default function TerminalPane({
       ws.close();
       term.dispose();
       wsRef.current = null;
+      termRef.current = null;
     };
   }, [provider, epoch]);
 
@@ -235,7 +242,13 @@ export default function TerminalPane({
           )}
         </div>
       )}
-      <div ref={mountRef} className="min-h-0 flex-1 bg-[#0a0a0a] px-2 py-1" />
+      {/* clicks on the padding land here, not on xterm's screen — forward focus */}
+      <div
+        ref={mountRef}
+        data-terminal-mount
+        onClick={() => termRef.current?.focus()}
+        className="min-h-0 flex-1 bg-[#0a0a0a] px-2 py-1"
+      />
     </section>
   );
 }

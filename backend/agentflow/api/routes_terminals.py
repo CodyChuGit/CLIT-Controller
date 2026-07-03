@@ -129,19 +129,28 @@ async def terminal_ws(ws: WebSocket, provider: str) -> None:
     await ws.send_text(json.dumps(session.current_meta()))
 
     async def pump() -> None:
-        while True:
-            item = await queue.get()
-            if item is CLOSED:
-                return
-            try:
+        try:
+            while True:
+                item = await queue.get()
+                if item is CLOSED:
+                    return
                 # dict items are lifecycle metadata → JSON text frames; raw PTY
                 # bytes stay binary for xterm.
                 if isinstance(item, dict):
                     await ws.send_text(json.dumps(item))
                 else:
                     await ws.send_bytes(item)
-            except (WebSocketDisconnect, RuntimeError):
-                return
+        except (WebSocketDisconnect, RuntimeError):
+            return
+        finally:
+            # A dead pump must not leave a half-open socket: output stops but the
+            # client's readyState stays OPEN, so it never auto-reconnects — a
+            # frozen pane that still silently forwards keystrokes to the PTY.
+            # Closing makes the client's onclose fire and the pane self-heal.
+            try:
+                await ws.close()
+            except Exception:  # noqa: BLE001 — already closed/disconnected is fine
+                pass
 
     pump_task = asyncio.create_task(pump())
     try:
