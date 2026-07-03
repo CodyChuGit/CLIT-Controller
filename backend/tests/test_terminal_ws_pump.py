@@ -22,6 +22,7 @@ class FakeSession:
         self.buffer = bytearray(b"$ ")
         self.clients: set = set()
         self.writes: list[bytes] = []
+        self.repaints = 0
 
     def current_meta(self) -> dict:
         return {"type": "meta", "state": "ready", "provider": "antigravity", "executablePath": "/bin/agy"}
@@ -31,6 +32,9 @@ class FakeSession:
 
     def resize(self, rows: int, cols: int) -> None:
         pass
+
+    def force_repaint(self) -> None:
+        self.repaints += 1
 
 
 @pytest.fixture()
@@ -73,3 +77,6 @@ def test_input_still_reaches_session_before_close(fake_terminal):
         # second frame round-trip (resize is a no-op ack path).
         ws.send_json({"type": "resize", "rows": 30, "cols": 100})
     assert b"hi" in b"".join(fake_terminal.writes)
+    # Every attachment must force a TUI repaint — a same-size reattach otherwise
+    # shows a blank screen (replayed paint history) while input flows invisibly.
+    assert fake_terminal.repaints >= 1

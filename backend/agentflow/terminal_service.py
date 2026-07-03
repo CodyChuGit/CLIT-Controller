@@ -240,6 +240,15 @@ class TerminalSession:
         self.rows, self.cols = max(1, rows), max(1, cols)
         self._set_winsize(self.rows, self.cols)
 
+    def force_repaint(self) -> None:
+        """SIGWINCH jiggle so full-screen TUIs (agy) repaint for a (re)attached
+        client. A same-size reattach otherwise replays cursor-addressed paint
+        history into a fresh xterm — which renders as a blank screen with a
+        cursor while keystrokes still reach the CLI invisibly."""
+        if self.master_fd >= 0 and not self.exited:
+            self._set_winsize(self.rows, max(1, self.cols - 1))
+            self._set_winsize(self.rows, self.cols)
+
     def write(self, data: bytes) -> None:
         if self.master_fd >= 0 and not self.exited:
             try:

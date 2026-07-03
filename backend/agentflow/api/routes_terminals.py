@@ -127,6 +127,9 @@ async def terminal_ws(ws: WebSocket, provider: str) -> None:
     # Replay the current lifecycle state so a (re)connecting client knows whether
     # the CLI is still launching, ready, or already closed.
     await ws.send_text(json.dumps(session.current_meta()))
+    # Force a TUI repaint for this attachment: the snapshot alone can render
+    # blank when its paint history was addressed to a different/same-size grid.
+    session.force_repaint()
 
     async def pump() -> None:
         try:
