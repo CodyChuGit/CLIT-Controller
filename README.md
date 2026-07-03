@@ -6,154 +6,130 @@
 
 <p align="center">
   <strong>Vibe with CLIT Controller</strong><br>
-  Plan design tasks, coordinate coding assistants, review changes, and keep the whole flow in one unified interface.
+  A local-first control room for CLI coding agents.
 </p>
 
----
+CLIT Controller IDE is a visual interface for coordinating user-installed coding
+CLIs. It runs Codex, Claude Code, Antigravity, git, and local commands on your
+machine, then shows their work as live, reviewable task flow instead of forcing
+you to manage several terminals by hand.
 
-## 🫘 What It Is
+## What It Does
 
-**Command Line Interface Traffic Controller** is a visual control room for designers who use AI coding assistants to bring interface ideas to life.
+| Surface | Purpose |
+| --- | --- |
+| Explorer | Workspace picker, file tree, editor tabs, git status, diffs, stage/unstage/commit. |
+| Agent Dock | Right-hand live control center: controller chat, provider tabs, PTY terminals, approvals, event cards, live streamed output. |
+| Tasks | Provider-lane task workbench that shows controller decisions, Codex/Claude/Antigravity/local work, queue state, artifacts, changed files, and raw detail. |
+| Agents | CLI detection, one-click install, login helpers, model selection. |
+| Usage | Budget/traffic-control mode, provider health, live quota where available. |
+| Preview | Start and monitor a localhost preview/dev server for the selected workspace. |
+| Logs | Redacted global logs and active run tails. |
+| Settings | Routing defaults, command templates, Headroom proxy, and Ponytail prompt discipline. |
 
-Instead of bouncing between chats, terminals, folders, diffs, and task notes, you get one place to describe the work, route it to the right assistant, watch progress, and review the result before moving forward.
+> **Note on live quota:** Codex (session `rate_limits` on disk) and Claude Code
+> (`claude -p "/usage"` intercepted headlessly) report real remaining quota, so
+> the Usage page shows live numbers for both. Antigravity (`agy`) does not — as of
+> v1.0.16 its `/usage` / `/quota` / `/credits` panels are interactive-TUI only,
+> with no headless flag, JSON output, or on-disk snapshot to read, so it falls
+> back to a manual limit. **Please, Google: ship a headless usage API for `agy`
+> (parity with Codex and Claude) so we can patch this and show real Antigravity
+> quota.**
 
-| CLI | Role | Best For |
-|---|---|---|
-| **Antigravity** | Controller / QA | Broad checks, second opinions, and lower-cost verification. |
-| **Codex** | Product partner | Specs, task plans, markdown handoffs, and final review. |
-| **Claude Code** | Implementation assistant | Code changes, bug fixes, and focused build work. |
-| **Local tools** | Workspace helper | STT, TTS, File scanning, git status, diffs, logs, usage tracking, and task folders. |
+## Agent Roles
 
-![CLITC Files](docs/assets/dark_mode_files.png)
-*Workspace view with project files, active tasks, file changes, and the task queue.*
+| Provider | Default Role | Notes |
+| --- | --- | --- |
+| `claude` | Controller and engineer | Default traffic controller; also handles implementation and fixes. |
+| `codex` | PM / spec / review | Specs, plans, final reviews, and product judgment. |
+| `antigravity` / `agy` | QA and broad checks | Tool-running, QA, second opinions, and terminal-based investigation. |
+| local tools | Workspace helper | git, shell commands, tests, preview servers, logs, and file operations. |
 
-![CLITC Agents](docs/assets/dark_mode_CLI.png)
-*Agents view for checking connected assistants, setup status, and configuration.*
+The controller uses the deterministic `CLITC_RESULT_V1` protocol for actions.
+Legacy `agentflow-*` directive blocks still work as a compatibility fallback, but
+validated controller actions are the primary mutation path.
 
-## ❓ Why You Need It
-
-AI-assisted design work gets messy fast. One assistant is good at planning, another is better at implementation, another is useful for review. Without a controller, the designer becomes the glue: copying prompts, pasting context, checking files, repeating constraints, and hoping the expensive model is used for the right job.
-
-CLIT Controller keeps that workflow tidy.
-
-| Problem | How CLIT Controller Helps |
-|---|---|
-| Token waste | Routes work intentionally so high-cost assistants are saved for the tasks that need them. |
-| Copy-paste fatigue | Keeps project context, task notes, logs, and handoffs together. |
-| Lost design intent | Preserves requests, references, approvals, and review history inside the workspace. |
-| Slow review loops | Surfaces generated output, file changes, and logs in one place. |
-| Too many terminals | Lets designers coordinate Codex, Claude Code, and Antigravity from a single UI. |
-
-The goal is simple: **less prompt wrangling, more product shaping**.
-
-## ⬇️ Install
-
-### Manual Install
-
-Clone the project, then run:
+## Quick Start
 
 ```bash
+git clone https://github.com/CodyChuGit/CLIT-Controller.git
+cd CLIT-Controller
 ./scripts/install.sh
+./scripts/dev.sh
 ```
 
-Build the installable app and start it on `localhost:8787`:
+Open `http://localhost:5180`. The backend runs on `http://localhost:8787`.
+
+Production-style single-port run:
 
 ```bash
 npm --prefix frontend run build
 AGENTFLOW_PORT=8787 .venv/bin/python -m agentflow
 ```
 
-Open the local app:
+Then open `http://localhost:8787`.
 
-```text
-http://localhost:8787
-```
+## Required Local Tools
 
-The install script creates a local Python environment, installs the app backend, and installs the frontend packages. If an assistant is missing, the app shows setup guidance in the Agents view.
+- Python 3.11+
+- Node.js 20+
+- git
+- Optional but recommended: `gh`
+- At least one agent CLI:
+  - Codex: `npm install -g @openai/codex`
+  - Claude Code: `npm install -g @anthropic-ai/claude-code`
+  - Antigravity: `curl -fsSL https://antigravity.google/cli/install.sh | bash`
 
-For hot-reload development, run `./scripts/dev.sh`; PWA install should use the backend-served production app at `http://localhost:8787`.
+Each provider keeps its own auth. CLIT Controller does not store provider API
+keys, passwords, or tokens.
 
-### Install via a Coding CLI
+## Runtime Model
 
-You can copy and paste the following prompt into your coding CLI (e.g., Claude Code, Codex or Antigravity) to have it install and run the app for you:
+- FastAPI backend: `backend/agentflow`
+- React/Vite frontend: `frontend/src`
+- Global state: `~/.agentflow/`
+- Workspace state: `<workspace>/.agentflow/`
+- Live managed-run output: `/api/events/stream` with `/api/events?cursor=` polling fallback
+- Interactive terminals: `/api/terminals/{provider}/ws` WebSockets
+- PTY terminal diagnostics: `/api/terminals/{provider}/diagnostics`
 
-> Clone the repository https://github.com/CodyChuGit/CLIT-Controller.git, navigate into it, run `./scripts/install.sh`, build the frontend with `npm --prefix frontend run build`, start the backend with `AGENTFLOW_PORT=8787 .venv/bin/python -m agentflow`, and open `http://localhost:8787`.
+Managed output streams through a single workspace event store. Interactive
+provider tabs use real PTY sessions and xterm.js.
 
-### Chrome PWA Install
+## Token Controls
 
-Install the PWA from the production single-port app, not the Vite dev server.
-If you previously installed a blank-icon copy, remove that installed app first so Chrome refreshes the icon cache.
+CLIT Controller has two token-saving layers:
 
-To run the app in its own standalone window like a native app:
+- **Headroom**: input-side context compression proxy for `claude` and `codex`.
+  It is enabled by default and fail-open: if the proxy is unavailable, agents run
+  directly.
+- **Ponytail**: output-side prompt discipline injected into agent prompts. The
+  default level is `full`; adjust it in Settings.
 
-1. Build and start the app at `http://localhost:8787`.
-2. Open `http://localhost:8787` in Google Chrome.
-3. Click the **Install** icon (a monitor with a down arrow) on the far right side of the address bar.
-4. Confirm **Install CLIT Controller IDE**.
-5. The installed app uses the bean icon and can be pinned to your Dock or taskbar.
-
-## 🧰 Requirements
-
-### Core App
-
-- **Python 3.11+** for the local backend.
-- **Node.js and npm** for the frontend.
-- **git** for workspace status, diffs, and source control context.
-- **GitHub CLI (`gh`)** for GitHub-aware workflows.
-
-### AI Assistants
-
-CLIT Controller works with the official command-line tools you already use:
-
-- **Codex CLI**: `npm install -g @openai/codex`
-- **Claude Code**: `npm install -g @anthropic-ai/claude-code`
-- **Antigravity CLI**: `curl -fsSL https://antigravity.google/cli/install.sh | bash`
-
-Prefer buttons over terminal commands? The Agents view also includes easy UI install/setup actions for supported assistants, so you can get connected without memorizing commands.
-
-Each assistant keeps its own official login. CLIT Controller does not ask for or store provider keys or tokens.
-
-### Packages Installed By The App
-
-- Backend: FastAPI, Uvicorn, Pydantic.
-- Frontend: React, Vite, TypeScript, Tailwind CSS, xterm, Prism.
-- Dev/test support: pytest.
-
-## 🛠️ Development
-
-One command surface (same locally and in CI — see the [Makefile](Makefile)):
+## Common Commands
 
 ```bash
-make setup       # create .venv, install backend (editable) + frontend deps
-make dev         # backend :8787 + Vite dev server :5180
-make verify      # format-check + lint + typecheck + tests + build (run before pushing)
-make test        # backend (pytest+coverage) + frontend (vitest)
+make setup
+make dev
+make test-backend
+make test-frontend
+make build
+make verify
 ```
 
-**Documentation:** start at the [docs index](docs/INDEX.md). Highlights —
-[Product pillars / interaction model](docs/PILLARS.md) ·
-[Getting started](docs/GETTING_STARTED.md) · [Architecture](docs/ARCHITECTURE.md) ·
-[Feature status](docs/FEATURE_STATUS.md) · [Backend](docs/BACKEND.md) ·
-[Frontend](docs/FRONTEND.md) · [API](docs/API.md) · [Configuration](docs/CONFIGURATION.md) ·
-[Testing](docs/TESTING.md) · [Security](docs/SECURITY.md) ·
-[Troubleshooting](docs/TROUBLESHOOTING.md) · [Limitations](docs/LIMITATIONS.md) ·
-[Roadmap](docs/ROADMAP.md). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
+Run the smallest relevant command for the change you made; `make verify` is the
+full local gate.
 
-**Token saving (optional):** route the claude/codex agents through a
-[Headroom](docs/PILLARS.md#pillar-1--token-saving-and-output-speed) proxy — run
-[`scripts/headroom.sh`](scripts/headroom.sh) and enable it in Settings.
+## Documentation
 
-## 🗺️ Roadmap
+Start at [docs/INDEX.md](docs/INDEX.md).
 
-- **Richer designer task briefs**: clearer intake for goals, references, constraints, acceptance notes, and visual QA.
-- **UI/UX reference library**: collect reusable style references and local design examples for faster frontend iteration.
-- **[Live output everywhere](docs/live-output-everywhere.md)**: generated content appears as soon as it is produced, with smoother real-time assistant progress across tasks, logs, approvals, and reviews.
-- **App-mode launcher**: a more polished standalone desktop-style launch experience.
-- **Local voice I/O**: optional dictation and spoken summaries for hands-light task review.
-- **More review intelligence**: better summaries of what changed, what still needs attention, and where design intent may have drifted.
+Key references:
 
----
-
-<p align="center">
-  <em>Vibe with CLIT Controller</em>
-</p>
+- [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)
+- [docs/PRODUCT_OVERVIEW.md](docs/PRODUCT_OVERVIEW.md)
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [docs/API.md](docs/API.md)
+- [docs/FEATURE_STATUS.md](docs/FEATURE_STATUS.md)
+- [docs/TESTING.md](docs/TESTING.md)
+- [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)

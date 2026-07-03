@@ -1,149 +1,62 @@
 # Contributing
 
-Thanks for working on **CLIT Controller IDE** (AgentComposer) — a local-first,
-single-user developer cockpit that orchestrates CLI coding agents. This page is the
-short, actionable checklist. The full contributor playbook (how to add a route,
-service, contract, page, or test) lives in
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and is not repeated here.
+CLIT Controller IDE is a local-first UI for CLI coding agents. Keep changes
+small, verified, and aligned with the current docs.
 
 ## Setup
 
 ```bash
-make setup        # creates .venv (Python 3.11+), installs backend + frontend deps
-make dev          # backend :8787 + Vite dev server :5180 (develop against :5180)
+make setup
+make dev
 ```
 
-The macOS system `python3` is 3.9 and will not work — `make setup` finds a Python
-≥ 3.11. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the dev-server and
-hot-reload details.
+Open `http://localhost:5180`.
 
-## Branches & commits
+## Checks
 
-- `main` is the only long-lived branch. Branch off `main`, keep each change small
-  and coherent, and open a pull request.
-- Commit subjects are **descriptive** (imperative, what + why), e.g.
-  `Pillar 5: deterministic, versioned output contracts`. Conventional-commit
-  prefixes are welcome but not required.
-- End every commit message with the trailer:
-
-  ```text
-  Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
-  ```
-
-- **Do not mix repo-wide reformatting with behavior changes** — formatting lands in
-  its own commit.
-
-## Required checks
-
-One command, identical locally and in CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)):
+Run focused checks while editing:
 
 ```bash
-make verify       # format-check + lint + typecheck + test + build
+.venv/bin/python -m pytest backend/tests/test_controller_protocol.py
+npm --prefix frontend run test -- src/lib/liveActivity.test.ts
 ```
 
-All must be green before a PR merges:
+Run the full gate before broad handoff:
 
-| | Backend | Frontend |
-|--|---------|----------|
-| format-check | `ruff format --check` | `prettier --check` |
-| lint | `ruff check` | `eslint` |
-| typecheck | `mypy` | `tsc --noEmit` |
-| test | `pytest --cov=agentflow` | `vitest run` |
-| build | (import smoke via tests) | `tsc && vite build` |
+```bash
+make verify
+```
 
-If `make verify` is green locally, CI will be too. Coverage must not drop below the
-`fail_under` gate in [pyproject.toml](pyproject.toml).
+## Code Rules
 
-## Code style
+- Put backend behavior in services, not thick routes.
+- Use explicit argv subprocess execution, never `shell=True`.
+- Keep workspace file operations confined to the selected workspace.
+- Keep frontend HTTP access in `frontend/src/api.ts`.
+- Keep live output in the shared event stream.
+- Keep provider PTYs in the terminal service and Agent Dock surfaces.
+- Use `CLITC_RESULT_V1` for controller mutations.
+- Redact secrets before persistence or broadcast.
 
-- **Formatting is owned by tooling**, not by hand: `ruff format` (backend) and
-  `prettier` (frontend). Run `make format` before committing.
-- Backend lint/style follows `ruff` (line-length 120). Frontend follows `eslint`.
-- **One markdown renderer** — [Markdown.tsx](frontend/src/components/Markdown.tsx).
-  Do not introduce a second.
-- **No `shell=True`** — subprocesses spawn with explicit `argv` lists.
-- **Loopback only** — the server binds `127.0.0.1`; there is no auth by design.
-- Centralize frontend network access in [api.ts](frontend/src/api.ts); components
-  never `fetch` directly.
+## Docs Rules
 
-## Type safety
+When behavior changes, update the matching docs in the same change:
 
-- TypeScript runs in `strict` mode. **No new `any`** (the codebase has zero).
-- `mypy` must be clean on `backend/agentflow`. A new `# type: ignore`, `Any`, or
-  `noqa` needs an inline reason.
+- routes: `docs/API.md`
+- backend behavior: `docs/BACKEND.md`, `docs/ARCHITECTURE.md`
+- frontend behavior: `docs/FRONTEND.md`, `DESIGN.md`
+- config/routing/templates: `docs/CONFIGURATION.md`
+- state files: `docs/DATA_MODEL.md`
+- safety/policy: `docs/SECURITY.md`
+- setup/runtime: `docs/GETTING_STARTED.md`, `docs/OPERATIONS.md`
 
-## Testing
-
-- **Every fixed defect gets a regression test in the same PR**, and new behavior
-  ships with a test.
-- The backend suite is **hermetic** (the autouse fixture in
-  [backend/tests/conftest.py](backend/tests/conftest.py) redirects `~/.agentflow`
-  and `$HOME` to a temp dir — never touch real global state) and **deterministic**
-  (poll with a timeout, no `sleep`-based timing).
-- The five product pillars are the success metrics — see
-  [docs/PILLARS.md](docs/PILLARS.md). A change that improves one pillar while
-  materially weakening another needs explicit justification in the PR.
-
-## Documentation
-
-When you change something with a documentation footprint, update the relevant docs
-in the **same PR**. Use the **documentation maintenance matrix** in
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) to find which doc to touch (new route or
-service → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); new env var → `.env.example`
-+ [docs/OPERATIONS.md](docs/OPERATIONS.md); origin/CORS/subprocess changes →
-[docs/SECURITY.md](docs/SECURITY.md); etc.).
+Remove stale planning markdown once its useful content has been folded into the
+current reference docs.
 
 ## Security
 
-This tool runs CLI agents and shells as subprocesses, so containment matters. Read
-[docs/SECURITY.md](docs/SECURITY.md) before touching security-sensitive areas
-([process_runner.py](backend/agentflow/process_runner.py),
-[policy_service.py](backend/agentflow/policy_service.py),
-[workspace.py](backend/agentflow/workspace.py),
-[origins.py](backend/agentflow/origins.py)). Keep these invariants intact:
+This app runs user-owned CLIs and local commands. Before touching process,
+terminal, path, policy, origin, or redaction code, read
+[docs/SECURITY.md](docs/SECURITY.md).
 
-- Loopback-only bind; no secrets in the repo.
-- No `shell=True`; every user/agent-controlled path gets a workspace-containment
-  check.
-- All log/event/ledger output passes through
-  [redaction.py](backend/agentflow/redaction.py), including structured payloads.
-- No unbounded buffers or retry loops; no silently swallowed exceptions (a broad
-  `except` at a must-not-crash boundary needs an annotated reason).
-
-Report issues via the repository's issue tracker. Do not include real secrets or
-exploit-ready details in public reports.
-
-## Dependency policy
-
-- Dependencies are **version-bounded** in [pyproject.toml](pyproject.toml) /
-  [frontend/package.json](frontend/package.json) and **pinned in lockfiles**:
-  [requirements.lock](requirements.lock) and
-  [frontend/package-lock.json](frontend/package-lock.json).
-- Adding a dep means bounding it and updating the lockfile (`make lock` regenerates
-  the Python lockfile; `npm install` updates `package-lock.json`). Commit the
-  lockfile change.
-- No secrets in any dependency config. `make audit` runs the vulnerability scans.
-
-## Review checklist
-
-Before requesting review, confirm:
-
-- [ ] Branched off `main`; change is the smallest coherent unit.
-- [ ] `make verify` is green (format-check · lint · typecheck · test · build).
-- [ ] Business logic lives in a service, not a route; output meaning is a versioned
-      contract ([contracts.py](backend/agentflow/contracts.py)), not re-parsed prose.
-- [ ] New behavior tested; every fixed bug has a regression test.
-- [ ] No new `any` (frontend) and no unexplained `# type: ignore` / `Any` / `noqa`
-      (backend).
-- [ ] Security invariants intact (loopback bind, no `shell=True`, workspace-contained
-      paths, redacted output, bounded buffers).
-- [ ] Docs updated per the maintenance matrix.
-- [ ] Formatting commit is separate from behavior commits.
-
-## Definition of done
-
-A change is done when `make verify` passes locally and CI is green; it is the
-smallest coherent unit with formatting kept separate; new behavior and every fixed
-bug are covered by tests; type and security invariants hold; and the docs called out
-by the maintenance matrix are updated. See the fuller statement in
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+Never commit secrets or provider credentials.

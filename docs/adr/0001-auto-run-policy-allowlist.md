@@ -1,46 +1,37 @@
-# ADR 0001 — Auto-run command policy: targeted hardening, not full allowlist inversion
+# ADR 0001 - Auto-Run Command Policy
 
 - Status: Accepted
 - Date: 2026-06-17
-- Context: audit finding P1-05
 
 ## Context
 
-`policy_service.classify_action` gates commands an agent emits via `agentflow-run`
-directives, which auto-execute in the default "balanced" mode. It was a **denylist**
-that fell through to `ALLOW` for anything unrecognized. Verification confirmed a
-prompt-injection-to-RCE path: `make`, `node <file>`, `npx`, and
-`awk 'BEGIN{system(...)}'` all classified `ALLOW` and ran without approval.
-
-The audit offered two fixes: (a) invert to a strict **allowlist** (default →
-require approval), or (b) **targeted hardening** of the known exec vectors.
+Controller and task actions can request local commands. The app is designed to
+automate low-risk workspace operations, but it also runs on a developer machine
+with the user's permissions. Command policy must keep routine reads/checks fast
+while preventing silent high-risk execution.
 
 ## Decision
 
-Adopt (b). Route code-executing binaries (interpreters running a file, `make`,
-`npx`, `awk`/`sed`, `pnpm dlx`) through the existing approval flow, and hard-deny
-the `git -c`/`--config` pager-exec and `tar` exec-hook bypass vectors. Keep
-recognized-safe workflow commands (`npm run`, `npm test`, `git status`/`diff`,
-`ls`, `cat` within the workspace) auto-allowed.
+Use a three-way policy:
+
+- `allow`: low-risk workspace-confined reads and checks.
+- `require_approval`: installs, deploys, remote/shared-state operations, code
+  execution helpers, and other risky commands.
+- `deny`: known bypasses, shell-control shapes, privileged commands, path
+  traversal, and commands outside the workspace.
+
+This policy applies to structured `CLITC_RESULT_V1` command actions and legacy
+directive fallback actions.
 
 ## Rationale
 
-- A full allowlist inversion would force approval for many legitimate auto-commands
-  the autonomous workflow relies on (and would break existing tests/behavior),
-  contradicting the directive's "preserve existing product behavior" and "smallest
-  coherent change" rules.
-- Targeted hardening closes every verified exploit vector while keeping the
-  documented dev/test workflow auto-running.
-- The approval flow already exists and is durable, so denied-by-default-for-exec
-  degrades to a user prompt, not a hard failure.
+A strict default-deny allowlist would make common local workflows too noisy. A
+targeted hardening policy preserves useful automation while forcing explicit
+approval for commands that can mutate shared resources or execute arbitrary code.
 
 ## Consequences
 
-- New code-execution attempts (`node script.js`, `make`, `npx`, …) now require a
-  one-click approval instead of running silently. This is the intended safer
-  default; it is mildly more interactive for power users.
-- The denylist can still, in principle, miss a novel exec vector. A future move to
-  a strict allowlist (with a curated read-only safe set) remains the stronger
-  long-term posture and is recorded as possible follow-up.
-- For workspaces that may contain untrusted content, running in `manual_approval`
-  mode is recommended (see [SECURITY.md](../SECURITY.md)).
+- Some legitimate commands require one-click approval.
+- Denied command shapes cannot run even after approval.
+- New command categories must be reviewed against [../SECURITY.md](../SECURITY.md)
+  and tested in `policy_service` coverage.
