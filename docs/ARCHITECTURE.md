@@ -68,7 +68,7 @@ Key services:
 | `terminal_service.py` | PTY sessions, scrollback, metadata frames, orphan cleanup. |
 | `provider_probe.py` | Provider definitions, detection, install/login/model helpers. |
 | `policy_service.py` | Allow / require approval / deny command classification. |
-| `headroom_service.py` | Managed Headroom proxy and fail-open env injection. |
+| `headroom_service.py` | In-process, fail-open Headroom context compression (no proxy). |
 | `ponytail.py` | Prompt-level output discipline block. |
 
 ## Controller Flow

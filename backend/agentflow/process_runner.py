@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Awaitable, Callable, Optional
 
-from . import event_bus, headroom_service
+from . import event_bus
 from .redaction import redact
 
 MAX_CAPTURE_CHARS = 2_000_000  # per stream, in memory
@@ -74,7 +74,6 @@ class RunRecord:
     # consumer of stdout — deltas, chat bubbles, logs — sees the normalized text.
     normalizer: Optional[object] = field(default=None, repr=False)
     seq: int = 0  # per-run monotonic sequence for ordering
-    headroom_applied: bool = False  # routed through the Headroom proxy (Pillar 1)
     _start_monotonic: float = field(default_factory=time.monotonic)
 
     def next_seq(self) -> int:
@@ -434,13 +433,6 @@ class ProcessRunner:
         # Children must not inherit OUR port assignment: dev servers honor PORT and
         # would bind on top of the CLITC backend, hijacking localhost:8787.
         child_env = {k: v for k, v in os.environ.items() if k not in ("PORT", "AGENTFLOW_PORT")}
-        # Optional Headroom token-saving proxy (Pillar 1): inject the provider's
-        # base-URL env so its LLM calls route through Headroom. Fail-open — returns
-        # {} (run direct) when disabled or the proxy is unreachable.
-        hr_env = headroom_service.proxy_env(provider)
-        if hr_env:
-            child_env.update(hr_env)
-            record.headroom_applied = True
         if extra_env:
             child_env.update(extra_env)
         try:

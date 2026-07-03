@@ -133,7 +133,7 @@ CLIT Controller is intentionally local and single-user:
 
 ## Token Controls
 
-Headroom is the input-side token compression proxy for `claude` and `codex`.
+Headroom is the input-side token compression library, applied in-process to the prompts CLIT Controller builds.
 It is enabled by default and fail-open.
 
 Ponytail is the output-side prompt discipline that pushes agents toward smaller,

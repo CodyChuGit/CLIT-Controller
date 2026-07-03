@@ -31,7 +31,7 @@ On startup the backend:
 
 1. recovers the current workspace if one is selected
 2. sweeps orphaned PTY terminal sessions
-3. starts the managed Headroom proxy when enabled and installed
+3. compresses bulky prompt context via the embedded Headroom library (no proxy process)
 4. starts the queue dispatcher
 
 ## Shutdown
@@ -62,7 +62,7 @@ Managed runs are owned by `process_runner.py` and tracked by run id. Examples:
 - task steps
 - shell commands
 - preview server
-- Headroom proxy
+- Headroom in-process compression
 
 Interactive terminals are PTY sessions owned by `terminal_service.py`.
 

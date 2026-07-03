@@ -104,7 +104,7 @@ Streaming kinds:
 - `run` -> `run.output` / `run.stderr`
 - `command` -> `command.started` / `run.output` / `command.finished`
 
-Headroom env injection happens here for supported providers when the proxy is
+Headroom compression is a library call inside prompt assembly when it is
 enabled and reachable.
 
 ## Event Bus And State Store
@@ -149,7 +149,7 @@ are not queue/chat/task providers.
 
 ## Token Controls
 
-`headroom_service.py` starts a managed Headroom proxy when enabled and installed.
+`headroom_service.py` compresses bulky prompt context in-process (no proxy).
 It is fail-open and only routes `claude` and `codex`.
 
 `ponytail.py` injects output-discipline instructions into agent prompts with

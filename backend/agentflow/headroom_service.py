@@ -1,55 +1,42 @@
-"""Pillar 1 — Headroom, the primary token-reduction layer (fail-open).
+"""Pillar 1 — Headroom as an in-process library (input-side token reduction).
 
-Headroom (`headroom proxy`, github.com/headroomlabs-ai/headroom) is a
-context-optimization proxy between an agent CLI and its model provider: it
-compresses prompts/tool output (60–95% fewer tokens) while preserving accuracy.
-When enabled and reachable, agent CLIs we spawn route through it via their
-base-URL env var:
+Headroom (github.com/headroomlabs-ai/headroom, the ``headroom-ai`` Python
+package — a backend dependency) compresses bulky machine context: logs, JSON,
+repeated tool output. We call it **in-process** on the context blocks CLITC
+embeds into the prompts it builds for its own CLIs (consult output tails,
+workspace/task-state summaries). No proxy, no base-URL env injection, no
+long-running process: scope is exactly the prompts CLITC assembles — external
+CLIs and the agents' own API traffic are untouched.
 
-    claude  → ANTHROPIC_BASE_URL = <proxy>
-    codex   → OPENAI_BASE_URL    = <proxy>/v1
-
-Design invariants (see docs/PILLARS.md, Pillar 1):
-- **Primary but fail-open**: ON by default; if headroom isn't installed, the
-  proxy is unreachable, or the probe is slow, the agent runs directly against
-  its provider. Headroom must never be *required* for ordinary execution.
-- **Bounded**: the reachability probe is a short TCP connect (300 ms) and its
-  result is cached briefly, so it never delays spawning or live output.
-- **Managed**: when enabled and the `headroom` executable is installed, CLITC
-  starts and owns the proxy itself (`ensure_proxy`) with the configured
-  `agent-savings` profile applied — no manual `scripts/headroom.sh` step.
+How it stays safe:
+- Headroom's router **protects user-role messages verbatim** and only crushes
+  ``tool``-role content, so we send instructions as the user message (it doubles
+  as the relevance query) and the bulky context as the tool message. CLITC's
+  instructions and the CLITC_RESULT_V1 contract can never be rewritten.
+- **Fail-open everywhere**: disabled, library missing, short input, zero savings,
+  or any exception → the original text comes back unchanged.
+- **Off the event loop**: compression is CPU-bound (rust core), so the async
+  entry point runs it in a thread.
 """
 
 from __future__ import annotations
 
-import shlex
-import socket
-import time
-from pathlib import Path
+import asyncio
+import importlib.util
 from typing import Optional
-from urllib.parse import urlsplit
 
 from . import config
 
-# Default proxy on :8799 — deliberately NOT :8787 (the AgentComposer backend port,
-# which is also Headroom's own default — running both on 8787 would collide).
 _DEFAULTS: dict[str, object] = {
     "enabled": True,  # primary token-reduction path; fail-open keeps it safe
-    "proxyUrl": "http://127.0.0.1:8799",
-    "savingsProfile": "agent-90",
+    "minChars": 1500,  # below this, compression can't pay for itself
 }
 
-_PROBE_TIMEOUT = 0.3  # seconds — bounded; fail-open past this
-_PROBE_CACHE_TTL = 5.0  # seconds — don't re-probe on every spawn
-_probe_cache: dict[str, object] = {"url": None, "ok": False, "at": 0.0}
+# Token accounting for this backend session (surfaced in Settings/status).
+_stats = {"calls": 0, "compressed": 0, "tokensSaved": 0}
 
-# Which providers can be routed through the proxy, and the env var to set.
-# Antigravity (`agy`, Google) is intentionally excluded — it is not an
-# Anthropic/OpenAI-compatible client for this proxy.
-_PROVIDER_BASE_URL_ENV = {
-    "claude": ("ANTHROPIC_BASE_URL", ""),
-    "codex": ("OPENAI_BASE_URL", "/v1"),
-}
+# Headroom keys pruning to the model's context budget; any current model id works.
+_COMPRESS_MODEL = "claude-sonnet-4-5-20250929"
 
 
 def settings() -> dict:
@@ -62,182 +49,63 @@ def is_enabled() -> bool:
     return bool(settings().get("enabled"))
 
 
-def _tcp_reachable(url: str) -> bool:
-    parts = urlsplit(url)
-    host = parts.hostname or "127.0.0.1"
-    port = parts.port or (443 if parts.scheme == "https" else 80)
+def installed() -> bool:
     try:
-        with socket.create_connection((host, port), timeout=_PROBE_TIMEOUT):
-            return True
-    except OSError:
+        return importlib.util.find_spec("headroom") is not None
+    except (ImportError, ValueError):
         return False
 
 
-def proxy_reachable(url: str | None = None) -> bool:
-    """Bounded, briefly-cached TCP reachability check for the proxy."""
-    url = url or str(settings()["proxyUrl"])
-    now = time.monotonic()
-    if _probe_cache["url"] == url and (now - float(_probe_cache["at"])) < _PROBE_CACHE_TTL:  # type: ignore[arg-type]
-        return bool(_probe_cache["ok"])
-    ok = _tcp_reachable(url)
-    _probe_cache.update(url=url, ok=ok, at=now)
-    return ok
+def _compress_sync(text: str, instructions: str) -> Optional[str]:
+    """One in-process compression pass. Returns the compressed context, or None
+    when nothing was saved (caller keeps the original). Raises nothing upward —
+    the async wrapper owns fail-open."""
+    from headroom import compress  # heavy import, deliberately lazy
 
-
-def proxy_env(provider: str | None) -> dict[str, str]:
-    """Env to inject into an agent child so its LLM calls route through Headroom.
-
-    Returns ``{}`` (i.e. run directly against the provider) when Headroom is
-    disabled, the provider is unsupported, or the proxy is unreachable. This is the
-    fail-open path — callers merge the result into the child env unconditionally.
-    """
-    if not provider or not is_enabled():
-        return {}
-    mapping = _PROVIDER_BASE_URL_ENV.get(provider)
-    if mapping is None:
-        return {}
-    s = settings()
-    url = str(s["proxyUrl"]).rstrip("/")
-    if not proxy_reachable(url):
-        return {}  # fail-open: proxy down → run direct
-    var, suffix = mapping
-    return {var: url + suffix}
-
-
-# ------------------------------------------------------------ managed proxy
-# CLITC owns the proxy process when enabled+installed: started on backend boot
-# and on settings save, with the configured `agent-savings` profile applied.
-# Everything below is best-effort — failure to manage the proxy must never
-# break the app (agents just run direct, per fail-open).
-
-_proxy_run_id: Optional[str] = None
-
-
-def executable() -> Optional[str]:
-    """The headroom CLI, preferring OUR python environment's console script —
-    headroom-ai is a backend dependency (pyproject), so a normal `make setup`
-    ships it; a user-global binary on PATH is only a fallback."""
-    import sys
-
-    venv_script = Path(sys.executable).parent / "headroom"
-    if venv_script.is_file():
-        return str(venv_script)
-
-    from .provider_probe import resolve_executable  # local: avoid import cycle
-
-    return resolve_executable("headroom")
-
-
-def _proxy_port(url: str) -> int:
-    return urlsplit(url).port or 8799
-
-
-def managed_running() -> bool:
-    from .process_runner import RUNNER  # local: avoid import cycle
-
-    if not _proxy_run_id:
-        return False
-    record = RUNNER.runs.get(_proxy_run_id)
-    return record is not None and record.status == "running"
-
-
-async def _savings_profile_env(binary: str, profile: str) -> dict[str, str]:
-    """The HEADROOM_* env for the chosen savings profile, from
-    `headroom agent-savings --profile <p> --format shell` (export KEY=VALUE lines)."""
-    from .process_runner import RUNNER  # local
-
-    record = await RUNNER.run_and_wait(
-        [binary, "agent-savings", "--profile", profile, "--format", "shell"],
-        Path.home(),
-        timeout=15,
-        provider="headroom",
+    result = compress(
+        [
+            # user role = protected verbatim AND the relevance query for pruning
+            {"role": "user", "content": instructions or "Keep what matters from this context."},
+            {"role": "tool", "content": text},
+        ],
+        model=_COMPRESS_MODEL,
     )
-    env: dict[str, str] = {}
-    if record.exit_code != 0:
-        return env
-    for line in record.stdout.splitlines():
-        line = line.strip()
-        if line.startswith("export "):
-            key, _, value = line[len("export ") :].partition("=")
-            if key and value:
-                try:
-                    parts = shlex.split(value)
-                except ValueError:
-                    continue
-                if parts:
-                    env[key.strip()] = parts[0]
-    return env
+    _stats["calls"] += 1
+    saved = int(getattr(result, "tokens_saved", 0) or 0)
+    if saved <= 0:
+        return None
+    compressed = next(
+        (m.get("content") for m in result.messages if m.get("role") == "tool"),
+        None,
+    )
+    if not isinstance(compressed, str) or not compressed.strip() or len(compressed) >= len(text):
+        return None
+    _stats["compressed"] += 1
+    _stats["tokensSaved"] += saved
+    return compressed
 
 
-async def ensure_proxy() -> dict:
-    """Start the managed Headroom proxy if enabled, installed, and not already
-    serving. Returns the resulting status(). Never raises."""
-    global _proxy_run_id
+async def compress_context(text: str, instructions: str = "") -> str:
+    """Compress one bulky, already-redacted context block for a prompt CLITC is
+    building. Fail-open: any reason not to compress returns ``text`` unchanged."""
+    s = settings()
+    if not s.get("enabled") or len(text) < int(s.get("minChars") or 0) or not installed():
+        return text
     try:
-        s = settings()
-        if not s.get("enabled"):
-            return status()
-        url = str(s["proxyUrl"]).rstrip("/")
-        if managed_running() or proxy_reachable(url):
-            return status()  # ours is up, or the user runs their own — done
-        binary = executable()
-        if binary is None:
-            return status()  # not installed → agents run direct (fail-open)
-
-        from .process_runner import RUNNER, add_log_entry  # local
-
-        profile = str(s.get("savingsProfile") or "agent-90")
-        env = await _savings_profile_env(binary, profile)
-        record, _task = await RUNNER.start(
-            [binary, "proxy", "--port", str(_proxy_port(url))],
-            Path.home(),
-            step="headroom",
-            provider="headroom",
-            extra_env=env,
-            # no max_runtime: like the preview dev server, it runs for the session
-        )
-        if record.status == "error":
-            add_log_entry(
-                "system",
-                f"headroom proxy failed to start: {record.stderr.strip()[:200]}",
-                status="warn",
-            )
-            return status()
-        _proxy_run_id = record.id
-        _probe_cache.update(url=None)  # forget the failed probe immediately
-        add_log_entry("system", f"headroom proxy started on :{_proxy_port(url)} (profile {profile})")
-    except Exception as exc:  # noqa: BLE001 — managing the proxy is best-effort
-        try:
-            from .process_runner import add_log_entry
-
-            add_log_entry("system", f"headroom proxy management failed: {exc}", status="warn")
-        except Exception:  # noqa: BLE001
-            pass
-    return status()
-
-
-async def stop_proxy() -> None:
-    """Stop the managed proxy (settings toggled off). User-run proxies untouched."""
-    global _proxy_run_id
-    if _proxy_run_id:
-        from .process_runner import RUNNER  # local
-
-        await RUNNER.cancel(_proxy_run_id)
-        _proxy_run_id = None
-        _probe_cache.update(url=None)
+        compressed = await asyncio.to_thread(_compress_sync, text, instructions)
+        return compressed if compressed is not None else text
+    except Exception:  # noqa: BLE001 — token saving must never break a prompt
+        return text
 
 
 def status() -> dict:
     """Headroom status for the settings UI / API."""
     s = settings()
-    enabled = bool(s["enabled"])
     return {
-        "enabled": enabled,
-        "installed": executable() is not None,
-        "executablePath": executable(),
-        "proxyUrl": s["proxyUrl"],
-        "savingsProfile": s["savingsProfile"],
-        "reachable": proxy_reachable(str(s["proxyUrl"])) if enabled else False,
-        "managed": managed_running(),
-        "routedProviders": sorted(_PROVIDER_BASE_URL_ENV.keys()),
+        "enabled": bool(s["enabled"]),
+        "installed": installed(),
+        "mode": "local",  # in-process library; the proxy integration was retired
+        "minChars": int(s.get("minChars") or 0),
+        "callsCompressed": _stats["compressed"],
+        "tokensSaved": _stats["tokensSaved"],
     }

@@ -160,7 +160,7 @@ def get_settings():
 
 
 @router.post("/settings")
-async def save_settings(body: SettingsUpdateRequest):
+def save_settings(body: SettingsUpdateRequest):
     config.update_settings(
         routing=body.routing.model_dump() if body.routing else None,
         command_templates=body.commandTemplates,
@@ -168,12 +168,5 @@ async def save_settings(body: SettingsUpdateRequest):
         headroom=body.headroom,
         ponytail=body.ponytail,
     )
-    # Token reduction is CLITC-managed: enabling Headroom starts the proxy,
-    # disabling stops OUR managed one (a user-run proxy is left alone).
-    if body.headroom is not None:
-        if headroom_service.is_enabled():
-            await headroom_service.ensure_proxy()
-        else:
-            await headroom_service.stop_proxy()
     add_log_entry("system", "settings updated (routing/templates/models/headroom/ponytail)")
     return get_settings()

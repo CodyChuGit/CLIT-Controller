@@ -278,17 +278,16 @@ export interface TerminalDiagnostics {
   suggestedAction: string | null;
 }
 
-/** Headroom (input-side token compression proxy) status — Pillar 1. */
+/** Headroom (in-process context compression library) status — Pillar 1. */
 export interface HeadroomStatus {
   enabled: boolean;
   installed: boolean;
-  executablePath: string | null;
-  proxyUrl: string;
-  savingsProfile: string;
-  reachable: boolean;
-  /** true when CLITC itself started and owns the proxy process. */
-  managed: boolean;
-  routedProviders: string[];
+  /** always "local": compression runs inside the backend, no proxy. */
+  mode: string;
+  /** context blocks below this many chars are left alone. */
+  minChars: number;
+  callsCompressed: number;
+  tokensSaved: number;
 }
 
 export type PonytailLevel = "off" | "lite" | "full" | "ultra";

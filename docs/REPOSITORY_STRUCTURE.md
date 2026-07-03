@@ -51,7 +51,7 @@ Important modules:
 | `backend/agentflow/event_bus.py` | Workspace live event stream. |
 | `backend/agentflow/policy_service.py` | Command allow / approval / deny decisions. |
 | `backend/agentflow/provider_probe.py` | Provider definitions, executable resolution, installs, logins. |
-| `backend/agentflow/headroom_service.py` | Managed fail-open Headroom proxy integration. |
+| `backend/agentflow/headroom_service.py` | In-process, fail-open Headroom context compression. |
 
 Routers live in `backend/agentflow/api/` and should stay thin. Business logic
 belongs in services.

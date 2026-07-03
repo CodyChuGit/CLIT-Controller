@@ -86,7 +86,7 @@ export const api = {
   saveSettings: (body: {
     routing?: RoutingConfig;
     commandTemplates?: Record<string, string>;
-    headroom?: { enabled?: boolean; proxyUrl?: string; savingsProfile?: string };
+    headroom?: { enabled?: boolean; minChars?: number };
     ponytail?: { level: string };
   }) => post<Settings>("/projects/settings", body),
 

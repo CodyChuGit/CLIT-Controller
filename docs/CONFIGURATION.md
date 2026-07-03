@@ -56,23 +56,21 @@ exposes a model command.
 
 ## Headroom
 
-Headroom is the input-side token compression proxy.
+Headroom is the input-side token compression library (in-process, no proxy).
 
 Default settings:
 
 ```json
 {
   "enabled": true,
-  "proxyUrl": "http://127.0.0.1:8799",
-  "savingsProfile": "agent-90"
+  "minChars": 1500
 }
 ```
 
-When enabled and installed, CLIT Controller starts a managed Headroom proxy.
-When the proxy is reachable:
-
-- `claude` receives `ANTHROPIC_BASE_URL`
-- `codex` receives `OPENAI_BASE_URL`
+When enabled, CLIT Controller compresses bulky machine context (step output
+tails, task-state summaries) in-process while it assembles agent prompts.
+Context blocks shorter than `minChars` are left alone; instructions are never
+rewritten. Failures of any kind fall back to the original text.
 
 Antigravity is not routed through Headroom. If Headroom is unavailable, agents
 run directly.

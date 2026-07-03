@@ -9,6 +9,7 @@ from typing import Optional
 from . import (
     config,
     controller_protocol,
+    headroom_service,
     paths,
     policy_service,
     prompt_templates,
@@ -540,7 +541,14 @@ async def orchestrator_consult(workspace: Path, task_id: str, trigger: str, outp
         return {"status": "provider_missing"}
 
     state = task_service.task_state_summary(workspace, task_id)
-    prompt = prompt_templates.orchestrator_consult_prompt(usage, state, trigger, redact(output_tail[-1500:]))
+    # Headroom (in-process): give the controller a WIDER window of the step's
+    # output, crushed to its essentials — better signal than a blind 1.5k-char
+    # tail, fewer tokens. Fail-open: uncompressed falls back to the plain tail.
+    raw_tail = redact(output_tail[-24_000:])
+    tail = await headroom_service.compress_context(raw_tail, instructions=trigger)
+    if tail == raw_tail:
+        tail = raw_tail[-1500:]
+    prompt = prompt_templates.orchestrator_consult_prompt(usage, state, trigger, tail[:6000])
     argv = build_argv(template, prompt, config.get_models().get(provider))
 
     from datetime import datetime

@@ -77,7 +77,7 @@ class SettingsUpdateRequest(BaseModel):
     routing: Optional[RoutingConfig] = None
     commandTemplates: Optional[dict[str, str]] = None
     models: Optional[dict[str, str]] = None
-    headroom: Optional[dict] = None  # Pillar 1: {enabled, proxyUrl, savingsProfile}
+    headroom: Optional[dict] = None  # Pillar 1 input side (local lib): {enabled, minChars}
     ponytail: Optional[dict] = None  # Pillar 1 output side: {level: off|lite|full|ultra}
 
 

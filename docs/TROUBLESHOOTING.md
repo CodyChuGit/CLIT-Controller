@@ -108,22 +108,18 @@ Use approve, reject, retry, skip, reroute, or remove from the Tasks queue strip.
 
 ## Headroom Not Applying
 
-Headroom is enabled by default but fail-open. If the proxy is missing or
-unreachable, `claude` and `codex` run directly.
+Headroom is enabled by default but fail-open: it runs as an in-process library
+call while CLIT Controller assembles prompts. If the `headroom` package is
+missing or a compression pass fails, the original context is used unchanged.
 
-Check port `8799`:
-
-```bash
-lsof -nP -tiTCP:8799 -sTCP:LISTEN
-```
-
-Install when desired:
+Verify the library is importable in the backend venv:
 
 ```bash
-pip install "headroom-ai[all]"
+.venv/bin/python -c "import headroom; print(headroom.__version__)"
 ```
 
-Do not point Headroom at `8787`; that is the app backend.
+If that fails, re-run `./scripts/install.sh` to refresh backend dependencies.
+The Settings page shows tokens saved this session when compression is active.
 
 ## Preview Does Not Load
 

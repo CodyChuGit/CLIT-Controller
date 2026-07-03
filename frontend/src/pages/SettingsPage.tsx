@@ -61,13 +61,7 @@ export default function SettingsPage() {
       const s = await api.saveSettings({
         routing: routing ?? undefined,
         commandTemplates: templates,
-        headroom: headroom
-          ? {
-              enabled: headroom.enabled,
-              proxyUrl: headroom.proxyUrl,
-              savingsProfile: headroom.savingsProfile,
-            }
-          : undefined,
+        headroom: headroom ? { enabled: headroom.enabled } : undefined,
         ponytail: { level: ponytail },
       });
       applySettings(s);
@@ -122,41 +116,25 @@ export default function SettingsPage() {
                   checked={headroom.enabled}
                   onChange={(e) => setHeadroom({ ...headroom, enabled: e.target.checked })}
                 />
-                <span className="font-medium">Headroom proxy</span>
+                <span className="font-medium">Headroom compression</span>
               </label>
-              <span className="text-xs text-neutral-500">
-                compresses prompt context (input side) · fail-open
-              </span>
+              <span className="text-xs text-neutral-500">in-process, input side · fail-open</span>
               <span className="flex-1" />
               <Dot
                 ok={headroom.installed}
                 label={headroom.installed ? "installed" : "not installed"}
               />
-              <Dot ok={headroom.reachable} label={headroom.reachable ? "proxy up" : "proxy down"} />
-              {headroom.managed && <Dot ok label="managed by CLITC" />}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="label">Proxy URL</label>
-                <input
-                  className="input font-mono"
-                  value={headroom.proxyUrl}
-                  onChange={(e) => setHeadroom({ ...headroom, proxyUrl: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="label">Savings profile</label>
-                <input
-                  className="input font-mono"
-                  value={headroom.savingsProfile}
-                  onChange={(e) => setHeadroom({ ...headroom, savingsProfile: e.target.value })}
-                />
-              </div>
+              {headroom.tokensSaved > 0 && (
+                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  ~{headroom.tokensSaved.toLocaleString()} tokens saved · {headroom.callsCompressed}{" "}
+                  block{headroom.callsCompressed === 1 ? "" : "s"}
+                </span>
+              )}
             </div>
             <p className="text-xs text-neutral-500">
-              Routes {headroom.routedProviders.join(" and ")} through the proxy when it is up;
-              agents run direct otherwise. Headroom installs with the backend (a Python dependency)
-              — CLITC starts and manages the proxy itself.
+              Crushes bulky machine context (logs, task state, step output) inside the prompts CLITC
+              builds for its own agents — a library call in the backend, no proxy, and only CLITC's
+              runs are affected. Instructions are never rewritten.
               {!headroom.installed && (
                 <>
                   {" "}

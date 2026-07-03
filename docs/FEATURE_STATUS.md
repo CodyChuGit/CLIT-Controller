@@ -26,7 +26,7 @@ Historical notes were removed; this document describes the working app.
 | Preview | Start, stop, check, and monitor a localhost preview/dev server. |
 | Usage | Manual health, local counters, routing recommendations, and best-effort live quota for supported CLIs. |
 | Settings | Routing, command templates, model settings, Headroom, Ponytail. |
-| Headroom | Managed, fail-open input compression proxy for `claude` and `codex`; enabled by default. |
+| Headroom | In-process, fail-open input compression of bulky prompt context; enabled by default. |
 | Ponytail | Prompt-level output discipline with `off`, `lite`, `full`, and `ultra` levels; `full` by default. |
 | Recovery | Startup and workspace-select recovery settles runs, queue items, and task steps after restart. |
 | Security controls | Localhost binding, CSRF/origin guard, terminal WS origin check, path confinement, subprocess argv execution, server-side redaction. |

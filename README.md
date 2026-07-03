@@ -100,10 +100,11 @@ provider tabs use real PTY sessions and xterm.js.
 
 CLIT Controller has two token-saving layers:
 
-- **Headroom**: input-side context compression proxy for `claude` and `codex`.
-  It installs with the backend as a Python dependency (`headroom-ai`, part of
-  `./scripts/install.sh`) and CLITC starts/manages the proxy itself. Enabled by
-  default and fail-open: if the proxy is unavailable, agents run directly.
+- **Headroom**: input-side context compression, embedded as a Python library
+  (`headroom-ai`, installed with the backend). CLITC calls it in-process to crush
+  bulky machine context (step output tails, task-state summaries) inside the
+  prompts it builds — no proxy, and only CLITC's own agent runs are affected.
+  Enabled by default and fail-open: any failure leaves the prompt unchanged.
 - **Ponytail**: output-side prompt discipline injected into agent prompts. The
   default level is `full`; adjust it in Settings.
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .. import git_service, queue_service, task_service, usage_service
+from .. import git_service, headroom_service, queue_service, task_service, usage_service
 
 
 async def workspace_summary(workspace: Path) -> str:
@@ -15,8 +15,12 @@ async def workspace_summary(workspace: Path) -> str:
         git_line = "not a git repository"
     tasks = task_service.list_tasks(workspace)[:5]
     task_lines = "".join(f"\n- {t['id']}: {t['title']} ({t['status']})" for t in tasks) or " none yet"
-    # The controller must see what each agent actually did, not just task names.
+    # The controller must see what each agent actually did, not just task names —
+    # crushed in-process by Headroom when it grows bulky (fail-open: unchanged).
     detail = "\n\n".join(task_service.task_state_summary(workspace, t["id"]) for t in tasks[:2])
+    detail = await headroom_service.compress_context(
+        detail, instructions="Current task state per agent — keep statuses, steps, blockers, artifacts."
+    )
     live_line = usage_service.live_summary_line()
     return (
         f"Workspace: {workspace} ({git_line})\n"
