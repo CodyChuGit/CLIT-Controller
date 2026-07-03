@@ -190,3 +190,19 @@ def test_savings_profile_env_parses_export_lines(monkeypatch):
     monkeypatch.setattr("agentflow.process_runner.RUNNER.run_and_wait", fake_run_and_wait)
     env = asyncio.run(headroom_service._savings_profile_env("headroom", "agent-90"))
     assert env == {"HEADROOM_MODE": "aggressive", "HEADROOM_GUARD": "0.9"}
+
+
+def test_executable_prefers_our_python_env(monkeypatch, tmp_path):
+    """headroom-ai is a backend dependency: the venv console script wins over any
+    user-global binary on PATH."""
+    fake_bin = tmp_path / "venv" / "bin"
+    fake_bin.mkdir(parents=True)
+    (fake_bin / "headroom").write_text("#!/bin/sh\n")
+    monkeypatch.setattr(sys, "executable", str(fake_bin / "python"))
+    assert headroom_service.executable() == str(fake_bin / "headroom")
+
+
+def test_executable_falls_back_to_path(monkeypatch, tmp_path):
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "nowhere" / "python"))
+    monkeypatch.setattr("agentflow.provider_probe.resolve_executable", lambda name: "/global/headroom")
+    assert headroom_service.executable() == "/global/headroom"

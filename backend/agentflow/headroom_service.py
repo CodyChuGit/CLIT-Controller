@@ -114,6 +114,15 @@ _proxy_run_id: Optional[str] = None
 
 
 def executable() -> Optional[str]:
+    """The headroom CLI, preferring OUR python environment's console script —
+    headroom-ai is a backend dependency (pyproject), so a normal `make setup`
+    ships it; a user-global binary on PATH is only a fallback."""
+    import sys
+
+    venv_script = Path(sys.executable).parent / "headroom"
+    if venv_script.is_file():
+        return str(venv_script)
+
     from .provider_probe import resolve_executable  # local: avoid import cycle
 
     return resolve_executable("headroom")

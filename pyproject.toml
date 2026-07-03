@@ -14,6 +14,9 @@ dependencies = [
     "fastapi>=0.110,<1",
     "uvicorn[standard]>=0.27,<1",
     "pydantic>=2.5,<3",
+    # Primary token-reduction layer (Pillar 1): installed with the backend so the
+    # managed proxy works out of the box — no separate global install required.
+    "headroom-ai[proxy]>=0.26,<1",
 ]
 
 [project.optional-dependencies]

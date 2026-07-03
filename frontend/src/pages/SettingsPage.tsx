@@ -155,11 +155,13 @@ export default function SettingsPage() {
             </div>
             <p className="text-xs text-neutral-500">
               Routes {headroom.routedProviders.join(" and ")} through the proxy when it is up;
-              agents run direct otherwise.
+              agents run direct otherwise. Headroom installs with the backend (a Python dependency)
+              — CLITC starts and manages the proxy itself.
               {!headroom.installed && (
                 <>
                   {" "}
-                  Install with <code className="font-mono">pip install "headroom-ai[all]"</code>.
+                  Missing here: re-run <code className="font-mono">./scripts/install.sh</code> to
+                  refresh backend dependencies.
                 </>
               )}
             </p>
