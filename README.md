@@ -25,6 +25,8 @@ you to manage several terminals by hand.
 | Usage | Budget/traffic-control mode, provider health, live quota where available. |
 | Preview | Start and monitor a localhost preview/dev server for the selected workspace. |
 | Logs | Redacted global logs and active run tails. |
+| Memory | 3D codebase knowledge-graph explorer (via `codebase-memory-mcp`): index the workspace, filter/search nodes, hotspots, and a node drawer with source + callers/callees. |
+| Sources | Fetch and browse any open-source package's real source (via `opensrc`) — for you and the agents. |
 | Settings | Routing defaults, command templates, Headroom proxy, and Ponytail prompt discipline. |
 
 > **Note on live quota:** Codex (session `rate_limits` on disk) and Claude Code
@@ -35,6 +37,15 @@ you to manage several terminals by hand.
 > back to a manual limit. **Please, Google: ship a headless usage API for `agy`
 > (parity with Codex and Claude) so we can patch this and show real Antigravity
 > quota.**
+
+> **Optional integrations & the engine:** the **Memory** and **Sources** tabs
+> light up once their local tools are installed (one-click from the **Agents**
+> tab): `codebase-memory-mcp` (code knowledge graph) and `opensrc` (source
+> fetcher; needs Node ≥ 24). The routing / dispatch / usage-fallback engine is
+> imported from the `Agent_CLI_Skill` project — set `AGENTCLI_CORE_PATH` to its
+> `scripts/` dir, or the vendored snapshot under
+> `backend/agentflow/orchestrator/_engine_snapshot/` is used (refresh it with
+> `scripts/sync-engine.sh`).
 
 ## Agent Roles
 
