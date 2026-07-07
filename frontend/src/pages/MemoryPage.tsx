@@ -25,13 +25,16 @@ const NODE_COLORS: Record<string, string> = {
 };
 const colorFor = (label: string) => NODE_COLORS[label] ?? "#9ca3af";
 
+// The app themes via Tailwind's `media` strategy (prefers-color-scheme), not a
+// `.dark` class — so match the OS setting to keep the WebGL canvas in sync.
 function useIsDark(): boolean {
-  const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
+  const QUERY = "(prefers-color-scheme: dark)";
+  const [dark, setDark] = useState(() => window.matchMedia?.(QUERY).matches ?? true);
   useEffect(() => {
-    const el = document.documentElement;
-    const obs = new MutationObserver(() => setDark(el.classList.contains("dark")));
-    obs.observe(el, { attributes: true, attributeFilter: ["class"] });
-    return () => obs.disconnect();
+    const mq = window.matchMedia(QUERY);
+    const onChange = (e: MediaQueryListEvent) => setDark(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
   }, []);
   return dark;
 }
@@ -320,7 +323,10 @@ export default function MemoryPage() {
             nodeLabel={(n: GraphNode) => `${n.label}: ${n.name}`}
             nodeColor={(n: GraphNode) => colorFor(n.label)}
             nodeRelSize={4}
-            linkColor={() => (isDark ? "#3f3f46" : "#d4d4d8")}
+            nodeVal={(n: GraphNode) => 1 + Math.min(n.degree || 0, 12)}
+            nodeOpacity={0.95}
+            linkColor={() => (isDark ? "rgba(148,163,184,0.4)" : "#cbd5e1")}
+            linkWidth={0.6}
             linkDirectionalParticles={0}
             onNodeClick={(n: object) => void onNodeClick(n as GraphNode)}
           />
