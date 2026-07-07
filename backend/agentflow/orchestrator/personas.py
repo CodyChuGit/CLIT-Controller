@@ -108,4 +108,9 @@ def persona_prompt(persona: str, ctx: dict) -> str:
     parts.append(body)
     prompt = "\n\n".join(parts)
     pony = ponytail.block()
-    return prompt + (f"\n\n{pony}" if pony else "")
+    opensrc = (
+        "Reading dependency source: run `opensrc path <pkg>` to fetch + cache any open-source "
+        "package's real source and get a local path (e.g. `opensrc path zod`, "
+        "`opensrc path pypi:requests`, `opensrc path owner/repo`), then read files under it."
+    )
+    return prompt + (f"\n\n{pony}" if pony else "") + f"\n\n{opensrc}"
