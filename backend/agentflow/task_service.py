@@ -22,6 +22,7 @@ from . import (
 )
 from .agent_commands import build_argv as _build_argv
 from .agent_commands import provider_busy_result
+from .orchestrator import personas, pipeline, usage_bridge
 from .process_runner import AGENT_RUN_TIMEOUT, RUNNER, RunRecord, add_log_entry, now_iso
 from .redaction import redact
 from .workflow import FULL_SEQUENCE, STEP_DEFS, STEP_IO
@@ -55,9 +56,23 @@ def _task_rel_dir(task_id: str) -> str:
     return f".agentflow/tasks/{task_id}"
 
 
+def _build_step_prompt(usage: dict, task_id: str, step: str, persona: Optional[str]) -> str:
+    """Engine stages carry a persona -> build a role-scoped prompt for it; legacy
+    steps (no persona) keep their hand-tuned template."""
+    if persona:
+        ctx = {
+            "usage_header": routing_service.budget_context_header(usage),
+            "task_rel_dir": _task_rel_dir(task_id),
+        }
+        return personas.persona_prompt(persona, ctx)
+    return prompt_templates.STEP_PROMPTS[step](usage, _task_rel_dir(task_id))
+
+
 def step_provider(workspace: Path, step: str) -> str:
     routing = config.get_workspace_routing(workspace)
-    return routing.get(STEP_DEFS[step]["role"], "claude")
+    preferred = routing.get(STEP_DEFS[step]["role"], "claude")
+    # Honor the user's routing choice; the engine only reroutes if it's exhausted.
+    return pipeline.effective_provider(preferred)
 
 
 def set_orchestrated(workspace: Path, task_id: str) -> None:
@@ -405,6 +420,7 @@ async def run_step(
     confirm: bool = False,
     source: str = "manual",
     provider_override: Optional[str] = None,
+    persona: Optional[str] = None,
 ) -> dict:
     """Run one traffic-control step as a real subprocess (or explain why not).
 
@@ -418,7 +434,7 @@ async def run_step(
     usage = usage_service.ensure_usage(workspace)
     mode = usage.get("orchestrationMode", "balanced")
     provider = provider_override or step_provider(workspace, step)
-    prompt = prompt_templates.STEP_PROMPTS[step](usage, _task_rel_dir(task_id))
+    prompt = _build_step_prompt(usage, task_id, step, persona)
     preview = build_step_preview(workspace, task_id, step, usage, provider_override=provider_override)
     folder = paths.task_dir(workspace, task_id)
 
@@ -526,6 +542,12 @@ async def run_step(
             duration_ms=record.duration_ms or 0,
             status=record.status,
         )
+        # Auto-detect provider exhaustion from the run's own output (advisory —
+        # feeds the engine's spread-first fallback; must never break the run).
+        try:
+            usage_bridge.on_run_output(provider, record.stdout + record.stderr)
+        except Exception as exc:
+            add_log_entry("orchestrator", f"exhaustion check failed: {exc}", provider=provider, status="warn")
         _set_step_state(
             workspace,
             task_id,
@@ -664,8 +686,15 @@ async def run_full_sequence(workspace: Path, task_id: str, confirm: bool = False
     usage = usage_service.ensure_usage(workspace)
     mode = usage.get("orchestrationMode", "balanced")
 
+    # The engine decides the sequence (and per-step provider) when confident; a
+    # free-form goal keeps the familiar codex_spec -> claude_implement -> gemini_qa
+    # -> codex_review flow. Step ids stay identical, so the queue and UI are unchanged.
+    engine_seq = pipeline.engine_pipeline(meta.get("goal", ""), meta.get("taskType"))
+    seq_plan: list[tuple[str, Optional[str], str]] = engine_seq or [(s, None, "") for s in FULL_SEQUENCE]
+    step_ids = [s for s, _, _ in seq_plan]
+
     if mode == "manual_approval":
-        previews = [build_step_preview(workspace, task_id, s, usage) for s in FULL_SEQUENCE]
+        previews = [build_step_preview(workspace, task_id, s, usage) for s in step_ids]
         return {
             "status": "manual_preview",
             "message": "Manual Approval mode: nothing was run. Review each command preview and run steps individually.",
@@ -700,7 +729,7 @@ async def run_full_sequence(workspace: Path, task_id: str, confirm: bool = False
                 provider="git",
             )
 
-            for step in FULL_SEQUENCE:
+            for step, provider_override, persona in seq_plan:
                 fresh_usage = usage_service.ensure_usage(workspace)
 
                 if (
@@ -756,7 +785,15 @@ async def run_full_sequence(workspace: Path, task_id: str, confirm: bool = False
                     return
 
                 _set_sequence(workspace, task_id, "running", step)
-                result = await run_step(workspace, task_id, step, confirm=confirm, source="auto")
+                result = await run_step(
+                    workspace,
+                    task_id,
+                    step,
+                    confirm=confirm,
+                    source="auto",
+                    provider_override=provider_override,
+                    persona=persona or None,
+                )
                 if result["status"] == "started":
                     record = await _await_run(result["runId"])
                     if record.status != "succeeded":
@@ -774,7 +811,7 @@ async def run_full_sequence(workspace: Path, task_id: str, confirm: bool = False
         finally:
             _full_sequences_running.discard(task_id)
 
-    _set_sequence(workspace, task_id, "running", FULL_SEQUENCE[0])
+    _set_sequence(workspace, task_id, "running", step_ids[0])
     asyncio.create_task(sequence())
     warning = "Claude is RED: the sequence will pause before claude_implement unless confirmed." if claude_red else None
     return {"status": "started", "message": "Full sequence started.", "warning": warning}

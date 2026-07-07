@@ -22,3 +22,15 @@ def build_caps() -> dict:
         "agy_plugin": False,
         "omlx": provider_probe.which("omlx") is not None,
     }
+
+
+def installed_agents() -> dict:
+    """Agent-name-keyed install map for usage_lib.resolve() (codex/antigravity/omlx).
+
+    Distinct from build_caps(): resolve() keys by agent name, dispatch by *_cli.
+    """
+    return {
+        "codex": provider_probe.which("codex") is not None,
+        "antigravity": provider_probe.which("antigravity") is not None,
+        "omlx": provider_probe.which("omlx") is not None,
+    }

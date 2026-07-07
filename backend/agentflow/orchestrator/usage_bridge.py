@@ -10,18 +10,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from agentflow import provider_probe
-
-from . import _engine
-
-
-def _installed() -> dict:
-    """Engine `resolve()` expects caps keyed by agent name (not codex_cli/…)."""
-    return {
-        "codex": provider_probe.which("codex") is not None,
-        "antigravity": provider_probe.which("antigravity") is not None,
-        "omlx": provider_probe.which("omlx") is not None,
-    }
+from . import _engine, caps
 
 
 def on_provider_health(provider: str, health: str) -> None:
@@ -45,7 +34,7 @@ def on_run_output(provider: str, text: str) -> Optional[str]:
         return None
     state = ns.usage_lib.load_state()
     ns.usage_lib.mark(state, provider, "exhausted", reason=f"detected: {signal}", cooldown=cooldown)
-    effective, _hops = ns.usage_lib.resolve(provider, _installed(), state, upolicy)
+    effective, _hops = ns.usage_lib.resolve(provider, caps.installed_agents(), state, upolicy)
     ns.usage_lib.save_state(state)
     return effective if effective != provider else None
 
