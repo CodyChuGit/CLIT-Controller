@@ -545,6 +545,7 @@ export interface GraphData {
 
 export interface MemoryStatus {
   available: boolean;
+  project?: string | null;
   detail?: string;
-  index?: Record<string, unknown>;
+  index?: Record<string, unknown> | null;
 }
