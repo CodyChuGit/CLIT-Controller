@@ -1,20 +1,11 @@
 import { render, screen } from "@testing-library/react";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-vi.mock("react-force-graph-3d", () => ({ default: () => <div data-testid="fg3d" /> }));
 vi.mock("../api", async (orig) => {
   const actual = (await orig()) as typeof import("../api");
   return {
     ...actual,
-    api: {
-      memoryStatus: vi.fn(),
-      memorySchema: vi.fn(),
-      memoryGraph: vi.fn(),
-      memoryArchitecture: vi.fn().mockResolvedValue({}),
-      memoryIndex: vi.fn(),
-      memorySnippet: vi.fn(),
-      memoryTrace: vi.fn(),
-    },
+    api: { memoryUi: vi.fn(), memoryIndex: vi.fn() },
   };
 });
 
@@ -23,36 +14,21 @@ import MemoryPage from "./MemoryPage";
 
 const mockApi = api as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
-beforeAll(() => {
-  // jsdom has no ResizeObserver
-  (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  };
-});
-
 describe("MemoryPage", () => {
   it("shows the not-installed state", async () => {
-    mockApi.memoryStatus.mockResolvedValue({ available: false });
+    mockApi.memoryUi.mockResolvedValue({ available: false, running: false, url: null });
     render(<MemoryPage />);
     expect(await screen.findByText(/not installed/i)).toBeInTheDocument();
   });
 
-  it("renders the control panel and node count when indexed", async () => {
-    mockApi.memoryStatus.mockResolvedValue({ available: true, project: "demo" });
-    mockApi.memorySchema.mockResolvedValue({ node_labels: [{ label: "Function", count: 3 }] });
-    mockApi.memoryGraph.mockResolvedValue({
-      nodes: [{ id: "demo.foo", label: "Function", name: "foo", file: "foo.py", degree: 1 }],
-      edges: [],
-    });
-    mockApi.memoryArchitecture.mockResolvedValue({
-      hotspots: [{ name: "hot", qualified_name: "demo.hot", fan_in: 9 }],
+  it("embeds the viewer iframe when the sidecar is running", async () => {
+    mockApi.memoryUi.mockResolvedValue({
+      available: true,
+      running: true,
+      url: "http://localhost:9749",
     });
     render(<MemoryPage />);
-    expect(await screen.findByText("Index now")).toBeInTheDocument();
-    expect(await screen.findByText(/Project: demo/)).toBeInTheDocument();
-    expect(await screen.findByText(/1 nodes/)).toBeInTheDocument();
-    expect(await screen.findByText("hot")).toBeInTheDocument();
+    const iframe = await screen.findByTitle("Codebase Memory graph");
+    expect(iframe).toHaveAttribute("src", "http://localhost:9749");
   });
 });

@@ -91,6 +91,13 @@ async def _lifespan(app: FastAPI):
     except Exception as exc:  # noqa: BLE001 — shutdown must not raise
         add_log_entry("system", f"run cancel_all on shutdown failed: {exc}", status="error")
     await TERMINALS.shutdown()
+    # Stop the codebase-memory graph-viewer sidecar if we started it.
+    try:
+        from . import memory_service
+
+        memory_service.stop_ui()
+    except Exception as exc:  # noqa: BLE001 — shutdown cleanup must not raise
+        add_log_entry("system", f"memory UI stop failed: {exc}", status="error")
 
 
 def create_app() -> FastAPI:

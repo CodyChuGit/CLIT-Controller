@@ -49,6 +49,12 @@ def status() -> dict:
     return {"available": True, "project": proj, "index": index}
 
 
+@router.get("/ui")
+def ui() -> Any:
+    """Ensure the built-in graph viewer is running; return its URL for embedding."""
+    return _guard(memory_service.ensure_ui)
+
+
 @router.post("/index")
 def index() -> Any:
     ws = require_workspace()

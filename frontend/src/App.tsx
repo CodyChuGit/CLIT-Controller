@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import ActivityBar, { type PageId } from "./components/ActivityBar";
 import AgentDock from "./components/dock/AgentDock";
@@ -20,6 +20,7 @@ const PAGE_IDS: PageId[] = [
 ];
 import AgentsPage from "./pages/AgentsPage";
 import LogsPage from "./pages/LogsPage";
+import MemoryPage from "./pages/MemoryPage";
 import PreviewPage from "./pages/PreviewPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -27,9 +28,6 @@ import SourcesPage from "./pages/SourcesPage";
 import TasksPage from "./pages/TasksPage";
 import UsagePage from "./pages/UsagePage";
 import type { CurrentProject, EditorFile, GitInfo, Usage } from "./types";
-
-// Lazy — pulls in three.js; keep it out of the initial bundle.
-const MemoryPage = lazy(() => import("./pages/MemoryPage"));
 
 export default function App() {
   const [page, setPageState] = useState<PageId>(() => {
@@ -301,13 +299,7 @@ export default function App() {
                 {page === "preview" && <PreviewPage />}
                 {page === "usage" && <UsagePage />}
                 {page === "logs" && <LogsPage />}
-                {page === "memory" && (
-                  <Suspense
-                    fallback={<div className="p-4 text-xs text-neutral-400">Loading graph…</div>}
-                  >
-                    <MemoryPage />
-                  </Suspense>
-                )}
+                {page === "memory" && <MemoryPage />}
                 {page === "sources" && <SourcesPage />}
                 {page === "settings" && <SettingsPage />}
               </ErrorBoundary>
