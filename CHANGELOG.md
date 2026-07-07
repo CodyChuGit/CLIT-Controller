@@ -19,9 +19,27 @@ Unreleased.
   startup orphan cleanup.
 - Shared frontend live activity derivation for Agent Dock and Tasks.
 - Headroom and Ponytail settings surfaced as current token controls.
+- Agent-use logic rebased onto the `Agent_CLI_Skill` orchestration engine
+  (`backend/agentflow/orchestrator/`): routing, per-step provider selection,
+  multi-agent stage pipelines, and spread-first usage fallback now flow through
+  the imported pure-stdlib engine.
+- Codebase Memory tab — a 3D knowledge-graph explorer backed by
+  `codebase-memory-mcp` (index the workspace into a queryable graph; filter,
+  search, hotspots, and a node drawer with source + callers/callees).
+- Sources tab — fetch and browse any open-source package's real source via
+  `opensrc` (npm / `pypi:` / `crates:` / `gitlab:` / `bitbucket:` / `owner/repo`)
+  with in-package search; every task agent is also told it can run
+  `opensrc path <pkg>` to read a dependency's real source.
+- `codebase-memory-mcp` and `opensrc` registered as one-click-installable tools
+  on the Agents page.
 
 ### Changed
 
+- Task execution derives its step sequence and per-step provider from the
+  orchestration engine (exhaustion-aware), replacing the fixed
+  `codex_spec → claude_implement → gemini_qa → codex_review` flow while keeping
+  the same step ids and UI; routing recommendations use the engine's
+  spread-first fallback when Claude is conserved.
 - Default controller routing is now `claude`; QA defaults to `antigravity`.
 - Legacy `agentflow-*` directives are compatibility fallback only when no
   `CLITC_RESULT_V1` block is present.
