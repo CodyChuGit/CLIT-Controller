@@ -5,6 +5,7 @@ provider goes RED we mark it exhausted so the engine's spread-first fallback
 routes around it; when a run's output shows a rate-limit/quota signal we
 auto-detect it, mark the provider exhausted, and return the effective fallback.
 """
+
 from __future__ import annotations
 
 from typing import Optional

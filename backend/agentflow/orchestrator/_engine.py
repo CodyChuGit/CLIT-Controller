@@ -11,6 +11,7 @@ registered under the name ``route_task``.
 
 This is the single point of coupling between AgentComposer and the engine.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -67,9 +68,7 @@ def load() -> SimpleNamespace:
     # route-task.py is hyphenated -> load by path, register as `route_task`.
     route_task = sys.modules.get("route_task")
     if route_task is None:
-        spec = importlib.util.spec_from_file_location(
-            "route_task", str(scripts_dir / "route-task.py")
-        )
+        spec = importlib.util.spec_from_file_location("route_task", str(scripts_dir / "route-task.py"))
         if spec is None or spec.loader is None:  # pragma: no cover - defensive
             raise RuntimeError(f"cannot load route-task.py from {scripts_dir}")
         route_task = importlib.util.module_from_spec(spec)

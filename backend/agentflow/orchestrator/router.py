@@ -4,6 +4,7 @@ Maps an AgentComposer task (its goal text and optional explicit task type) onto
 an engine routing decision, returned as typed :class:`RouteResult` / :class:`Stage`
 objects so the rest of the adapter never touches raw engine dicts.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

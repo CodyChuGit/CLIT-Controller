@@ -6,6 +6,7 @@ onto ``{provider_id, model, persona, action, parallel_group}`` that
 ``process_runner`` can execute. ``parallel_group`` is taken from the *route*
 stage (the engine's dispatch entry drops it).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -26,18 +27,18 @@ def _cli_only_policy(ns) -> dict:
 @dataclass
 class StagePlan:
     provider_id: Optional[str]  # codex|claude|antigravity, or None for a monitor stage
-    model: Optional[str]        # engine tier suggestion; user override wins at exec time
+    model: Optional[str]  # engine tier suggestion; user override wins at exec time
     persona: str
     action: str
     parallel_group: Optional[str] = None
-    via: str = ""               # engine mechanism hint (codex_cli|local_script|claude|...)
-    monitor: bool = False       # True for an oMLX monitor stage (no provider to spawn)
+    via: str = ""  # engine mechanism hint (codex_cli|local_script|claude|...)
+    monitor: bool = False  # True for an oMLX monitor stage (no provider to spawn)
     fallbacks: list = field(default_factory=list)  # usage fallback hops applied to this stage
 
 
 def _provider_for(entry: dict) -> Optional[str]:
-    agent = entry.get("agent")
-    mech = entry.get("mechanism", "")
+    agent = str(entry.get("agent") or "")
+    mech = str(entry.get("mechanism", ""))
     if agent == "omlx":
         return None
     # A degraded/absorbed stage means the delegate was unavailable -> Claude takes it.
@@ -64,9 +65,7 @@ def plan(
     """Resolve a route into ordered, spawnable stage plans (with usage fallback)."""
     ns = _engine.load()
     caps_dict = caps_override if caps_override is not None else caps.build_caps()
-    dp = ns.dispatch.dispatch_plan(
-        route_result.raw, caps_dict, policy=_cli_only_policy(ns), usage_state=usage_state
-    )
+    dp = ns.dispatch.dispatch_plan(route_result.raw, caps_dict, policy=_cli_only_policy(ns), usage_state=usage_state)
     entries = dp.get("dispatch") or []
     rstages = route_result.stages
     out: list[StagePlan] = []

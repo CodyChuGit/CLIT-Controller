@@ -1,4 +1,5 @@
 """Task A3 — dispatch adapter maps engine plans to spawnable stages (cli_only)."""
+
 from __future__ import annotations
 
 from agentflow.orchestrator import dispatch_adapter, router
@@ -24,9 +25,7 @@ def test_plan_returns_spawnable_stages():
 
 
 def test_codex_agentic_stage_carries_gpt55_tier():
-    rr = router.route_for_task(
-        "analyze the codebase architecture", task_type="CODEBASE_SEMANTIC_ANALYSIS"
-    )
+    rr = router.route_for_task("analyze the codebase architecture", task_type="CODEBASE_SEMANTIC_ANALYSIS")
     plans = dispatch_adapter.plan(rr, caps_override=ALL_CAPS, usage_state=CLEAN_STATE)
     codex = [p for p in plans if p.provider_id == "codex"]
     assert codex, plans

@@ -6,6 +6,7 @@ Keys read by the engine (``dispatch.py`` / ``usage_lib.py``):
 AgentComposer spawns CLIs directly (``cli_only`` dispatch mode) and never uses
 Claude-Code plugins, so ``*_plugin`` are always ``False``.
 """
+
 from __future__ import annotations
 
 from agentflow import provider_probe
