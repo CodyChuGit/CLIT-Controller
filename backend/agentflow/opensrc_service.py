@@ -35,7 +35,11 @@ def binary() -> Optional[str]:
     explicit = os.environ.get(BIN_ENV)
     if explicit:
         return explicit if os.path.exists(explicit) else None
-    return shutil.which(DEFAULT_BIN)
+    found = shutil.which(DEFAULT_BIN)
+    if found:
+        return found
+    fallback = os.path.expanduser(f"~/.local/bin/{DEFAULT_BIN}")
+    return fallback if os.access(fallback, os.X_OK) else None
 
 
 def available() -> bool:
