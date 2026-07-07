@@ -106,6 +106,7 @@ export const api = {
 
   // codebase memory graph
   memoryStatus: () => get<MemoryStatus>("/memory/status"),
+  memoryUi: () => get<{ available: boolean; running: boolean; url: string | null }>("/memory/ui"),
   memoryIndex: () => post<Record<string, unknown>>("/memory/index"),
   memoryGraph: (params: { label?: string; name?: string; limit?: number }) => {
     const q = new URLSearchParams();

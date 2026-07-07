@@ -16,7 +16,9 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import socket
 import subprocess
+import time
 from typing import Any, Optional
 
 BIN_ENV = "CODEBASE_MEMORY_MCP_BIN"
@@ -47,6 +49,61 @@ def binary() -> Optional[str]:
 
 def available() -> bool:
     return binary() is not None
+
+
+# --- graph UI sidecar (the binary's built-in :9749 viewer) -----------------
+
+UI_PORT = 9749
+_ui_proc: Optional["subprocess.Popen[bytes]"] = None
+
+
+def ui_url(port: int = UI_PORT) -> str:
+    return f"http://localhost:{port}"
+
+
+def ui_running(port: int = UI_PORT) -> bool:
+    with socket.socket() as s:
+        s.settimeout(0.3)
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
+def ensure_ui(port: int = UI_PORT) -> dict:
+    """Ensure codebase-memory-mcp's built-in graph viewer is serving on ``port``.
+
+    The UI runs as a thread inside the MCP stdio server, so we spawn the binary
+    with stdin held open (never written/closed) so the server — and its viewer —
+    stays alive. Idempotent: only starts a process if nothing is serving yet.
+    """
+    exe = binary()
+    if not exe:
+        return {"available": False, "running": False, "url": None}
+    if ui_running(port):
+        return {"available": True, "running": True, "url": ui_url(port)}
+    global _ui_proc
+    if _ui_proc is None or _ui_proc.poll() is not None:
+        _ui_proc = subprocess.Popen(
+            [exe, "--ui=true", f"--port={port}"],
+            stdin=subprocess.PIPE,  # held open -> MCP server (and its UI) stays alive
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    for _ in range(30):
+        if ui_running(port):
+            break
+        time.sleep(0.1)
+    return {"available": True, "running": ui_running(port), "url": ui_url(port)}
+
+
+def stop_ui() -> None:
+    global _ui_proc
+    if _ui_proc and _ui_proc.poll() is None:
+        _ui_proc.terminate()
+        try:
+            _ui_proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            _ui_proc.kill()
+    _ui_proc = None
 
 
 def _run(tool: str, args: Optional[dict] = None) -> Any:
