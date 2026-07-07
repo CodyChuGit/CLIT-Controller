@@ -1,12 +1,14 @@
 """codebase-memory-mcp integration — query the code knowledge graph via CLI mode.
 
-The binary indexes a repo into a SQLite knowledge graph and answers queries as
-JSON: ``codebase-memory-mcp cli <tool> '<json_args>'``. We render our own themed
-graph tab, so only the STANDARD binary is needed (no UI variant, no MCP stdio).
+``codebase-memory-mcp cli <tool> '<json_args>'``. Most tools require a ``project``
+name (produced by ``index_repository`` / listed by ``list_projects``), so this
+service resolves the project for a workspace by matching indexed root paths.
+We render our own themed tab, so only the STANDARD binary is needed.
 
-Output field names vary slightly across binary versions, so :func:`_normalize_graph`
-is deliberately tolerant. The binary path is resolved from ``$CODEBASE_MEMORY_MCP_BIN``
-(tests point this at a fake) or ``codebase-memory-mcp`` on PATH.
+Verified against the binary source (2026-07). ``search_graph`` returns nodes only
+(``results``) — edges are assembled best-effort from ``query_graph``. The exact
+Cypher dialect and the default (non-``--json``) output framing should be
+reconfirmed on a real install; parsing here is deliberately tolerant.
 """
 
 from __future__ import annotations
@@ -19,7 +21,12 @@ from typing import Any, Optional
 
 BIN_ENV = "CODEBASE_MEMORY_MCP_BIN"
 DEFAULT_BIN = "codebase-memory-mcp"
-_TIMEOUT = 120
+_TIMEOUT = 300  # indexing a large repo is slow
+
+# Relationships aren't emitted by search_graph; pull them from the graph directly.
+_EDGE_CYPHER = (
+    "MATCH (a)-[r]->(b) RETURN a.qualified_name AS source, type(r) AS type, b.qualified_name AS target LIMIT 1000"
+)
 
 
 class MemoryUnavailable(RuntimeError):
@@ -61,98 +68,108 @@ def _run(tool: str, args: Optional[dict] = None) -> Any:
         raise MemoryUnavailable(f"{tool} returned non-JSON output") from exc
 
 
-def index(path: str) -> dict:
-    return _run("index_repository", {"path": path})
+# --- indexing -------------------------------------------------------------
 
 
-def status() -> dict:
-    return _run("index_status")
+def index(repo_path: str, mode: str = "full", persistence: bool = False) -> dict:
+    return _run("index_repository", {"repo_path": repo_path, "mode": mode, "persistence": persistence})
 
 
-def list_projects() -> Any:
-    return _run("list_projects")
+def status(project: str) -> dict:
+    return _run("index_status", {"project": project})
 
 
-def schema() -> dict:
-    return _run("get_graph_schema")
+def list_projects() -> list:
+    out = _run("list_projects")
+    if isinstance(out, dict):
+        return out.get("projects") or []
+    return out or []
 
 
-def architecture() -> dict:
-    return _run("get_architecture")
-
-
-def snippet(qualified_name: str) -> dict:
-    return _run("get_code_snippet", {"qualified_name": qualified_name})
-
-
-def trace(qualified_name: str, depth: int = 2) -> dict:
-    return _run("trace_path", {"qualified_name": qualified_name, "depth": depth})
-
-
-def query(cypher: str) -> dict:
-    return _run("query_graph", {"query": cypher})
-
-
-def graph(label: Optional[str] = None, name: Optional[str] = None, limit: int = 200) -> dict:
-    """Return render-ready ``{nodes, edges}`` from search_graph."""
-    args: dict = {"limit": limit}
-    if label:
-        args["label"] = label
-    if name:
-        args["name"] = name
-    return _normalize_graph(_run("search_graph", args))
-
-
-def _first(d: dict, *keys: str) -> Any:
-    for k in keys:
-        if d.get(k) is not None:
-            return d[k]
+def resolve_project(repo_path: str) -> Optional[str]:
+    """Project name whose indexed root matches ``repo_path`` (else None)."""
+    target = os.path.realpath(repo_path)
+    for p in list_projects():
+        root = isinstance(p, dict) and p.get("root_path")
+        if root and os.path.realpath(root) == target:
+            return p.get("name")
     return None
 
 
-def _normalize_graph(raw: Any) -> dict:
-    """Normalize search_graph output to a stable render shape, tolerating the
-    field-name variations seen across binary versions.
+# --- queries (each requires a project) ------------------------------------
 
-    -> {nodes: [{id, label, name, file, degree}], edges: [{source, target, type}]}
-    """
-    if not isinstance(raw, dict):
-        return {"nodes": [], "edges": []}
-    nodes_in = raw.get("nodes") or []
-    edges_in = raw.get("edges") or raw.get("relationships") or raw.get("links") or []
 
+def schema(project: str) -> dict:
+    return _run("get_graph_schema", {"project": project})
+
+
+def architecture(project: str) -> dict:
+    return _run("get_architecture", {"project": project})
+
+
+def snippet(project: str, qualified_name: str) -> dict:
+    return _run(
+        "get_code_snippet",
+        {"project": project, "qualified_name": qualified_name, "include_neighbors": True},
+    )
+
+
+def trace(project: str, function_name: str, direction: str = "both", depth: int = 3) -> dict:
+    return _run(
+        "trace_path",
+        {"project": project, "function_name": function_name, "direction": direction, "depth": depth},
+    )
+
+
+def query(project: str, cypher: str, max_rows: int = 1000) -> dict:
+    return _run("query_graph", {"project": project, "query": cypher, "max_rows": max_rows})
+
+
+def graph(project: str, label: Optional[str] = None, name_pattern: Optional[str] = None, limit: int = 200) -> dict:
+    """Render-ready ``{nodes, edges}``: nodes from search_graph, edges from query_graph."""
+    args: dict = {"project": project, "limit": limit}
+    if label:
+        args["label"] = label
+    if name_pattern:
+        args["name_pattern"] = name_pattern
+    return _assemble_graph(project, _run("search_graph", args))
+
+
+def _assemble_graph(project: str, search_raw: Any) -> dict:
+    results = search_raw.get("results") if isinstance(search_raw, dict) else None
     nodes = []
-    for n in nodes_in:
-        if not isinstance(n, dict):
+    node_ids: set[str] = set()
+    for r in results or []:
+        if not isinstance(r, dict):
             continue
-        nid = _first(n, "id", "qualified_name", "qualifiedName", "name")
-        if nid is None:
+        qn = r.get("qualified_name") or r.get("name")
+        if not qn:
             continue
-        labels = n.get("labels")
-        label = n.get("label") or (labels[0] if isinstance(labels, list) and labels else None) or "Node"
+        node_ids.add(qn)
+        degree = (r.get("in_degree") or 0) + (r.get("out_degree") or 0)
         nodes.append(
             {
-                "id": str(nid),
-                "label": label,
-                "name": _first(n, "name", "qualified_name", "qualifiedName") or str(nid),
-                "file": _first(n, "file", "path", "filePath"),
-                "degree": n.get("degree", 0),
+                "id": qn,
+                "label": r.get("label") or "Node",
+                "name": r.get("name") or qn,
+                "file": r.get("file_path"),
+                "degree": degree,
             }
         )
 
     edges = []
-    for e in edges_in:
-        if not isinstance(e, dict):
-            continue
-        src = _first(e, "source", "from", "start", "src")
-        dst = _first(e, "target", "to", "end", "dst")
-        if src is None or dst is None:
-            continue
-        edges.append(
-            {
-                "source": str(src),
-                "target": str(dst),
-                "type": _first(e, "type", "rel", "relationship", "label") or "REL",
-            }
-        )
+    try:
+        qres = query(project, _EDGE_CYPHER)
+        cols = qres.get("columns") or []
+        idx = {c: i for i, c in enumerate(cols)}
+        si, ti, tyi = idx.get("source"), idx.get("target"), idx.get("type")
+        if si is not None and ti is not None:
+            for row in qres.get("rows") or []:
+                src, dst = row[si], row[ti]
+                if src in node_ids and dst in node_ids:
+                    etype = row[tyi] if tyi is not None and tyi < len(row) else "REL"
+                    edges.append({"source": src, "target": dst, "type": etype or "REL"})
+    except MemoryUnavailable:
+        pass  # nodes-only graph when the Cypher dialect isn't available
+
     return {"nodes": nodes, "edges": edges}
