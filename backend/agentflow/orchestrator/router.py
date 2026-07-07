@@ -6,7 +6,7 @@ objects so the rest of the adapter never touches raw engine dicts.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from . import _engine
@@ -29,6 +29,8 @@ class RouteResult:
     confidence: float
     rationale: str
     task_type: Optional[str] = None
+    # The original engine decision dict, passed through to dispatch_plan verbatim.
+    raw: dict = field(default_factory=dict)
 
 
 def _to_result(d: dict) -> RouteResult:
@@ -49,6 +51,7 @@ def _to_result(d: dict) -> RouteResult:
         confidence=float(d.get("confidence", 0.0)),
         rationale=d.get("rationale", ""),
         task_type=d.get("task_type"),
+        raw=d,
     )
 
 
