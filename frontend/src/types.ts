@@ -549,3 +549,28 @@ export interface MemoryStatus {
   detail?: string;
   index?: Record<string, unknown> | null;
 }
+
+// opensrc source fetcher
+export interface OpensrcTreeEntry {
+  path: string;
+  type: "file" | "dir";
+}
+
+export interface OpensrcTree {
+  pkg: string;
+  root: string;
+  entries: OpensrcTreeEntry[];
+  truncated: boolean;
+}
+
+export interface OpensrcFile {
+  pkg: string;
+  path: string;
+  content: string;
+}
+
+export interface OpensrcSearchHit {
+  path: string;
+  line: number;
+  text: string;
+}

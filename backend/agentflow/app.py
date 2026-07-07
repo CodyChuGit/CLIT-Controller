@@ -18,6 +18,7 @@ from .api import (
     routes_context,
     routes_logs,
     routes_memory,
+    routes_opensrc,
     routes_preview,
     routes_projects,
     routes_queue,
@@ -122,6 +123,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_preview.router, prefix="/api/preview", tags=["preview"])
     app.include_router(routes_context.router, prefix="/api/context", tags=["context"])
     app.include_router(routes_memory.router, prefix="/api/memory", tags=["memory"])
+    app.include_router(routes_opensrc.router, prefix="/api/opensrc", tags=["opensrc"])
 
     @app.get("/api/health")
     def health() -> dict:
