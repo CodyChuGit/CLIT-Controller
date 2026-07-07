@@ -6,6 +6,7 @@ export type PageId =
   | "usage"
   | "logs"
   | "memory"
+  | "sources"
   | "settings";
 
 interface NavItem {
@@ -52,6 +53,16 @@ const MAIN_NAV: NavItem[] = [
         <circle cx="18" cy="7" r="2" />
         <circle cx="12" cy="17" r="2" />
         <path d="M7.7 7.2 10.5 15.5M16.7 8.5 13.2 15.7M8 6.4h8" />
+      </>
+    ),
+  },
+  {
+    id: "sources",
+    label: "Sources",
+    icon: (
+      <>
+        <path d="M3 7l9-4 9 4-9 4-9-4z" />
+        <path d="M3 12l9 4 9-4M3 17l9 4 9-4" />
       </>
     ),
   },

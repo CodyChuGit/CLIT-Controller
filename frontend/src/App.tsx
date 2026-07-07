@@ -15,6 +15,7 @@ const PAGE_IDS: PageId[] = [
   "usage",
   "logs",
   "memory",
+  "sources",
   "settings",
 ];
 import AgentsPage from "./pages/AgentsPage";
@@ -22,6 +23,7 @@ import LogsPage from "./pages/LogsPage";
 import PreviewPage from "./pages/PreviewPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import SettingsPage from "./pages/SettingsPage";
+import SourcesPage from "./pages/SourcesPage";
 import TasksPage from "./pages/TasksPage";
 import UsagePage from "./pages/UsagePage";
 import type { CurrentProject, EditorFile, GitInfo, Usage } from "./types";
@@ -306,6 +308,7 @@ export default function App() {
                     <MemoryPage />
                   </Suspense>
                 )}
+                {page === "sources" && <SourcesPage />}
                 {page === "settings" && <SettingsPage />}
               </ErrorBoundary>
             )}
