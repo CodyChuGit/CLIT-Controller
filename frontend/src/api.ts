@@ -17,6 +17,9 @@ import type {
   LoginResult,
   LogsResponse,
   MemoryStatus,
+  OpensrcFile,
+  OpensrcSearchHit,
+  OpensrcTree,
   PreviewState,
   QueueState,
   RunRecord,
@@ -117,6 +120,16 @@ export const api = {
     get<Record<string, unknown>>(`/memory/snippet?qname=${encodeURIComponent(qname)}`),
   memoryTrace: (qname: string, depth = 2) =>
     get<GraphData>(`/memory/trace?qname=${encodeURIComponent(qname)}&depth=${depth}`),
+
+  // opensrc source fetcher
+  opensrcStatus: () => get<{ available: boolean }>("/opensrc/status"),
+  opensrcFetch: (pkg: string) => post<{ pkg: string; path: string }>("/opensrc/fetch", { pkg }),
+  opensrcList: () => get<{ name?: string; path?: string }[]>("/opensrc/list"),
+  opensrcTree: (pkg: string) => get<OpensrcTree>(`/opensrc/tree?pkg=${encodeURIComponent(pkg)}`),
+  opensrcFile: (pkg: string, path: string) =>
+    get<OpensrcFile>(`/opensrc/file?pkg=${encodeURIComponent(pkg)}&path=${encodeURIComponent(path)}`),
+  opensrcSearch: (pkg: string, q: string) =>
+    get<OpensrcSearchHit[]>(`/opensrc/search?pkg=${encodeURIComponent(pkg)}&q=${encodeURIComponent(q)}`),
 
   // agents
   agents: () => get<Provider[]>("/agents"),
