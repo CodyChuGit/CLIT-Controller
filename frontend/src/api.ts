@@ -127,9 +127,13 @@ export const api = {
   opensrcList: () => get<{ name?: string; path?: string }[]>("/opensrc/list"),
   opensrcTree: (pkg: string) => get<OpensrcTree>(`/opensrc/tree?pkg=${encodeURIComponent(pkg)}`),
   opensrcFile: (pkg: string, path: string) =>
-    get<OpensrcFile>(`/opensrc/file?pkg=${encodeURIComponent(pkg)}&path=${encodeURIComponent(path)}`),
+    get<OpensrcFile>(
+      `/opensrc/file?pkg=${encodeURIComponent(pkg)}&path=${encodeURIComponent(path)}`,
+    ),
   opensrcSearch: (pkg: string, q: string) =>
-    get<OpensrcSearchHit[]>(`/opensrc/search?pkg=${encodeURIComponent(pkg)}&q=${encodeURIComponent(q)}`),
+    get<OpensrcSearchHit[]>(
+      `/opensrc/search?pkg=${encodeURIComponent(pkg)}&q=${encodeURIComponent(q)}`,
+    ),
 
   // agents
   agents: () => get<Provider[]>("/agents"),
