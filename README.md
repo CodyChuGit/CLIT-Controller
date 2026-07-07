@@ -51,8 +51,8 @@ you to manage several terminals by hand.
 
 |  |  |
 | --- | --- |
-| ![Memory — the codebase as a 3D knowledge graph](docs/assets/memory-graph.png) | ![Sources — browse any package's real source](docs/assets/sources.png) |
-| **Memory** — this repo indexed into a 3D knowledge graph (via `codebase-memory-mcp`): filter, search, hotspots, and a node drawer with source + callers/callees. | **Sources** — fetch and read any open-source package's real source (via `opensrc`), right next to your workspace. |
+| ![Memory — codebase-memory-mcp's graph viewer embedded](docs/assets/memory-graph.png) | ![Sources — browse any package's real source](docs/assets/sources.png) |
+| **Memory** — this repo's knowledge graph in codebase-memory-mcp's own "galaxy" viewer, embedded right in the tab (filter by node/edge type, search, per-file clusters). | **Sources** — fetch and read any open-source package's real source (via `opensrc`), right next to your workspace. |
 | ![Explorer — workspace, files, git](docs/assets/explorer.png) | ![Usage — traffic control and routing](docs/assets/usage.png) |
 | **Explorer** — workspace picker, file tree, git status/diffs, and live run output. | **Usage** — traffic-control modes, per-provider health, and the engine's routing recommendations. |
 
