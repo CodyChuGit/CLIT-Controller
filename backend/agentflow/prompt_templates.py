@@ -27,7 +27,11 @@ def _compose(usage: dict, task_rel_dir: str, body: str) -> str:
         f"{budget_context_header(usage)}\n\n"
         f"Task folder: {task_rel_dir}/\n"
         "All numbered markdown files mentioned below live in the task folder.\n\n"
-        f"{body.strip()}" + (f"\n\n{pony}" if pony else "")
+        f"{body.strip()}"
+        + (f"\n\n{pony}" if pony else "")
+        + "\n\nReading dependency source: run `opensrc path <pkg>` to fetch + cache any open-source "
+        "package's real source and get a local path (e.g. `opensrc path zod`, "
+        "`opensrc path pypi:requests`, `opensrc path owner/repo`), then read files under it."
     )
 
 
