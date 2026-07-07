@@ -137,6 +137,36 @@ PROVIDERS: list[dict] = [
         "versionCommand": "{exe} --version",
         "statusCommand": None,
     },
+    {
+        # Not a chat agent — a local tool that powers the Memory graph tab.
+        "id": "codebase-memory-mcp",
+        "displayName": "Codebase Memory (graph)",
+        "role": "code knowledge graph",
+        "executableNames": ["codebase-memory-mcp"],
+        "authMode": "none",
+        "usageMode": "free/local",
+        "preferredUse": "index a repo into a queryable knowledge graph (powers the Memory tab)",
+        "installHint": "curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash",
+        "installCommand": "bash -c 'curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash'",
+        "loginCommand": None,
+        "versionCommand": "codebase-memory-mcp --version",
+        "statusCommand": None,
+    },
+    {
+        # Not a chat agent — fetches any package's real source for agents + the Sources tab.
+        "id": "opensrc",
+        "displayName": "opensrc (source fetcher)",
+        "role": "open-source source access",
+        "executableNames": ["opensrc"],
+        "authMode": "none",
+        "usageMode": "free/local",
+        "preferredUse": "fetch any package's real source (npm/pypi/crates/git) for agents to read",
+        "installHint": "npm install -g opensrc  (requires Node >= 24)",
+        "installCommand": "npm install -g opensrc --no-fund --no-audit --cache /tmp/agentflow-npm-cache",
+        "loginCommand": None,
+        "versionCommand": "opensrc --version",
+        "statusCommand": None,
+    },
 ]
 
 PROVIDER_IDS = [p["id"] for p in PROVIDERS]
