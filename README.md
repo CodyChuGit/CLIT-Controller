@@ -60,39 +60,74 @@ The controller uses the deterministic `CLITC_RESULT_V1` protocol for actions.
 Legacy `agentflow-*` directive blocks still work as a compatibility fallback, but
 validated controller actions are the primary mutation path.
 
-## Quick Start
+## Installation
+
+macOS and Linux are supported.
+
+### 1. Prerequisites
+
+| Tool | Version | Install (macOS) |
+| --- | --- | --- |
+| Python | 3.11+ | `brew install python@3.12` |
+| Node.js | 20+ (24+ for the Sources/opensrc tab) | `brew install node` |
+| git | any | `xcode-select --install` |
+
+`gh` (GitHub CLI) is optional but recommended. On Linux, use your package
+manager (`apt install python3 nodejs git`, etc.).
+
+### 2. One-command setup
 
 ```bash
 git clone https://github.com/CodyChuGit/CLIT-Controller.git
 cd CLIT-Controller
-./scripts/install.sh
-./scripts/dev.sh
+make setup     # creates .venv, installs backend (editable) + frontend deps
+make dev       # backend on :8787, Vite dev server on :5180 (hot reload)
 ```
 
-Open `http://localhost:5180`. The backend runs on `http://localhost:8787`.
+Open **http://localhost:5180**. (`make setup` / `make dev` wrap
+`./scripts/install.sh` and `./scripts/dev.sh` — run those directly if you
+prefer. The installer finds Python 3.11+, creates the venv, and retries `npm
+install` with an isolated cache if your `~/.npm` has permission issues.)
 
-Production-style single-port run:
+Single-port, production-style run (built SPA + API on one port):
 
 ```bash
 npm --prefix frontend run build
-AGENTFLOW_PORT=8787 .venv/bin/python -m agentflow
+AGENTFLOW_PORT=8787 .venv/bin/python -m agentflow   # then open http://localhost:8787
 ```
 
-Then open `http://localhost:8787`.
+### 3. Agent CLIs — install at least one
 
-## Required Local Tools
+CLIT Controller drives *your* locally-installed coding CLIs. Install them
+one-click from the **Agents** tab, or by hand:
 
-- Python 3.11+
-- Node.js 20+
-- git
-- Optional but recommended: `gh`
-- At least one agent CLI:
-  - Codex: `npm install -g @openai/codex`
-  - Claude Code: `npm install -g @anthropic-ai/claude-code`
-  - Antigravity: `curl -fsSL https://antigravity.google/cli/install.sh | bash`
+| Agent | Install |
+| --- | --- |
+| Codex | `npm install -g @openai/codex` |
+| Claude Code | `npm install -g @anthropic-ai/claude-code` |
+| Antigravity (`agy`) | `curl -fsSL https://antigravity.google/cli/install.sh \| bash` |
 
-Each provider keeps its own auth. CLIT Controller does not store provider API
-keys, passwords, or tokens.
+Each provider authenticates through its own login/keychain — CLIT Controller
+never stores provider API keys, passwords, or tokens.
+
+### 4. Optional integrations
+
+One-click installable from the **Agents** tab, or:
+
+| Tool | Powers | Install |
+| --- | --- | --- |
+| `codebase-memory-mcp` | the **Memory** knowledge-graph tab | `curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh \| bash` |
+| `opensrc` | the **Sources** tab + agent source access | `npm install -g opensrc` (needs Node 24+) |
+
+The orchestration engine is imported from the `Agent_CLI_Skill` project — point
+`AGENTCLI_CORE_PATH` at its `scripts/` dir, or run `scripts/sync-engine.sh` to
+vendor a snapshot (used automatically as a fallback so CI works without it).
+
+### 5. Verify
+
+```bash
+make verify    # ruff format + lint, mypy, backend pytest, frontend build + vitest
+```
 
 ## Runtime Model
 
