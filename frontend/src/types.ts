@@ -522,3 +522,29 @@ export interface QueueState {
   activeCount: number;
   runningProviders: string[];
 }
+
+// codebase-memory-mcp knowledge graph
+export interface GraphNode {
+  id: string;
+  label: string;
+  name: string;
+  file: string | null;
+  degree: number;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+  type: string;
+}
+
+export interface GraphData {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+export interface MemoryStatus {
+  available: boolean;
+  detail?: string;
+  index?: Record<string, unknown>;
+}
