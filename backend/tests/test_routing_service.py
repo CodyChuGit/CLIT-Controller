@@ -24,6 +24,14 @@ def test_claude_red_recommends_cheaper_route():
     assert any("local tests" in line.lower() for line in rec["lines"])
 
 
+def test_claude_red_with_codex_red_falls_back_to_antigravity():
+    """Claude conserved AND Codex RED -> the engine's spread-first chain routes the
+    recommendation to Antigravity, not a hardcoded Codex."""
+    rec = recommend(usage_with(claude="red", codex="red", antigravity="green"))
+    assert rec["selectedProvider"] == "antigravity"
+    assert rec["cheaperRouteRecommended"] is True
+
+
 def test_claude_yellow_allows_implementation_only():
     rec = recommend(usage_with(claude="yellow"))
     assert rec["cheaperRouteRecommended"] is True

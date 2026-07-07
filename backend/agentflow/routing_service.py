@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import paths
+from .orchestrator import _engine
 from .usage_service import provider_health
 
 MODE_LABELS = {
@@ -34,6 +35,20 @@ def budget_context_header(usage: dict) -> str:
     )
 
 
+def _best_delegate(codex: str, antigravity: str) -> str:
+    """Fallback-aware delegate pick when Claude must be conserved: prefer Codex,
+    then Antigravity, via the engine's spread-first chain (treating RED == exhausted).
+    Falls back to 'codex' as the nominal recommendation if every delegate is RED."""
+    ns = _engine.load()
+    installed = {"codex": True, "antigravity": True, "omlx": False}
+    state: dict = {"agents": {}, "events": {}}
+    for agent, health in (("codex", codex), ("antigravity", antigravity)):
+        if health == "red":
+            state["agents"][agent] = {"status": "exhausted", "cooldown_until": 9_999_999_999}
+    effective, _hops = ns.usage_lib.resolve("codex", installed, state)
+    return effective if effective != "claude" else "codex"
+
+
 def recommend(usage: dict, task_type: str = "feature", diff_size: int | None = None) -> dict:
     """Apply the routing rules to current usage state."""
     mode = usage.get("orchestrationMode", "balanced")
@@ -48,7 +63,7 @@ def recommend(usage: dict, task_type: str = "feature", diff_size: int | None = N
 
     if claude == "red":
         cheaper = True
-        selected = "codex"
+        selected = _best_delegate(codex, antigravity)
         warnings.append("Claude is RED — avoid Claude unless production code changes are strictly required.")
         lines += [
             "Avoid Claude unless production code changes are required.",
