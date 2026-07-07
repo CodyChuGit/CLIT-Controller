@@ -17,6 +17,7 @@ from .api import (
     routes_chat,
     routes_context,
     routes_logs,
+    routes_memory,
     routes_preview,
     routes_projects,
     routes_queue,
@@ -120,6 +121,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_state.router, prefix="/api", tags=["state"])
     app.include_router(routes_preview.router, prefix="/api/preview", tags=["preview"])
     app.include_router(routes_context.router, prefix="/api/context", tags=["context"])
+    app.include_router(routes_memory.router, prefix="/api/memory", tags=["memory"])
 
     @app.get("/api/health")
     def health() -> dict:
