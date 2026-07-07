@@ -1,0 +1,94 @@
+# routing-policy.yaml
+# Tunables and overrides for scripts/route-task.py.
+#
+# The AUTHORITATIVE task_type -> routing-decision table lives inside
+# route-task.py (ROUTE_TABLE) so routing always works even if this file is
+# missing or hand-edited into an invalid state. This file LAYERS on top:
+#   * tunables       - thresholds and toggles
+#   * overrides      - remap any TASK_TYPE to a different routing decision
+#   * intent_hints   - extra keyword phrases for inference when no explicit
+#                      TASK_TYPE is supplied (semantic intent is preferred;
+#                      these are only a fallback signal)
+version: 1
+
+default_decision: HANDLE_WITH_CLAUDE
+
+tunables:
+  # A task estimated to run longer than this gets an oMLX monitor attached.
+  long_running_threshold_seconds: 120
+  # A task expected to emit more log lines than this gets an oMLX monitor.
+  large_log_threshold_lines: 2000
+  add_monitor_for_long_running: true
+  add_monitor_for_large_logs: true
+  # Confidence assigned to each resolution path.
+  confidence_explicit: 0.95
+  confidence_inferred_strong: 0.8
+  confidence_inferred_weak: 0.55
+  confidence_default: 0.4
+
+# Per-TASK_TYPE overrides. Key must be a valid TASK_TYPE; value must be a valid
+# routing decision. Uncomment to change behaviour, e.g. force monitoring on
+# every dependency audit:
+#
+# overrides:
+#   DEPENDENCY_EVALUATION: CODEX_WITH_OMLX_MONITOR
+#   WEB_RESEARCH: CODEX_WITH_OMLX_MONITOR
+overrides:
+
+# Inference fallback. Phrases are matched case-insensitively against the task
+# text and add weight to the listed TASK_TYPE. These EXTEND the defaults baked
+# into route-task.py; they never replace explicit classification.
+intent_hints:
+  LOCAL_ARCHITECTURE:
+    - architecture
+    - system boundary
+    - state machine
+    - data model
+  LOCAL_BACKEND_IMPLEMENTATION:
+    - backend
+    - server endpoint
+    - migration
+    - persistence layer
+  LOCAL_FRONTEND_IMPLEMENTATION:
+    - build the component
+    - new ui
+    - new screen
+  FRONTEND_BUG_FIX:
+    - css bug
+    - layout broken
+    - responsive issue
+    - component broken
+  CODEBASE_SEMANTIC_ANALYSIS:
+    - how does this work
+    - trace the flow
+    - explain the codebase
+  WEB_RESEARCH:
+    - latest
+    - current best practice
+    - look up
+    - research
+  GITHUB_CODE_SEARCH:
+    - find an example
+    - real-world implementation
+  TEST_EXECUTION:
+    - run the tests
+    - run the suite
+  LONG_RUNNING_JOB:
+    - long-running
+    - training run
+    - large export
+    - takes hours
+  GIT_CHECKPOINT:
+    - commit and push
+    - checkpoint
+  APPLE_VERIFICATION:
+    - verify on the simulator
+    - run it on iphone
+    - check the watch app
+  XCODE_PROJECT_SETUP:
+    - xcode project
+    - add a target
+  COMMIT_SUMMARY:
+    - commit message
+  MILESTONE_SUMMARY:
+    - milestone summary

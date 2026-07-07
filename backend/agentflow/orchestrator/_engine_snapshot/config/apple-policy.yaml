@@ -1,0 +1,105 @@
+# apple-policy.yaml
+# Apple platform & Mac development routing (per APPLE_PLATFORM_ROUTING.md).
+# Codex is the SOLE Mac controller: Xcode project setup, xcodebuild builds and
+# tests, the full simctl simulator lifecycle, .xcresult parsing, Swift audits.
+# Claude writes all Swift/SwiftUI code and all tests (unit + XCUITest).
+# Antigravity (Gemini) analyzes the screenshots/recordings Codex captures — it
+# never drives a simulator.
+apple:
+  enabled: true
+  controller: codex
+  swift_author: claude
+  visual_qa: antigravity
+
+  # --- pre-approved (simulators are disposable) ------------------------------
+  preapproved_commands:
+    - xcodebuild -list
+    - xcodebuild build
+    - xcodebuild test
+    - swift build
+    - swift test
+    - xcrun simctl create
+    - xcrun simctl pair
+    - xcrun simctl boot
+    - xcrun simctl install
+    - xcrun simctl launch
+    - xcrun simctl openurl
+    - xcrun simctl push
+    - xcrun simctl ui
+    - xcrun simctl status_bar
+    - xcrun simctl io
+    - xcrun simctl erase
+    - xcrun simctl shutdown
+    - xcrun simctl delete
+    - xcrun xcresulttool
+    - swiftlint
+    - swift-format
+  preapproved_actions:
+    - deleting DerivedData
+    - simulator screenshots, recordings, log capture
+
+  # --- approval-gated (distribution is production) ----------------------------
+  requires_approval:
+    - code signing, provisioning profiles, entitlements, or bundle-id changes
+    - adding or upgrading dependencies (Swift packages included)
+    - downloading Xcode platform SDKs or simulator runtimes
+    - TestFlight / App Store Connect uploads
+    - any operation on a physical device
+    - deleting source files
+
+  # --- default destination matrix (Open Decision 6 defaults) ------------------
+  # visionOS is out of scope until requested; macOS runs natively (no simulator).
+  destinations:
+    ios:
+      primary: latest iPhone simulator
+      layout_check: one iPad simulator
+    tvos:
+      primary: Apple TV 4K simulator
+    watchos:
+      primary: current Apple Watch simulator
+      pair_with_iphone: true            # simctl pair when the watch app has an iOS companion
+    macos:
+      primary: native run (no simulator)
+
+  # Prefer dedicated QA devices over whatever simulator happens to be booted.
+  qa_device_prefix: "orchestrator-qa-"   # e.g. orchestrator-qa-ios
+
+  # --- simulator hygiene -------------------------------------------------------
+  hygiene:
+    erase_between_stateful_runs: true
+    shutdown_after_run: true
+    delete_orphaned_qa_devices: true
+    flaky_retry: 1                       # one retry after shutdown+erase, then report stuck
+  # UI interaction is automated ONLY through Claude-authored XCUITest run by
+  # Codex via `xcodebuild test` — never ad-hoc simctl tap driving.
+  ui_interaction: xcuitest_only
+  # tvOS focus flows are verified via XCUITest (remote simulation) plus
+  # screenshots of key focus states for Gemini.
+  tvos_focus_via_xcuitest: true
+
+  # --- heartbeat (Apple builds are long-running by definition) -----------------
+  stuck_thresholds_seconds:
+    xcodebuild_no_output: 300
+    simulator_boot: 180
+    app_install_launch: 60
+  # phase-weighted progress for multi-platform verification
+  verification_phases:
+    - name: resolve_destinations
+      weight: 5
+    - name: build_all_targets
+      weight: 30
+    - name: unit_tests
+      weight: 20
+    - name: ui_tests_xcuitest
+      weight: 20
+    - name: simulator_visual_qa
+      weight: 15
+    - name: parse_results_report
+      weight: 10
+
+  # --- failure handling --------------------------------------------------------
+  failure:
+    parse_first_hard_error: true         # file:line with minimal context, never the full log
+    signing_errors_stop_and_surface: true
+    # milestone rule applies unchanged: validated test pass on the agreed
+    # destination matrix = a milestone -> summary -> automatic staging push.

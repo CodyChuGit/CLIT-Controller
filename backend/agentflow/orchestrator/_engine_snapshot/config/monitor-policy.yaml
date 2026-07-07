@@ -1,0 +1,76 @@
+# monitor-policy.yaml
+# Long-running job supervision + optional oMLX watchdog.
+#
+# Escalation ladder (cheapest observer first):
+#   Level 0  deterministic supervisor   process state, exit code, files, timestamps, metrics
+#   Level 1  oMLX                        log triage, anomaly detection, repetitive summarization
+#   Level 2  Codex                       operational inspection, reruns, artifact collection (heartbeat owner)
+#   Level 3  Codex deep / agy visual     deep semantic log analysis; agy joins only for browser-visible/visual tasks
+#   Level 4  Claude                      architecture, code changes, debugging, final judgment
+supervisor:
+  runtime_dir: .claude-runtime/jobs
+  default_timeout_seconds: 3600
+  default_inactivity_timeout_seconds: 300
+  metrics_sample_interval_seconds: 5
+  use_process_group: true
+  terminate_grace_seconds: 10
+
+  # Deterministic conditions that recall Claude (Level 0 -> Level 4). These are
+  # computed by code, never by a model.
+  recall_on:
+    - passed
+    - failed
+    - timeout
+    - stalled
+    - missing_artifacts
+    - input_required
+    - milestone            # validated test pass: summary + staging push result
+  # Individual auto-commits do NOT recall Claude — commits are logged as
+  # evidence and surface in milestone summaries, not notifications.
+
+  # Apple-specific stuck thresholds (see config/apple-policy.yaml):
+  #   xcodebuild no output 300s | simulator boot 180s | app install/launch 60s
+
+omlx:
+  # oMLX is OPTIONAL. Disabled by default; the system is fully functional
+  # without it. When it is not loaded (disabled OR unreachable), Codex takes
+  # over the Level-1 triage role (it owns heartbeat supervision) using
+  # deterministic, grep-based operational triage (see fallback_agent). Only if
+  # Codex is ALSO unavailable does triage fall to agy, then to the bare
+  # deterministic supervisor.
+  enabled: false
+  fallback_agent: codex              # who takes over triage when oMLX is off
+  endpoint: http://127.0.0.1:8000
+  model: ""
+  api_style: openai            # openai | anthropic ; detected at runtime
+  health_path: /v1/models
+  analysis_interval_seconds: 60
+  request_timeout_seconds: 30
+  summarize_logs: true
+  detect_stalls: true
+  escalation_enabled: true
+  # oMLX is advisory only. It may classify, summarize and recommend escalation,
+  # but it can NEVER upgrade a deterministically-failed job to "passed".
+  can_override_deterministic_state: false
+  # Deterministic checks oMLX must NOT be used for (normal code handles these).
+  deterministic_only:
+    - pid_state
+    - exit_code
+    - file_existence
+    - artifact_existence
+    - timeout
+    - output_timestamps
+    - cpu_usage
+    - memory_usage
+    - disk_usage
+    - test_counts
+    - command_completion
+  # What oMLX IS for.
+  semantic_tasks:
+    - error_summarization
+    - failure_grouping
+    - likely_cause_classification
+    - log_compression
+    - semantic_anomaly_detection
+    - recall_decision_support
+    - relevant_evidence_selection

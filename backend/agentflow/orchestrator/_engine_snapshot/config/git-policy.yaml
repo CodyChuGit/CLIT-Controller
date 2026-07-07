@@ -1,0 +1,111 @@
+# git-policy.yaml
+# Git workflow + safety (v2, per GIT_WORKFLOW.md). Codex executes every git
+# write; agy (Gemini Flash) writes the commit story; the user gates production.
+# validate-git-operation.py enforces every gate below.
+git:
+  # --- v2 workflow cadence ---------------------------------------------------
+  # Commit after EVERY change unit (a logical, self-contained edit). Commits are
+  # NOT QA-gated; milestones are. A milestone = a validation run that passes.
+  # After each milestone: agy Flash milestone summary -> annotated tag ->
+  # automatic push to the staging surface. Production never moves automatically.
+  automatic_commit: true
+  commit_cadence: EVERY_CHANGE_UNIT
+  push_mode: AFTER_MILESTONE           # was AFTER_ANY_VALID_CHECKPOINT (v1)
+  require_qa_pass_for_commit: false    # change-unit commits are not QA-gated
+  require_qa_pass: true                # pushes (milestones) ARE QA-gated
+
+  # Staging surface: auto commit/push allowed. Production surface: frozen —
+  # every push/merge needs explicit user confirmation in the current session.
+  staging_branch: staging
+  # feature branches targeting staging count as the staging surface
+  staging_surface_patterns:
+    - staging
+    - "feature/*"
+    - "feat/*"
+    - "fix/*"
+  production_branches:
+    - main
+    - master
+    - prod
+    - production
+    - release/*
+  require_user_confirmation_for_production: true
+
+  expected_remote: origin
+  preferred_main_branch: main
+  push_active_branch_when_not_main: true
+  allow_direct_main_push: false        # production frozen (was true in v1)
+  allow_force_push: false
+  allow_history_rewrite: false
+  allow_push_with_failed_qa: false
+  allow_push_with_detected_secrets: false
+  allow_push_during_merge: false
+  allow_push_during_rebase: false
+  allow_push_from_detached_head: false
+  require_upstream_verification: true
+  require_remote_verification: true
+  require_diff_summary: true
+  require_secret_scan: true            # every commit is secret-scanned, always
+  require_branch_verification: true    # Codex verifies the branch before every write
+
+  # --- commit narrative (agy Flash writes; Codex owns what happened) ---------
+  summary:
+    writer: antigravity-flash          # commit-summarizer persona, model tier flash
+    # never block a commit on summary generation:
+    fallback_chain: [antigravity-flash, haiku, wip-marker]
+    wip_subject_format: "wip: {files_changed}"
+    flag_on_fallback: "summary_quality: low"
+    subject_max_chars: 72
+    body_max_lines: 15
+    # if a summary and its diff disagree, the diff wins and the summary is regenerated
+    diff_wins: true
+
+  # --- milestones -------------------------------------------------------------
+  milestone:
+    trigger: VALIDATED_TEST_PASS
+    marker: annotated_tag
+    tag_format: "milestone/{task_id}-{n}"
+    tag_carries_summary: true
+    push_to_staging_after: true        # automatic, no approval needed
+    notify_claude: true                # heartbeat `milestone` event (summary + push result)
+
+  # Conventional Commits by default when the repo's history is compatible.
+  commit_convention: conventional
+  commit_types:
+    - feat
+    - fix
+    - refactor
+    - perf
+    - docs
+    - test
+    - build
+    - ci
+    - chore
+    - style
+    - revert
+
+  # Never run. Only permitted if the user explicitly requests the exact
+  # operation AND policy is changed to allow it.
+  forbidden_commands:
+    - git push --force
+    - git push -f
+    - git push --force-with-lease
+    - git reset --hard
+    - git clean -fd
+    - git checkout -- .
+    - git restore .
+    - git rebase --interactive
+    - git filter-branch
+    - git update-ref -d
+
+  # A change-unit commit is blocked outright when any of these hold.
+  # (failed_required_qa blocks PUSHES, not per-change commits — see cadence.)
+  checkpoint_blockers:
+    - half_finished_implementation
+    - temporary_debug_code
+    - placeholder_logic
+    - merge_conflict
+    - rebase_in_progress
+    - unrelated_mixed_changes
+    - detected_secrets
+    - wrong_branch_surface

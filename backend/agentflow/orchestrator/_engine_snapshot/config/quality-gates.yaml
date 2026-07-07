@@ -1,0 +1,96 @@
+# quality-gates.yaml
+# Delegated work is rejected or retried when any gate fails. Gate ids are
+# referenced by the validate-*.py scripts.
+gates:
+  research:
+    - id: sources_present
+      reject_when: required sources are missing
+    - id: sources_support_claims
+      reject_when: sources do not support the claims made
+    - id: current_info_dated
+      reject_when: current-information claims have no dates
+    - id: comparison_has_multiple_options
+      reject_when: only one candidate considered when a comparison was requested
+    - id: repo_maintenance_checked
+      reject_when: repository maintenance/health was not checked
+    - id: no_archived_without_warning
+      reject_when: archived repositories recommended without warning
+    - id: platform_constraints_respected
+      reject_when: platform constraints ignored
+    - id: inferences_not_facts
+      reject_when: inferences presented as verified facts
+  frontend:
+    - id: findings_have_evidence
+      reject_when: frontend findings lack screenshots/recordings/console/network evidence
+    - id: flows_actually_run
+      reject_when: browser flows were not actually executed
+  filesystem:
+    - id: claimed_files_exist
+      reject_when: claimed created/modified files do not exist
+    - id: only_approved_paths
+      reject_when: unapproved paths were modified
+  qa:
+    - id: tests_not_silently_skipped
+      reject_when: tests were skipped without explanation
+    - id: no_hidden_failures
+      reject_when: failed commands are hidden
+    - id: summary_matches_exit_codes
+      reject_when: a passing summary contradicts raw exit codes
+    - id: artifacts_present
+      reject_when: required artifacts are missing
+  git:
+    - id: git_state_safe
+      reject_when: git state is unsafe
+    - id: no_secrets
+      reject_when: secrets may be present in the diff
+    - id: message_matches_diff
+      reject_when: commit message does not match the actual diff (the diff wins; regenerate the summary)
+    - id: branch_on_staging_surface
+      reject_when: a workflow write targets a production branch without user confirmation
+    - id: milestone_requires_validation
+      reject_when: a milestone tag or staging push happens without a validated test pass
+  apple:
+    - id: destination_results_complete
+      reject_when: a destination in the agreed matrix has no build/test result
+    - id: first_hard_error_extracted
+      reject_when: a failed Apple build returns a raw log instead of the first hard error with file:line
+    - id: xcresult_backs_claims
+      reject_when: a destination is claimed passing without an .xcresult artifact
+    - id: simulator_findings_have_artifacts
+      reject_when: simulator visual findings lack screenshot/recording references
+  monitor:
+    - id: long_job_deterministic_confirmation
+      reject_when: long job declared successful without deterministic confirmation
+  general:
+    - id: grounded_output
+      reject_when: output is generic or not grounded in project context
+    - id: confidence_calibrated
+      reject_when: confidence is high despite unresolved unknowns
+
+# Targeted retry categories. Never retry the same vague prompt unchanged.
+retry:
+  max_attempts: 2
+  categories:
+    - NARROW_SCOPE
+    - MISSING_EVIDENCE
+    - INSUFFICIENT_OPTIONS
+    - OUTDATED_SOURCES
+    - WRONG_PLATFORM
+    - INCOMPLETE_DELIVERABLE
+    - INVALID_FORMAT
+    - UNSUPPORTED_CLAIM
+    - MISSING_BROWSER_EVIDENCE
+    - FAILED_REPRODUCTION
+    - FAILED_VALIDATION
+    - ENVIRONMENT_BLOCKED
+    - UNAPPROVED_FILE_CHANGE
+    - MISSING_ARTIFACT
+    - UNSAFE_GIT_STATE
+  # After retries are exhausted, in order of preference:
+  on_exhaustion:
+    - use_reliable_partial_output
+    - split_the_task
+    - change_persona
+    - escalate_to_another_agent
+    - minimal_local_fallback
+    - report_limitation_honestly
