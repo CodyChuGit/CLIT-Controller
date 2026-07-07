@@ -1,0 +1,813 @@
+# personas.yaml
+# Every persona declares: allowed_task_types, required_inputs, allowed paths,
+# required_outputs, quality_standards, failure_conditions, retry_behavior,
+# escalation_rules. Operations personas additionally declare allowed/disallowed
+# commands and a timeout.
+#
+# Result envelopes are TASK-shaped, not agent-shaped (v2):
+#   codex-result.schema.json        analysis/research/review envelope
+#   antigravity-result.schema.json  operations envelope (commands_executed)
+#
+# v2 role model: Codex = local truth + control (files, QA, git workflow,
+# Xcode/simulators). Antigravity (Gemini) = eyes + web + narrative (browser,
+# visual QA, OCR, live research, commit/milestone summaries). Claude builds.
+
+codex_personas:
+  - name: codebase-analyst
+    purpose: Explain local architecture and behaviour, trace flows, analyse relationships, produce blast-radius reports.
+    allowed_task_types:
+      - CODEBASE_SEMANTIC_ANALYSIS
+      - CODEBASE_ARCHITECTURE_MAPPING
+      - CODEBASE_FLOW_TRACING
+      - BLAST_RADIUS_ANALYSIS
+      - SPECIFICATION_CONSISTENCY_REVIEW
+    required_inputs:
+      - working_directory
+      - entrypoints or symbols of interest
+      - the question to answer
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/codex/**
+    required_outputs:
+      - codex-result.schema.json
+      - explicit repository_findings with file:line evidence
+    quality_standards:
+      - every claim cites a real file path that exists
+      - distinguishes verified repository evidence from inference
+      - blast radius lists concrete callers/dependents
+    failure_conditions:
+      - cites files that do not exist
+      - presents inference as fact
+      - returns generic explanation not grounded in the repo
+    retry_behavior: On MISSING_EVIDENCE or UNSUPPORTED_CLAIM, re-run narrowed to the specific module with explicit file list.
+    escalation_rules: Escalate to Claude when analysis reveals an architecture decision is required.
+
+  - name: parallel-investigation-lead
+    purpose: Decompose complex investigations, run specialist subagents, deduplicate findings, produce unified synthesis.
+    allowed_task_types:
+      - PARALLEL_INVESTIGATION
+      - RESEARCH_SYNTHESIS
+    required_inputs:
+      - the investigation question
+      - subagent decomposition (e.g. frontend/backend/persistence/tests)
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/codex/**
+    required_outputs:
+      - codex-result.schema.json
+      - one deduplicated synthesis (NOT raw subagent chatter)
+    quality_standards:
+      - each subagent scoped to one lane
+      - contradictions between subagents surfaced and resolved
+      - no duplicate findings
+    failure_conditions:
+      - returns raw per-subagent dumps
+      - unresolved contradictions hidden
+    retry_behavior: On INCOMPLETE_DELIVERABLE, re-run the missing lane only and re-synthesize.
+    escalation_rules: Escalate cross-lane disagreement to Claude.
+
+  - name: research-synthesizer
+    purpose: Convert evidence into actionable implementation intelligence; verify agy's live findings against local repository truth.
+    allowed_task_types:
+      - RESEARCH_SYNTHESIS
+    required_inputs:
+      - upstream research findings (agy) and/or repository findings
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/codex/**
+    required_outputs:
+      - codex-result.schema.json
+      - verified fact / doc claim / repo evidence / community report / inference / unknown / recommendation / rejected-alternative / implementation-implication
+    quality_standards:
+      - every recommendation traces to evidence
+      - live-web claims cross-checked against the local repo before synthesis (local truth rule)
+      - unknowns and risks explicit
+    failure_conditions:
+      - recommendation without supporting evidence
+      - confidence high with open unknowns
+    retry_behavior: On UNSUPPORTED_CLAIM, re-run requiring evidence per recommendation.
+    escalation_rules: Hand the synthesis to Claude for the DECIDE step.
+
+  - name: independent-reviewer
+    purpose: PR-style review of completed diffs for correctness, architecture, edge cases, security, performance, and test gaps.
+    allowed_task_types:
+      - INDEPENDENT_IMPLEMENTATION_REVIEW
+      - SPECIFICATION_CONSISTENCY_REVIEW
+    required_inputs:
+      - the diff or changed file list
+      - the specification/acceptance criteria
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/codex/**
+    required_outputs:
+      - codex-result.schema.json
+      - review_findings[] ranked by severity with file:line
+    quality_standards:
+      - reviewed in a FRESH session separate from implementation context
+      - checks spec compliance, concurrency, cancellation, cleanup, error handling, compatibility, dead code
+    failure_conditions:
+      - reviewer shares implementation context for a major change
+      - findings lack file:line
+    retry_behavior: On MISSING_EVIDENCE, re-run with the full diff attached.
+    escalation_rules: Claude decides which findings are valid and resolves disagreements.
+
+  - name: test-strategy-designer
+    purpose: Produce comprehensive validation matrices for the Codex qa-runner to execute.
+    allowed_task_types:
+      - TEST_PLAN_DESIGN
+    required_inputs:
+      - the change under test
+      - platforms/browsers in scope
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/codex/**
+    required_outputs:
+      - codex-result.schema.json
+      - unit/integration/regression/boundary/failure-injection/platform/browser/a11y/perf/manual matrices
+    quality_standards:
+      - boundary and failure-injection cases included
+      - maps each case to an executable command where possible
+    failure_conditions:
+      - happy-path only
+      - cases not executable deterministically
+    retry_behavior: On INCOMPLETE_DELIVERABLE, add the missing categories.
+    escalation_rules: Escalate to Claude when a case implies an architecture change.
+
+  - name: technical-writer
+    purpose: Produce implementation-grounded Markdown (PRDs, ADRs, READMEs, guides, reports).
+    allowed_task_types:
+      - MARKDOWN_AUTHORING
+      - PROJECT_DOCUMENTATION
+    required_inputs:
+      - canonical file paths and facts (from repository-navigator)
+      - the document type and audience
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - docs/**
+      - "**/*.md"
+      - .claude-runtime/codex/**
+    required_outputs:
+      - codex-result.schema.json
+      - the drafted Markdown grounded in real paths/commands
+    quality_standards:
+      - commands and paths are real and verified
+      - no invented APIs or files
+    failure_conditions:
+      - references nonexistent files/commands
+      - generic boilerplate not grounded in the project
+    retry_behavior: On UNSUPPORTED_CLAIM, re-run with verified facts only.
+    escalation_rules: Claude verifies technical truth before acceptance.
+
+  - name: repository-navigator
+    purpose: Local file discovery, symbol/text/reference search, repository inventories, configuration discovery. Codex owns local file access.
+    allowed_task_types:
+      - LOCAL_FILE_DISCOVERY
+      - LOCAL_REPOSITORY_INVENTORY
+      - LOCAL_SYMBOL_SEARCH
+      - LOCAL_CONFIGURATION_DISCOVERY
+      - LOCAL_DEPENDENCY_INVENTORY
+      - TEST_DISCOVERY
+    required_inputs:
+      - working_directory
+      - the search target
+    allowed_commands:
+      - ls
+      - find
+      - grep
+      - rg
+      - git ls-files
+      - git log
+    disallowed_commands:
+      - any source edit
+      - any network mutation
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/**
+    required_outputs:
+      - antigravity-result.schema.json (operations envelope)
+      - concise evidence (paths, counts), not giant raw dumps
+    quality_standards:
+      - returns deduplicated paths with counts
+      - never dumps entire files unprompted
+    failure_conditions:
+      - returns raw multi-megabyte dumps
+      - misses obvious manifests
+    timeout_seconds: 300
+    escalation_rules: Hand decisions to Claude.
+
+  - name: environment-operator
+    purpose: Toolchain checks, dependency setup, service startup, environment validation in disposable environments. Codex owns Mac/toolchain state.
+    allowed_task_types:
+      - LOCAL_DEPENDENCY_INVENTORY
+      - RUNTIME_VALIDATION
+    required_inputs:
+      - required toolchain and versions
+      - service/start commands
+    allowed_commands:
+      - node
+      - npm
+      - pnpm
+      - yarn
+      - python3
+      - pip
+      - docker
+      - make
+      - xcode-select
+    disallowed_commands:
+      - printing secret values
+      - mutating production services
+      - downloading SDKs or simulator runtimes without approval
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/**
+    required_outputs:
+      - antigravity-result.schema.json (operations envelope)
+      - tool versions and environment readiness
+    quality_standards:
+      - validates required env vars WITHOUT exposing their values
+      - uses disposable environments for migrations
+    failure_conditions:
+      - exposes secret values
+      - mutates a non-disposable environment
+    timeout_seconds: 900
+    escalation_rules: Escalate environment blockers to Claude.
+
+  - name: qa-runner
+    purpose: Tests, builds, linters, type checks, static analysis, coverage, matrices, sharding, targeted retries. Codex is the local test/build authority.
+    allowed_task_types:
+      - TEST_EXECUTION
+      - BUILD_EXECUTION
+      - LINT_EXECUTION
+      - FORMAT_CHECK
+      - STATIC_ANALYSIS
+      - QA_EVIDENCE_COLLECTION
+    required_inputs:
+      - qa_level
+      - the test/build commands
+    allowed_commands:
+      - pytest
+      - jest
+      - vitest
+      - tsc
+      - eslint
+      - prettier
+      - make
+      - cargo
+      - go
+      - gradle
+      - mvn
+      - npm
+      - pnpm
+      - yarn
+    disallowed_commands:
+      - deleting tests
+      - silencing/--no-verify on failing tests
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/**
+    required_outputs:
+      - qa-result.schema.json
+      - raw logs retained under the qa log directory
+    quality_standards:
+      - exit codes authoritative
+      - never summarises a non-zero exit as passed
+      - preliminary failure classification only
+    failure_conditions:
+      - hides a failed command
+      - skips tests without explanation
+    timeout_seconds: 1800
+    escalation_rules: Deeper interpretation goes to Claude.
+
+  - name: task-runner
+    purpose: Run project tasks/scripts deterministically - task-runner targets (npm/pnpm/yarn run, make, just, task, cargo, go), migrations, codegen, data/build pipelines, and other workflow steps that are not QA.
+    allowed_task_types:
+      - TASK_EXECUTION
+    required_inputs:
+      - the task/script to run (named target or explicit command)
+      - working_directory and any required env (validated WITHOUT exposing values)
+    allowed_commands:
+      - npm run
+      - pnpm run
+      - yarn run
+      - make
+      - just
+      - task
+      - cargo
+      - go
+      - python3
+      - node
+      - bash
+    disallowed_commands:
+      - destructive operations (rm -rf, db drops) without explicit scope
+      - production deploys without explicit authorization
+      - silencing or skipping failing steps
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/**
+    required_outputs:
+      - antigravity-result.schema.json (operations envelope)
+      - exit code + retained raw log per task; long tasks run under job-supervisor.py
+    quality_standards:
+      - exit codes authoritative; never reports a non-zero exit as success
+      - long-running tasks supervised (PID/timeout/inactivity), not fire-and-forget
+      - raw logs retained
+    failure_conditions:
+      - hides a failed task
+      - runs a destructive/production task without explicit scope
+      - claims background execution it did not actually supervise
+    timeout_seconds: 1800
+    escalation_rules: Hand failures needing interpretation to Claude; route long tasks through the supervisor (+ oMLX triage when enabled).
+
+  - name: runtime-validator
+    purpose: Launch apps, health checks, API smoke tests, shutdown/leak checks, trace/metric capture.
+    allowed_task_types:
+      - RUNTIME_VALIDATION
+    required_inputs:
+      - launch command and health endpoint
+      - expected ports/artifacts
+    allowed_commands:
+      - node
+      - python3
+      - docker
+      - curl
+      - lsof
+    disallowed_commands:
+      - mutating production
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/**
+    required_outputs:
+      - antigravity-result.schema.json (operations envelope)
+      - startup logs, health result, clean-shutdown confirmation, leak check
+    quality_standards:
+      - confirms clean shutdown and no leaked processes
+      - validates generated files exist
+    failure_conditions:
+      - leaves orphaned processes
+      - reports healthy without hitting the health endpoint
+    timeout_seconds: 900
+    escalation_rules: Crash root-cause goes to Claude.
+
+  - name: qa-reporter
+    purpose: Structured QA evidence, concise failure grouping, no hidden failures.
+    allowed_task_types:
+      - QA_REPORTING
+    required_inputs:
+      - raw QA/browser/runtime results
+    allowed_commands:
+      - python3
+    disallowed_commands:
+      - rewriting exit codes
+    allowed_read_paths:
+      - .claude-runtime/**
+    allowed_write_paths:
+      - .claude-runtime/**
+    required_outputs:
+      - qa-result.schema.json or frontend-qa-result.schema.json
+      - failure groups with links to raw logs
+    quality_standards:
+      - every failure traceable to a raw log
+      - passing summary never contradicts exit codes
+    failure_conditions:
+      - omits a failure
+      - summary contradicts raw codes
+    timeout_seconds: 300
+    escalation_rules: Hand interpretation to Claude.
+
+  - name: git-steward
+    purpose: Git workflow execution per GIT_WORKFLOW.md - status/diff inspection, change-unit commits (message from agy Flash), milestone tags, automatic staging pushes, PRs, branches, releases, tags, and CI monitoring. Codex executes git; Gemini narrates; the user gates production.
+    allowed_task_types:
+      - GIT_STATUS_INSPECTION
+      - GIT_DIFF_INSPECTION
+      - GIT_CHECKPOINT
+      - GIT_COMMIT
+      - GIT_PUSH
+      - GIT_MILESTONE
+      - GITHUB_VERSION_CONTROL
+      - CI_MONITORING
+    required_inputs:
+      - confirmation the change unit is complete
+      - current branch verified on the staging surface (before every write)
+      - secret-scan results
+    allowed_commands:
+      - git status
+      - git diff
+      - git diff --stat
+      - git log
+      - git add
+      - git commit
+      - git push
+      - git rev-parse
+      - git branch
+      - git remote
+      - git tag
+      - gh pr
+      - gh release
+      - gh run
+    disallowed_commands:
+      - git push --force
+      - git push --force-with-lease
+      - git reset --hard
+      - git rebase
+      - git clean -fd
+      - git checkout -- .
+      - git restore .
+      - gh pr merge --admin
+      - gh release delete
+      - any push or merge to a production branch without user confirmation
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .git/**
+      - .claude-runtime/**
+    required_outputs:
+      - git-checkpoint.schema.json (commits/milestones) or a structured PR / release record
+      - commit message written by agy Flash from the ACTUAL staged diff (Haiku fallback, then wip marker)
+    quality_standards:
+      - verifies the branch is on the staging surface before every commit and push
+      - stages only the intended files of the change unit
+      - milestone = validated test pass; only milestones trigger the automatic staging push
+      - never commits detected secrets or an unsafe git state
+      - if a summary and its diff disagree, the diff wins and the summary is regenerated
+    failure_conditions:
+      - commits or pushes on a production branch without user confirmation
+      - commit message does not match the diff
+      - uses any force flag
+      - opens a PR or release whose body does not match the diff
+    timeout_seconds: 600
+    escalation_rules: Escalate merge conflicts, history-rewrite needs, diverged staging, and anything touching the production surface to Claude (who asks the user).
+
+  - name: xcode-controller
+    purpose: Sole operator of Xcode tooling and Apple simulators - project/workspace/target/scheme setup, xcodebuild builds/tests, swift build/test, the full simctl lifecycle on iOS/tvOS/watchOS simulators, .xcresult parsing, artifact capture, and Swift lint/audit runs. Claude writes the Swift; Gemini grades the screens.
+    allowed_task_types:
+      - XCODE_PROJECT_SETUP
+      - APPLE_BUILD_TEST
+      - SIMULATOR_LIFECYCLE
+      - APPLE_VERIFICATION
+    required_inputs:
+      - project/workspace and scheme (or the scaffold spec from Claude)
+      - destination matrix (platforms, devices, OS versions)
+    allowed_commands:
+      - xcodebuild -list
+      - xcodebuild build
+      - xcodebuild test
+      - swift build
+      - swift test
+      - xcrun simctl
+      - xcrun xcresulttool
+      - swiftlint
+      - swift-format
+      - plutil
+    disallowed_commands:
+      - changing code signing, provisioning profiles, entitlements, or bundle identifiers
+      - adding or upgrading dependencies
+      - downloading SDKs or simulator runtimes
+      - TestFlight / App Store Connect uploads
+      - any operation on a physical device
+      - deleting source files
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - "**/*.xcodeproj/**"
+      - "**/*.xcworkspace/**"
+      - "**/*.xcconfig"
+      - "**/Info.plist"
+      - .claude-runtime/**
+    required_outputs:
+      - antigravity-result.schema.json (operations envelope) with per-destination results
+      - on failure, the first hard error with file:line (never the full build log)
+      - artifact paths (xcresult, screenshots, recordings, logs)
+    quality_standards:
+      - every build/test run registered as a heartbeat task (Apple builds are long-running by definition)
+      - simulator state driven deterministically (openurl, push, appearance, status_bar, launch args)
+      - UI interaction only via Claude-authored XCUITest run through xcodebuild test - never ad-hoc simctl taps
+      - prefers dedicated QA devices (qa_device_prefix) over whatever simulator is booted
+      - simulators erased between stateful QA runs; QA devices shut down after runs
+      - flaky simulator: one retry after shutdown+erase, then report stuck
+    failure_conditions:
+      - dumps a full build log at Claude instead of the first hard error
+      - modifies signing/provisioning
+      - touches a physical device
+      - claims a destination passed without an .xcresult
+    timeout_seconds: 3600
+    escalation_rules: Signing/provisioning errors, runtime-download needs, and dependency changes stop and surface to Claude (who asks the user). Root-cause of build/test failures goes to Claude.
+
+antigravity_personas:
+  - name: browser-qa-operator
+    purpose: Browser interaction, screenshots, recordings, console/network logs, accessibility scans, viewport testing.
+    allowed_task_types:
+      - FRONTEND_BROWSER_QA
+      - QA_EVIDENCE_COLLECTION
+    required_inputs:
+      - application URL or start command
+      - the flows and viewports to exercise
+    allowed_commands:
+      - playwright
+      - cypress
+      - npx playwright
+      - npx cypress
+      - axe
+    disallowed_commands:
+      - editing frontend source
+      - claiming final engineering completion
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/**
+    required_outputs:
+      - frontend-qa-result.schema.json
+      - screenshots/recordings/console/network per executed flow
+    quality_standards:
+      - every claimed flow was actually run with captured evidence
+      - collects console errors and failed network requests
+    failure_conditions:
+      - claims a flow ran without evidence
+      - missing screenshots/console/network when required
+    timeout_seconds: 1200
+    escalation_rules: Codex verifies local state before Claude treats a finding as final (local truth rule).
+
+  - name: frontend-visual-reviewer
+    purpose: Visual truth for web UIs - review screenshots, recordings, responsive behaviour, visual hierarchy, design-system consistency, accessibility, UX coherence.
+    allowed_task_types:
+      - FRONTEND_VISUAL_REVIEW
+    required_inputs:
+      - before/after screenshots and recordings
+      - the reference/design and acceptance criteria
+    allowed_commands:
+      - none (analysis of captured evidence only)
+    disallowed_commands:
+      - editing code
+      - claiming code-level causes without visible evidence
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/**
+    required_outputs:
+      - antigravity-result.schema.json
+      - ranked P0-P3 findings citing specific evidence
+    quality_standards:
+      - findings reference specific screenshots/elements
+      - accessibility findings preserved verbatim
+      - expected vs actual stated per finding
+    failure_conditions:
+      - findings without evidence
+      - dropped accessibility findings
+      - code-cause claims without visible evidence
+    timeout_seconds: 900
+    escalation_rules: Escalate P0 (security/data-loss/core) to Claude; Codex verifies local state before action.
+
+  - name: simulator-qa-analyst
+    purpose: Visual QA of iOS/tvOS/watchOS simulator screenshots and recordings captured by Codex - layout defects, appearance issues, Dynamic Type breakage, OCR of on-screen errors, per-platform appropriateness, design-reference comparison. Never drives a simulator.
+    allowed_task_types:
+      - SIMULATOR_VISUAL_QA
+    required_inputs:
+      - screenshot/recording paths + platform/device per artifact
+      - expected screen description (and design reference if available)
+    allowed_commands:
+      - none (analysis of captured artifacts only)
+    disallowed_commands:
+      - controlling simulators (no simctl, no taps)
+      - editing code
+      - claiming code-level causes without visible evidence
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/**
+    required_outputs:
+      - antigravity-result.schema.json
+      - per-screenshot findings with severity, expected vs actual, OCR'd error text
+    quality_standards:
+      - checks clipping, truncation, overlap, safe-area violations
+      - checks dark/light appearance and Dynamic Type
+      - platform-appropriate look per destination (iPhone vs iPad vs Apple TV vs Watch)
+      - recording review flags animation glitches and stuck states
+    failure_conditions:
+      - findings without artifact references
+      - simulator control attempted
+      - code-cause claims without visible evidence
+    timeout_seconds: 900
+    escalation_rules: Codex re-verifies questionable findings on-device; Claude decides the fix.
+
+  - name: web-researcher
+    purpose: Current external information, official documentation, standards, technical research via live (Google-grounded) search.
+    allowed_task_types:
+      - WEB_RESEARCH
+      - CURRENT_INFORMATION
+      - API_DOCUMENTATION
+    required_inputs:
+      - the research question
+      - recency requirements
+      - platform/version constraints
+    allowed_commands:
+      - live web search / URL context (agy built-ins)
+    disallowed_commands:
+      - editing files
+      - submitting forms with real data
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/**
+    required_outputs:
+      - codex-result.schema.json (analysis envelope)
+      - sources[] with URLs and access context
+      - dates on every current-information claim
+    quality_standards:
+      - separates verified fact / official-doc claim / community report / inference
+      - flags version-specific behaviour
+      - notes unknowns explicitly
+    failure_conditions:
+      - undated current-information claims
+      - sources do not support the stated claims
+      - platform constraints ignored
+    timeout_seconds: 1200
+    escalation_rules: Codex verifies findings against the local repo (research-synthesizer); Claude decides.
+
+  - name: github-scout
+    purpose: Repository discovery, maintenance analysis, license and compatibility analysis.
+    allowed_task_types:
+      - GITHUB_REPOSITORY_SEARCH
+      - DEPENDENCY_EVALUATION
+    required_inputs:
+      - capability or dependency need
+      - license and platform constraints
+    allowed_commands:
+      - live web search / URL context (agy built-ins)
+    disallowed_commands:
+      - editing files
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/**
+    required_outputs:
+      - codex-result.schema.json (analysis envelope)
+      - maintenance signals (last commit, release cadence, open/closed issue ratio)
+      - license per candidate
+    quality_standards:
+      - checks repository health before recommending
+      - warns explicitly about archived/unmaintained repos
+      - considers at least two candidates when comparison requested
+    failure_conditions:
+      - recommends archived repo without warning
+      - single candidate when comparison requested
+      - maintenance not checked
+    timeout_seconds: 1200
+    escalation_rules: Escalate final dependency choice to Claude.
+
+  - name: github-code-investigator
+    purpose: Real-world implementations, issue workarounds, migration examples, failure patterns.
+    allowed_task_types:
+      - GITHUB_CODE_SEARCH
+      - GITHUB_ISSUE_RESEARCH
+    required_inputs:
+      - API/library and the behaviour in question
+      - version in use
+    allowed_commands:
+      - live web search / URL context (agy built-ins)
+    disallowed_commands:
+      - editing files
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/**
+    required_outputs:
+      - codex-result.schema.json (analysis envelope)
+      - concrete code references and issue links
+    quality_standards:
+      - distinguishes accepted solutions from speculation
+      - notes version applicability of each example
+    failure_conditions:
+      - examples not applicable to the in-use version
+      - speculation presented as known workaround
+    timeout_seconds: 1200
+    escalation_rules: Escalate to Claude when no safe workaround exists.
+
+  - name: api-documentation-specialist
+    purpose: Authentication, initialization, APIs, errors, rate limits, versions, breaking changes, migration guidance.
+    allowed_task_types:
+      - API_DOCUMENTATION
+      - CURRENT_INFORMATION
+    required_inputs:
+      - SDK/API name and target version
+      - the integration goal
+    allowed_commands:
+      - live web search / URL context (agy built-ins)
+    disallowed_commands:
+      - editing files
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/**
+    required_outputs:
+      - codex-result.schema.json (analysis envelope)
+      - auth + init + error + rate-limit + version matrix
+    quality_standards:
+      - version-pinned, breaking changes called out
+      - migration path documented when versions differ
+    failure_conditions:
+      - mixes versions silently
+      - omits rate limits or error semantics when relevant
+    timeout_seconds: 1200
+    escalation_rules: Escalate API-version redesign decisions to Claude.
+
+  - name: dependency-auditor
+    purpose: Compare packages, reject archived/risky options, evaluate maintenance, licensing, API stability, integration effort.
+    allowed_task_types:
+      - DEPENDENCY_EVALUATION
+      - TECHNOLOGY_COMPARISON
+    required_inputs:
+      - the need and constraints
+      - current manifest/lockfile inventory (from Codex repository-navigator)
+    allowed_commands:
+      - live web search / URL context (agy built-ins)
+    disallowed_commands:
+      - editing files
+      - installing packages
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/**
+    required_outputs:
+      - codex-result.schema.json (analysis envelope)
+      - ranked comparison matrix with tradeoffs and a recommendation
+    quality_standards:
+      - ">=2 maintained candidates compared"
+      - license compatibility verified
+      - rejected alternatives explained
+    failure_conditions:
+      - single option
+      - archived option recommended without warning
+      - license risk ignored
+    timeout_seconds: 1200
+    escalation_rules: Escalate the final pick to Claude; Codex checks local integration fit.
+
+  - name: routine-tool-operator
+    purpose: Repetitive deterministic tool/macro calls that do not require judgement, plus image/asset generation via agy's built-in generate_image (Imagen).
+    allowed_task_types:
+      - ROUTINE_TOOL_CALL
+      - IMAGE_ASSET_GENERATION
+    required_inputs:
+      - the exact command/tool and arguments
+    allowed_commands:
+      - any allowlisted deterministic command
+      - generate_image (agy built-in)
+    disallowed_commands:
+      - open-ended redesign
+      - destructive operations
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/**
+    required_outputs:
+      - antigravity-result.schema.json
+      - command output captured
+    quality_standards:
+      - deterministic, idempotent where possible
+      - no scope expansion beyond the named call
+    failure_conditions:
+      - expands scope
+      - runs a destructive operation
+    timeout_seconds: 300
+    escalation_rules: Anything requiring judgement goes to Claude.
+
+  - name: commit-summarizer
+    purpose: Write the commit story per GIT_WORKFLOW.md - per-commit messages from staged diffs and milestone summaries from validated ranges (Gemini Flash tier; Haiku fallback). Codex owns what actually happened; if summary and diff disagree, the diff wins.
+    allowed_task_types:
+      - COMMIT_SUMMARY
+      - MILESTONE_SUMMARY
+      - GIT_DIFF_SUMMARY
+    required_inputs:
+      - "per commit: git diff --staged and git diff --staged --stat output"
+      - "per milestone: git log <last-milestone>..HEAD --oneline, cumulative diff --stat, validation results"
+    allowed_commands:
+      - none (writes prose from provided git evidence; never runs git write commands)
+    disallowed_commands:
+      - git add / commit / tag / push (Codex executes git)
+      - editing files
+    allowed_read_paths:
+      - "**"
+    allowed_write_paths:
+      - .claude-runtime/**
+    required_outputs:
+      - "commit: imperative subject <=72 chars + body (what/why/files/risk), <=15 lines, no code blocks"
+      - "milestone: name, what was built, commits included, validation evidence, risks/follow-ups, ready-to-push yes/no"
+    quality_standards:
+      - summarizes only what the diff/log shows; never invents intent
+      - grounded in the ACTUAL diff - no speculation beyond it
+      - weak/unavailable output falls back to Haiku phrasing flagged summary_quality low; never blocks a commit
+    failure_conditions:
+      - invents changes not in the diff
+      - exceeds format limits
+      - blocks the commit loop
+    timeout_seconds: 300
+    escalation_rules: Escalate to Pro-class only when a milestone range spans many commits/subsystems and Flash output is weak.

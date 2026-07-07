@@ -1,0 +1,84 @@
+# frontend-policy.yaml
+# Default frontend flow (v2):
+#   Antigravity Browser QA -> CLAUDE Implementer -> Codex Regression
+#   -> Antigravity Visual Review -> Codex Git Steward (change-unit commit)
+frontend:
+  browser_operator: antigravity
+  implementer: claude            # Claude writes ALL frontend code
+  regression_runner: codex       # Codex re-runs the failed flow + regression suite
+  visual_reviewer: antigravity   # Gemini owns visual truth (agy judges the screens)
+  independent_reviewer: codex_fresh_session   # PR-style diff review stays with Codex
+  git_steward: codex             # Codex commits the change unit per GIT_WORKFLOW
+  core_escalation_agent: claude
+
+  require_before_after_evidence: true
+  require_accessibility_checks: true
+  require_console_check: true
+  require_network_check: true
+  require_regression_after_fix: true
+
+  # Paths Codex may edit during a FRONTEND task. Discover real repo paths per
+  # project and adjust (see scripts/detect-capabilities.sh repo profiling).
+  approved_frontend_patterns:
+    - frontend/**
+    - web/**
+    - app/**
+    - src/components/**
+    - src/features/**
+    - src/pages/**
+    - src/routes/**
+    - src/styles/**
+    - src/ui/**
+    - tests/frontend/**
+    - tests/e2e/**
+    - "**/*.css"
+    - "**/*.scss"
+    - "**/*.tsx"
+    - "**/*.jsx"
+    - "**/*.vue"
+    - "**/*.svelte"
+
+  protected_patterns:
+    - backend/**
+    - server/**
+    - database/**
+    - migrations/**
+    - infrastructure/**
+    - auth/core/**
+    - secrets/**
+
+  # Severity -> behaviour. P0 always escalates to Claude.
+  severity:
+    P3:
+      label: cosmetic
+      handler: claude
+      requires_regression: false
+      escalate_to_claude: false
+    P2:
+      label: normal usability issue
+      handler: claude
+      requires_regression: true
+      escalate_to_claude: false
+    P1:
+      label: workflow-breaking
+      handler: claude
+      requires_regression: true
+      escalate_to_claude: false
+      escalate_if_backend_or_security: true
+    P0:
+      label: security/data-loss/cross-system/core-architecture
+      handler: claude
+      requires_regression: true
+      escalate_to_claude: true
+
+  # When frontend work crosses into these, escalate to Claude regardless of P-level.
+  escalation_triggers:
+    - authentication architecture
+    - backend contracts
+    - persistence
+    - security-sensitive logic
+    - major state-management redesign
+    - cross-process synchronization
+    - data-model changes
+    - api-version redesign
+    - system-wide architecture

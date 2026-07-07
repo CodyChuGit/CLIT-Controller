@@ -1,0 +1,86 @@
+# fallback-policy.yaml
+# The overriding goal of this skill: PRESERVE CLAUDE TOKENS by delegating the
+# expensive, token-heavy grinding (research, doc generation, codebase analysis,
+# QA, ops, monitoring) to the cheaper agents, and SPREAD usage across agents/
+# accounts. Claude keeps only token-cheap final judgment (architecture, accept/
+# reject) and is the CAPACITY fallback of last resort - it takes over only when
+# the delegate agents are unavailable or out of usage.
+#
+# Two independent reasons an agent can't take work:
+#   * not installed         (capabilities.json - detect-capabilities.sh)
+#   * out of usage/quota    (agent-usage.json - exhaustion, with a cooldown)
+# "usable" = installed AND not exhausted. Routing walks a role's chain to the
+# first usable agent; if none, Claude takes over.
+version: 1
+
+preserve_claude_tokens: true
+delegate_by_default: true
+
+# Role -> ordered fallback chain (first usable agent wins; claude is the implicit
+# and explicit final fallback). v2 role model:
+#   - Codex owns local ops/QA/git/Apple; agy backs it up
+#   - agy (Gemini) owns live research + visual QA + summaries; Codex backs it up
+#   - oMLX not available/out -> Codex takes over triage (it supervises heartbeats)
+#   - all agents out         -> Claude takes over everything
+chains:
+  research:   [antigravity, codex, claude]          # live web research / visual QA / summaries (Gemini's lane)
+  analysis:   [codex, antigravity, claude]          # codebase analysis / review / synthesis / docs (Codex's lane)
+  frontend:   [antigravity, codex, claude]          # visual review (agy judges; Codex verifies locally)
+  operations: [codex, antigravity, claude]          # discovery / QA / runtime / git workflow / Apple / tasks
+  monitoring: [omlx, codex, antigravity, claude]    # long-job triage / log compression
+
+# Which chain each primary agent's work belongs to (used to find the fallback
+# chain when an agent is exhausted, regardless of the original routing label).
+agent_roles:
+  codex: operations
+  antigravity: research
+  omlx: monitoring
+  claude: analysis
+
+# Exhaustion: when a delegate CLI signals it is out of quota / rate-limited, mark
+# it exhausted for a cooldown so routing skips it; after the cooldown it is
+# retried. If a reset time is parseable from the message we use it; else the
+# default cooldown.
+exhaustion:
+  default_cooldown_seconds: 3600        # 1h; agents typically reset on the hour/day
+  state_file: .claude-runtime/agent-usage.json
+  # Case-insensitive regexes scanned in an agent's stderr/stdout. A match marks
+  # that agent exhausted. Keep these broad - a false "exhausted" only costs a
+  # fallback hop, while a missed one wastes a real failed call.
+  signals:
+    codex:
+      - "rate.?limit"
+      - "quota"
+      - "usage limit"
+      - "insufficient_quota"
+      - "\\b429\\b"
+      - "too many requests"
+      - "you (?:have|'ve)? ?(?:reached|hit|exceeded).{0,40}limit"
+      - "plan limit"
+      - "upgrade your plan"
+    antigravity:
+      - "rate.?limit"
+      - "quota"
+      - "resource.?exhausted"
+      - "\\b429\\b"
+      - "too many requests"
+      - "RESOURCE_EXHAUSTED"
+      - "usage limit"
+      - "out of (?:credits|quota)"
+    omlx:
+      - "out of memory"
+      - "model not loaded"
+      - "\\b503\\b"
+      - "connection refused"
+      - "overloaded"
+  # Patterns that look like a transient reset hint, e.g. "try again in 23m" or
+  # "resets at 14:00". Parsed best-effort to set a shorter, accurate cooldown.
+  reset_hint_patterns:
+    - "try again in (\\d+) ?(s|sec|seconds|m|min|minutes|h|hours)"
+    - "resets? in (\\d+) ?(s|sec|seconds|m|min|minutes|h|hours)"
+
+# Token-preservation accounting (motivational; counts are exact, the token
+# estimate is a clearly-labelled heuristic).
+accounting:
+  enabled: true
+  estimated_claude_tokens_per_delegation: 8000   # rough avg of work kept off Claude

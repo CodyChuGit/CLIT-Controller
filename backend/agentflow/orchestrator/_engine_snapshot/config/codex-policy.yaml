@@ -1,0 +1,167 @@
+# codex-policy.yaml
+# Codex = Local Truth + Control layer (v2). Local files, repo inspection,
+# Mac control, shell/test/git verification, git workflow execution, Xcode and
+# simulator control, heartbeat supervision. Codex still never writes FEATURE
+# code — Claude implements; Codex verifies, executes, and reviews.
+codex:
+  enabled: true
+  command: codex
+  noninteractive_subcommand: exec
+  # Codex always runs at its BEST. gpt-5.5 + xhigh reasoning effort
+  # ("5.5 thinking, extra-high"). Matches the user's ~/.codex/config.toml default.
+  model_profile: reasoning_xhigh
+  default_model: gpt-5.5
+  reasoning_effort: xhigh        # none|minimal|low|medium|high|xhigh
+  max_retries: 2
+  task_timeout_seconds: 1200
+  require_fresh_reviewer_for_major_changes: true
+
+  # Path-aware source editing. Codex does NOT get a blanket "never edit source"
+  # rule; it gets task-aware + path-aware permissions.
+  source_edits:
+    default: false
+    allow_frontend_tasks: false   # frontend implementation is Claude's
+    allow_swift_feature_code: false  # Swift/SwiftUI feature code is Claude's too
+    allow_test_tasks: true
+    # Project CONTAINERS are Codex's to maintain (Xcode setup) — not feature code.
+    approved_project_container_patterns:
+      - "**/*.xcodeproj/**"
+      - "**/*.xcworkspace/**"
+      - "**/*.xcconfig"
+      - "**/Info.plist"
+
+    approved_frontend_patterns:
+      - frontend/**
+      - web/**
+      - app/**
+      - src/components/**
+      - src/features/**
+      - src/pages/**
+      - src/routes/**
+      - src/styles/**
+      - src/ui/**
+      - tests/frontend/**
+      - tests/e2e/**
+      - "**/*.css"
+      - "**/*.scss"
+      - "**/*.tsx"
+      - "**/*.jsx"
+      - "**/*.vue"
+      - "**/*.svelte"
+
+    protected_patterns:
+      - backend/**
+      - server/**
+      - database/**
+      - migrations/**
+      - infrastructure/**
+      - auth/core/**
+      - secrets/**
+
+  # Local execution surface (v2): deterministic ops Codex runs without
+  # escalation (prefix match) — the same allowlist Antigravity held in v1,
+  # plus git workflow writes and Apple tooling.
+  allowed_commands:
+    - git status
+    - git diff
+    - git log
+    - git branch
+    - git remote
+    - git rev-parse
+    - git add
+    - git commit
+    - git push
+    - git tag
+    - gh pr
+    - gh release
+    - gh run
+    - just
+    - task
+    - ls
+    - find
+    - grep
+    - rg
+    - cat
+    - npm
+    - pnpm
+    - yarn
+    - node
+    - npx
+    - python
+    - python3
+    - pytest
+    - tox
+    - make
+    - cargo
+    - go
+    - gradle
+    - mvn
+    - docker
+    - eslint
+    - prettier
+    - tsc
+    - vitest
+    - jest
+    - xcodebuild
+    - swift build
+    - swift test
+    - xcrun simctl
+    - xcrun xcresulttool
+    - swiftlint
+    - swift-format
+
+  # Hard-blocked regardless of task (destructive / history-rewriting / scope).
+  disallowed_commands:
+    - git push --force
+    - git push -f
+    - git push --force-with-lease
+    - git reset --hard
+    - git clean -fd
+    - git checkout -- .
+    - git restore .
+    - git rebase
+    - git filter-branch
+    - rm -rf /
+    - sudo rm
+    - "git merge --abort"
+
+  read_paths:
+    - "**"
+  # Codex writes only inside the runtime sandbox, the git index, and Apple
+  # project containers; it does not edit feature source.
+  write_paths:
+    - .claude-runtime/**
+    - .git/**
+    - "**/*.xcodeproj/**"
+    - "**/*.xcworkspace/**"
+    - "**/*.xcconfig"
+    - "**/Info.plist"
+
+  # Which personas are enabled (see config/personas.yaml for definitions).
+  personas_enabled:
+    - codebase-analyst
+    - parallel-investigation-lead
+    - research-synthesizer
+    - independent-reviewer
+    - test-strategy-designer
+    - technical-writer
+    - repository-navigator
+    - environment-operator
+    - qa-runner
+    - task-runner
+    - runtime-validator
+    - qa-reporter
+    - git-steward
+    - xcode-controller
+
+  parallel_investigation:
+    enabled: true
+    max_subagents: 5
+    return_deduplicated_synthesis_only: true
+
+  escalation:
+    on_disallowed_command: claude
+    on_merge_conflict: claude
+    on_signing_or_provisioning: claude   # never auto-modify signing
+    on_ambiguous_scope: claude
+    on_repeated_failure: claude

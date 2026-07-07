@@ -1,0 +1,163 @@
+# dispatch-policy.yaml
+# HOW each routed stage actually executes. route-task.py decides WHO (agent +
+# persona); dispatch.py turns that into a concrete invocation via the installed
+# Claude Code plugins, falling back to raw CLIs / local scripts.
+#
+# Plugins this skill targets:
+#   codex@openai-codex   -> subagent codex:codex-rescue, /codex:rescue, /codex:review
+#   agy@antigravity-cc   -> subagent agy:runner, /agy:delegate, /agy:research, /agy:review
+#
+# v2 role model: Codex = local truth + control (deterministic local scripts run
+# under the Codex lane: QA, git workflow, Apple/simulators). Antigravity
+# (Gemini) = eyes + web + narrative (browser QA, visual analysis, live research,
+# commit/milestone summaries).
+version: 2
+
+# prefer_plugin: use the plugin when available, else raw CLI/script.
+# cli_only:      never use the plugins (raw codex/agy CLIs + local scripts).
+# plugin_only:   require the plugins; degrade to Claude if a plugin is missing.
+mode: prefer_plugin
+
+codex:
+  plugin: codex@openai-codex
+  subagent: codex:codex-rescue          # Agent tool subagent_type
+  commands:
+    task: /codex:rescue
+    review: /codex:review               # native review-only reviewer
+    adversarial_review: /codex:adversarial-review
+  cli_fallback: scripts/codex-run.sh
+  # personas that may run WRITE-capable (codex-rescue --write). Codex never
+  # writes FEATURE code (Claude implements, frontend and Swift included);
+  # xcode-controller may edit Apple project CONTAINERS only (pbxproj, schemes,
+  # xcconfig, plists) — enforced by its allowed_write_paths.
+  write_personas:
+    - xcode-controller
+  # personas that should use the review command instead of a task subagent
+  review_personas:
+    - independent-reviewer
+  # Most precise mapping: concrete deterministic TASK_TYPE -> local script,
+  # used first. Deterministic ops (pytest/git/grep/simctl) need no agent —
+  # the scripts return schema-conformant results directly under the Codex lane.
+  task_type_scripts:
+    TEST_EXECUTION: scripts/codex-qa.sh
+    BUILD_EXECUTION: scripts/codex-qa.sh
+    LINT_EXECUTION: scripts/codex-qa.sh
+    FORMAT_CHECK: scripts/codex-qa.sh
+    STATIC_ANALYSIS: scripts/codex-qa.sh
+    QA_EVIDENCE_COLLECTION: scripts/codex-qa.sh
+    QA_REPORTING: scripts/codex-qa.sh
+    TASK_EXECUTION: scripts/codex-task.sh
+    RUNTIME_VALIDATION: scripts/codex-runtime-check.sh
+    LOCAL_FILE_DISCOVERY: scripts/codex-browse.sh
+    LOCAL_REPOSITORY_INVENTORY: scripts/codex-browse.sh
+    LOCAL_SYMBOL_SEARCH: scripts/codex-browse.sh
+    LOCAL_CONFIGURATION_DISCOVERY: scripts/codex-browse.sh
+    LOCAL_DEPENDENCY_INVENTORY: scripts/codex-browse.sh
+    TEST_DISCOVERY: scripts/codex-browse.sh
+    GIT_STATUS_INSPECTION: scripts/codex-git-workflow.sh
+    GIT_DIFF_INSPECTION: scripts/codex-git-workflow.sh
+    GIT_CHECKPOINT: scripts/codex-git-workflow.sh
+    GIT_COMMIT: scripts/codex-git-workflow.sh
+    GIT_PUSH: scripts/codex-git-workflow.sh
+    GIT_MILESTONE: scripts/codex-git-workflow.sh
+    GITHUB_VERSION_CONTROL: scripts/codex-github.sh
+    CI_MONITORING: scripts/codex-ci-watch.sh
+    XCODE_PROJECT_SETUP: scripts/codex-apple.sh
+    APPLE_BUILD_TEST: scripts/codex-apple.sh
+    SIMULATOR_LIFECYCLE: scripts/codex-apple.sh
+    APPLE_VERIFICATION: scripts/codex-apple.sh
+    LOG_TRIAGE: scripts/codex-monitor.sh
+  # DETERMINISTIC personas run as local skill scripts (fallback when the
+  # task_type isn't mapped above).
+  deterministic_personas:
+    qa-runner: scripts/codex-qa.sh
+    qa-reporter: scripts/codex-qa.sh
+    task-runner: scripts/codex-task.sh
+    git-steward: scripts/codex-git-workflow.sh
+    runtime-validator: scripts/codex-runtime-check.sh
+    repository-navigator: scripts/codex-browse.sh
+    xcode-controller: scripts/codex-apple.sh
+  # personas whose work goes through the Codex agent (semantic, not deterministic)
+  agentic_personas:
+    codebase-analyst: scripts/codex-run.sh
+    parallel-investigation-lead: scripts/codex-batch.sh
+    research-synthesizer: scripts/codex-run.sh
+    test-strategy-designer: scripts/codex-run.sh
+    technical-writer: scripts/codex-run.sh
+    environment-operator: scripts/codex-run.sh
+  # Codex ALWAYS uses its best model + max reasoning. gpt-5.5 + xhigh effort.
+  # (spark -> gpt-5.3-codex-spark is available but not used by default.)
+  model: gpt-5.5
+  effort: xhigh
+
+antigravity:
+  plugin: agy@antigravity-cc
+  subagent: agy:runner                  # Agent tool subagent_type
+  commands:
+    delegate: /agy:delegate
+    research: /agy:research
+    review: /agy:review                 # reviews current git diff via agy
+    image: /agy:image                   # agy built-in generate_image (Imagen)
+  cli_fallback: scripts/antigravity-run.sh
+  # Deterministic gather + agy writes: the diff-summary script collects git
+  # evidence deterministically, then agy (Flash) WRITES the prose.
+  task_type_scripts:
+    GIT_DIFF_SUMMARY: scripts/antigravity-diff-summary.sh
+    COMMIT_SUMMARY: scripts/antigravity-diff-summary.sh
+    MILESTONE_SUMMARY: scripts/antigravity-diff-summary.sh
+    FRONTEND_BROWSER_QA: scripts/antigravity-browser-qa.sh
+  deterministic_personas:
+    routine-tool-operator: scripts/antigravity-run.sh
+    commit-summarizer: scripts/antigravity-diff-summary.sh   # gathers git evidence, agy Flash writes
+  # personas whose work goes through the agy agent (browser QA, visual
+  # analysis, live research); local script listed as the raw-CLI fallback.
+  agentic_personas:
+    browser-qa-operator: scripts/antigravity-browser-qa.sh
+    frontend-visual-reviewer: scripts/antigravity-run.sh
+    simulator-qa-analyst: scripts/antigravity-run.sh
+    web-researcher: scripts/antigravity-run.sh
+    github-scout: scripts/antigravity-run.sh
+    github-code-investigator: scripts/antigravity-run.sh
+    api-documentation-specialist: scripts/antigravity-run.sh
+    dependency-auditor: scripts/antigravity-run.sh
+  # Task types whose local script GATHERS deterministically but then has agy
+  # WRITE prose (commit messages, milestone summaries, version-update
+  # summaries). The dispatch entry marks these uses_agy=true with the model.
+  agy_backed_task_types:
+    - GIT_DIFF_SUMMARY
+    - COMMIT_SUMMARY
+    - MILESTONE_SUMMARY
+  # Task types mapped to a dedicated agy plugin command (unique agy capability).
+  command_task_types:
+    IMAGE_ASSET_GENERATION: image
+  # Model selection when work goes THROUGH the agy agent (agy:runner / raw agy).
+  # Deterministic local scripts use no model. Gemini 3.5 Flash (High) is the
+  # default worker (browser QA, visual analysis, OCR, summaries — per spec, the
+  # commit narrative is EXPLICITLY Flash); Gemini 3.1 Pro (High) only for deep/
+  # complex research or when Flash output is weak.
+  agy_model:
+    simple: flash          # alias -> "Gemini 3.5 Flash (High)"
+    complex: pro           # alias -> "Gemini 3.1 Pro (High)"
+    simple_task_types:
+      - ROUTINE_TOOL_CALL
+      - GIT_DIFF_SUMMARY
+      - COMMIT_SUMMARY
+      - MILESTONE_SUMMARY
+      - IMAGE_ASSET_GENERATION
+      - FRONTEND_BROWSER_QA
+      - FRONTEND_VISUAL_REVIEW
+      - SIMULATOR_VISUAL_QA
+    simple_personas:
+      - routine-tool-operator
+      - commit-summarizer
+      - browser-qa-operator
+      - frontend-visual-reviewer
+      - simulator-qa-analyst
+
+omlx:
+  monitor_script: scripts/omlx-monitor.py
+  takeover_script: scripts/codex-monitor.sh   # Codex takes over triage when oMLX is off
+  supervisor: scripts/job-supervisor.py
+
+claude:
+  inline: true        # Claude handles its stages itself (no dispatch)

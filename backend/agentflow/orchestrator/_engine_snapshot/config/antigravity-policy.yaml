@@ -1,0 +1,88 @@
+# antigravity-policy.yaml
+# Antigravity (Gemini) = Eyes + Web + Narrative (v2). Browser/frontend QA,
+# visual judgment (web + simulator screenshots), OCR/vision, live Google-
+# grounded research, repetitive macros, and the commit/milestone story.
+# Never final local truth; never drives a simulator; never edits source.
+antigravity:
+  enabled: true
+  # The Antigravity CLI ships as `agy` (v1.x). `antigravity` is kept as a
+  # forward-compatible fallback name; scripts resolve via antigravity_bin().
+  command: agy
+  command_candidates:
+    - agy
+    - antigravity
+  noninteractive_flag_candidates:
+    - --headless
+    - --non-interactive
+    - --json
+  max_task_timeout_seconds: 1800
+  allow_core_source_edits: false
+  allow_simulator_control: false     # Codex drives simulators; agy only analyzes captures
+  final_local_truth: false           # Codex verifies before Claude acts on agy findings
+
+  # Commands Antigravity may run without escalation (prefix match).
+  # v2: read-only git evidence gathering + browser tooling. Git WRITES
+  # (add/commit/push/tag) moved to Codex per GIT_WORKFLOW.md.
+  allowed_commands:
+    - git status
+    - git diff
+    - git log
+    - git branch
+    - git rev-parse
+    - ls
+    - find
+    - grep
+    - rg
+    - cat
+    - playwright
+    - cypress
+    - npx playwright
+    - npx cypress
+    - axe
+
+  # Hard-blocked regardless of task (destructive / history-rewriting / scope).
+  disallowed_commands:
+    - git push --force
+    - git push -f
+    - git push --force-with-lease
+    - git reset --hard
+    - git clean -fd
+    - git checkout -- .
+    - git restore .
+    - git rebase
+    - git filter-branch
+    - git add
+    - git commit
+    - git push
+    - git tag
+    - xcrun simctl
+    - xcodebuild
+    - rm -rf /
+    - sudo rm
+    - "git merge --abort"
+
+  read_paths:
+    - "**"
+  # Antigravity writes only inside the runtime sandbox (evidence, summaries,
+  # screenshots); it does not edit source and no longer touches the git index.
+  write_paths:
+    - .claude-runtime/**
+
+  # Which personas are enabled (see config/personas.yaml for definitions).
+  personas_enabled:
+    - browser-qa-operator
+    - frontend-visual-reviewer
+    - simulator-qa-analyst
+    - web-researcher
+    - github-scout
+    - github-code-investigator
+    - api-documentation-specialist
+    - dependency-auditor
+    - routine-tool-operator
+    - commit-summarizer
+
+  escalation:
+    on_disallowed_command: claude
+    on_ambiguous_scope: claude
+    on_repeated_failure: codex
+    on_visual_finding: codex        # local truth rule: Codex verifies local state first

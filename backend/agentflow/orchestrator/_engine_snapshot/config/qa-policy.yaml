@@ -1,0 +1,66 @@
+# qa-policy.yaml
+# QA levels escalate with change size. Exit codes are authoritative.
+# v2: Codex executes all QA (local truth). A passing validation run = a
+# MILESTONE per GIT_WORKFLOW.md (summary -> tag -> automatic staging push).
+qa:
+  after_minor_change: CHANGE_SCOPED
+  after_major_change: FULL
+  require_pass_before_commit: false   # change-unit commits are not QA-gated (v2 workflow)
+  require_pass_before_push: true      # staging pushes happen only at validated milestones
+  store_raw_logs: true
+  log_directory: .claude-runtime/qa-logs
+  report_directory: .claude-runtime/qa-reports
+
+  levels:
+    TARGETED:
+      description: Narrow tests for changed code; used inside implementation loops.
+      includes:
+        - changed-unit-tests
+      blocks_commit: false
+    CHANGE_SCOPED:
+      description: Relevant tests + type checks + lint + affected builds; after minor changes.
+      includes:
+        - affected-unit-tests
+        - affected-integration-tests
+        - type-check
+        - lint
+        - affected-build
+      blocks_commit: true
+    FULL:
+      description: Full project validation; after major changes.
+      includes:
+        - unit-tests
+        - integration-tests
+        - e2e-tests
+        - type-check
+        - lint
+        - format-check
+        - static-analysis
+        - build
+        - coverage
+      blocks_commit: true
+    RELEASE:
+      description: Full checks + packaging + production build + migration checks.
+      includes:
+        - unit-tests
+        - integration-tests
+        - e2e-tests
+        - type-check
+        - lint
+        - format-check
+        - static-analysis
+        - build
+        - package
+        - install-check
+        - production-build
+        - migration-check
+        - runtime-smoke
+      blocks_commit: true
+
+  # Browser/frontend QA evidence requirements (enforced by validate-qa-result.py).
+  frontend_evidence:
+    require_screenshots: true
+    require_console_check: true
+    require_network_check: true
+    require_executed_flows: true
+    preserve_accessibility_findings: true

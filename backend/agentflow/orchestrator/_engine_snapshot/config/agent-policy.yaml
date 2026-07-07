@@ -1,0 +1,74 @@
+# agent-policy.yaml
+# Master switchboard for the orchestrator. Disable an agent here and the router
+# falls back to the least-cost capable agent that remains (see README > fallback).
+orchestrator:
+  enabled: true
+  prefer_least_expensive_capable_agent: true
+  require_explicit_routing_for_substantial_tasks: true
+
+claude:
+  owns_core_implementation: true
+  owns_backend: true
+  owns_architecture: true
+  owns_final_decisions: true
+
+codex:
+  enabled: true
+  model_profile: reasoning_high
+  prefer_for_external_research: true
+  prefer_for_codebase_analysis: true
+  prefer_for_parallel_investigation: true
+  prefer_for_research_synthesis: true
+  prefer_for_independent_review: true
+  prefer_for_markdown: true
+  prefer_for_frontend_implementation: false  # Claude writes frontend; Codex audits
+  allow_frontend_source_edits: false
+  require_fresh_reviewer_for_major_changes: true
+  max_retries: 2
+
+antigravity:
+  enabled: true
+  prefer_for_local_browsing: true
+  prefer_for_qa: true
+  prefer_for_browser_qa: true
+  prefer_for_runtime_validation: true
+  prefer_for_git: true
+  prefer_for_ci_monitoring: true
+  allow_core_source_edits: false
+  max_task_timeout_seconds: 1800
+
+omlx:
+  enabled: false
+  endpoint: http://127.0.0.1:8000
+  model: ""
+  monitor_long_jobs: true
+  summarize_logs: true
+  detect_stalls: true
+  escalation_enabled: true
+  analysis_interval_seconds: 60
+
+qa:
+  after_minor_change: CHANGE_SCOPED
+  after_major_change: FULL
+  require_pass_before_commit: true
+  require_pass_before_push: true
+  store_raw_logs: true
+  log_directory: .claude-runtime/qa-logs
+  report_directory: .claude-runtime/qa-reports
+
+frontend:
+  browser_operator: antigravity
+  implementer: claude   # Claude writes frontend; Codex audits only
+  independent_reviewer: codex_fresh_session
+  core_escalation_agent: claude
+  require_before_after_evidence: true
+  require_accessibility_checks: true
+  require_console_check: true
+  require_network_check: true
+
+checkpoints:
+  enabled: true
+  minor_changes: true
+  major_changes: true
+  ignore_trivial_edits: true
+  require_coherent_diff: true
