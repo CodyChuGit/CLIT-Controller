@@ -46,7 +46,9 @@ filterwarnings = ["ignore::DeprecationWarning"]
 # (see docs/ENGINEERING_STANDARDS.md).
 line-length = 120
 target-version = "py311"
-extend-exclude = [".venv", "dist", "dist-app", "frontend"]
+# _engine_snapshot is a vendored copy of the Agent_CLI_Skill engine (see
+# scripts/sync-engine.sh) — it is not ours to lint/format.
+extend-exclude = [".venv", "dist", "dist-app", "frontend", "backend/agentflow/orchestrator/_engine_snapshot"]
 
 [tool.ruff.lint]
 # E/W pycodestyle, F pyflakes, I import-sort, B bugbear. `ruff format` owns line
@@ -68,6 +70,8 @@ ignore = ["B008", "E501"]
 [tool.mypy]
 python_version = "3.11"
 files = ["backend/agentflow"]
+# Vendored engine snapshot is not type-checked (it is external, pure-stdlib code).
+exclude = ['backend/agentflow/orchestrator/_engine_snapshot/']
 ignore_missing_imports = true
 warn_unused_ignores = true
 warn_redundant_casts = true

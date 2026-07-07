@@ -1,4 +1,5 @@
 """Task A2 — router returns typed RouteResult/Stage from the engine."""
+
 from __future__ import annotations
 
 from agentflow.orchestrator import router
