@@ -13,3 +13,4 @@ dist-app/
 .DS_Store
 *.egg-info/
 /dist/
+.claude-runtime/
