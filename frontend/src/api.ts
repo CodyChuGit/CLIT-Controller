@@ -11,10 +11,12 @@ import type {
   FileDiff,
   GitInfo,
   GitStatus,
+  GraphData,
   InstallResult,
   LiveProviderUsage,
   LoginResult,
   LogsResponse,
+  MemoryStatus,
   PreviewState,
   QueueState,
   RunRecord,
@@ -98,6 +100,23 @@ export const api = {
       maxTokens === undefined ? { task } : { task, maxTokens },
     ),
   contextReport: (id: string) => get<ContextReport>(`/context/reports/${encodeURIComponent(id)}`),
+
+  // codebase memory graph
+  memoryStatus: () => get<MemoryStatus>("/memory/status"),
+  memoryIndex: () => post<Record<string, unknown>>("/memory/index"),
+  memoryGraph: (params: { label?: string; name?: string; limit?: number }) => {
+    const q = new URLSearchParams();
+    if (params.label) q.set("label", params.label);
+    if (params.name) q.set("name", params.name);
+    if (params.limit) q.set("limit", String(params.limit));
+    return get<GraphData>(`/memory/graph?${q.toString()}`);
+  },
+  memorySchema: () => get<Record<string, unknown>>("/memory/schema"),
+  memoryArchitecture: () => get<Record<string, unknown>>("/memory/architecture"),
+  memorySnippet: (qname: string) =>
+    get<Record<string, unknown>>(`/memory/snippet?qname=${encodeURIComponent(qname)}`),
+  memoryTrace: (qname: string, depth = 2) =>
+    get<GraphData>(`/memory/trace?qname=${encodeURIComponent(qname)}&depth=${depth}`),
 
   // agents
   agents: () => get<Provider[]>("/agents"),
