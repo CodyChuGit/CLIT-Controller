@@ -16,7 +16,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Optional
 
-from agentflow import ponytail
+from agentflow import dependency_service, ponytail
 
 from . import _engine
 
@@ -108,9 +108,6 @@ def persona_prompt(persona: str, ctx: dict) -> str:
     parts.append(body)
     prompt = "\n\n".join(parts)
     pony = ponytail.block()
-    opensrc = (
-        "Reading dependency source: run `opensrc path <pkg>` to fetch + cache any open-source "
-        "package's real source and get a local path (e.g. `opensrc path zod`, "
-        "`opensrc path pypi:requests`, `opensrc path owner/repo`), then read files under it."
-    )
-    return prompt + (f"\n\n{pony}" if pony else "") + f"\n\n{opensrc}"
+    # Concrete resolved dep paths when the workspace map is ready; the generic
+    # `opensrc path` capability line until then.
+    return prompt + (f"\n\n{pony}" if pony else "") + f"\n\n{dependency_service.prompt_section()}"

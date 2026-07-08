@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from . import controller_protocol, ponytail
+from . import controller_protocol, dependency_service, ponytail
 from .routing_service import budget_context_header
 
 TASK_FILES = [
@@ -29,9 +29,9 @@ def _compose(usage: dict, task_rel_dir: str, body: str) -> str:
         "All numbered markdown files mentioned below live in the task folder.\n\n"
         f"{body.strip()}"
         + (f"\n\n{pony}" if pony else "")
-        + "\n\nReading dependency source: run `opensrc path <pkg>` to fetch + cache any open-source "
-        "package's real source and get a local path (e.g. `opensrc path zod`, "
-        "`opensrc path pypi:requests`, `opensrc path owner/repo`), then read files under it."
+        # Concrete resolved dep paths when the workspace map is ready; the
+        # generic `opensrc path` capability line until then.
+        + f"\n\n{dependency_service.prompt_section()}"
     )
 
 
