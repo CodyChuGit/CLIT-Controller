@@ -19,7 +19,9 @@ export default function MemoryGalaxy() {
     setError(null);
     setData(null);
     try {
-      setData(await api.memoryLayout());
+      // Load the whole graph (not a 5k slice) so every edge has both endpoints
+      // and the galaxy is as dense as the viewer's.
+      setData(await api.memoryLayout(20000));
     } catch (e) {
       setError(errMsg(e));
     }
@@ -53,6 +55,9 @@ export default function MemoryGalaxy() {
         highlightedIds={null}
         cameraTarget={null}
         showLabels
+        // Brighten edges — the density scale dims them hard at this edge count,
+        // which reads as "no edges"; this restores the viewer's visible web.
+        display={{ edgeBrightness: 2.5, nodeGlow: 1, bloom: 1 }}
         onNodeClick={() => {}}
       />
     </div>
