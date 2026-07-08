@@ -24,7 +24,7 @@ const PROVIDER_TEXT: Record<string, string> = {
   antigravity: "text-sky-600 dark:text-sky-500",
 };
 
-const PROVIDER_MARK: Record<string, (p: React.SVGProps<SVGSVGElement>) => JSX.Element> = {
+const PROVIDER_MARK: Record<string, (p: React.SVGProps<SVGSVGElement>) => React.JSX.Element> = {
   codex: OpenAIMark,
   claude: ClaudeMark,
   antigravity: AntigravityMark,
