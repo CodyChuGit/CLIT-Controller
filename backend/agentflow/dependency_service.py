@@ -12,11 +12,12 @@ import hashlib
 import json
 import os
 import re
+import threading
 import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import opensrc_service, paths
+from . import config, opensrc_service, paths
 
 MAX_DEPS = 60
 # Fixed order within a directory (deterministic prompts).
@@ -149,3 +150,52 @@ def resolved_deps(ws: Path) -> dict[str, str]:
     source dir no longer exists (e.g. removed from the Sources tab)."""
     cached = _read_cache(ws).get("resolved") or {}
     return {n: p for n, p in cached.items() if os.path.isdir(p)}
+
+
+# --- background refresh + prompt section --------------------------------------
+
+GENERIC_LINE = (
+    "Reading dependency source: run `opensrc path <pkg>` to fetch + cache any open-source "
+    "package's real source and get a local path (e.g. `opensrc path zod`, "
+    "`opensrc path pypi:requests`, `opensrc path owner/repo`), then read files under it."
+)
+
+_inflight: set[str] = set()
+_inflight_lock = threading.Lock()
+
+
+def start_background_refresh(ws: Path) -> None:
+    """Kick off refresh(ws) on a daemon thread; no-op while one is in flight."""
+    key = str(ws)
+    with _inflight_lock:
+        if key in _inflight:
+            return
+        _inflight.add(key)
+
+    def _job() -> None:
+        try:
+            refresh(ws)
+        except Exception:  # noqa: BLE001 — background best-effort, never crashes the app
+            pass
+        finally:
+            with _inflight_lock:
+                _inflight.discard(key)
+
+    threading.Thread(target=_job, daemon=True, name="opensrc-deps-refresh").start()
+
+
+def prompt_section() -> str:
+    """The dependency-source block for agent prompts: the concrete resolved map
+    when we have one, else the generic capability line."""
+    ws = config.get_current_workspace()
+    if ws is None:
+        return GENERIC_LINE
+    deps = resolved_deps(ws)
+    if not deps:
+        return GENERIC_LINE
+    lines = "\n".join(f"- {name} → {path}" for name, path in deps.items())
+    return (
+        "Dependency source (real code — read these with your file tools instead of guessing APIs):\n"
+        f"{lines}\n"
+        "(+ run `opensrc path <pkg>` for anything not listed)"
+    )

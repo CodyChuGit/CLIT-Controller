@@ -157,3 +157,51 @@ def test_refresh_inert_without_binary_or_manifest(tmp_path, monkeypatch):
     assert dependency_service.refresh(ws) == {}
     _fake_bin(tmp_path, monkeypatch)
     assert dependency_service.refresh(ws) == {}  # no manifests
+
+
+# --- background refresh + prompt_section -------------------------------------
+
+
+def test_prompt_section_falls_back_to_generic(monkeypatch):
+    monkeypatch.setattr(dependency_service.config, "get_current_workspace", lambda: None)
+    assert "opensrc path" in dependency_service.prompt_section()
+
+
+def test_prompt_section_renders_map(tmp_path, monkeypatch):
+    _fake_bin(tmp_path, monkeypatch)
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "package.json").write_text(json.dumps({"dependencies": {"zod": "^3"}}))
+    dependency_service.refresh(ws)
+    monkeypatch.setattr(dependency_service.config, "get_current_workspace", lambda: ws)
+    section = dependency_service.prompt_section()
+    assert "Dependency source" in section
+    assert "zod →" in section
+    assert "opensrc path" in section  # escape hatch keeps the capability test green
+
+
+def test_background_refresh_runs_once_per_workspace(tmp_path, monkeypatch):
+    import threading
+    import time
+
+    started = threading.Event()
+    release = threading.Event()
+    calls = []
+
+    def slow_refresh(ws):
+        calls.append(ws)
+        started.set()
+        release.wait(timeout=5)
+
+    monkeypatch.setattr(dependency_service, "refresh", slow_refresh)
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    dependency_service.start_background_refresh(ws)
+    assert started.wait(timeout=5)
+    dependency_service.start_background_refresh(ws)  # in-flight -> no second thread
+    release.set()
+    for _ in range(50):
+        if not dependency_service._inflight:
+            break
+        time.sleep(0.05)
+    assert calls == [ws]
