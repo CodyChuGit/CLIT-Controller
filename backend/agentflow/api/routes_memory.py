@@ -67,6 +67,14 @@ def graph(label: Optional[str] = None, name: Optional[str] = None, limit: int = 
     return _guard(lambda: memory_service.graph(proj, label=label, name_pattern=name, limit=limit))
 
 
+@router.get("/layout")
+def layout(max_nodes: int = 5000) -> Any:
+    """Proxy the viewer's precomputed 3D layout for the current workspace's
+    project, so the frontend can render the galaxy natively (no iframe)."""
+    proj = _project()
+    return _guard(lambda: memory_service.layout(proj, max_nodes))
+
+
 @router.get("/schema")
 def schema() -> Any:
     proj = _project()

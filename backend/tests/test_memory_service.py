@@ -75,3 +75,33 @@ def test_missing_binary_raises(tmp_path, monkeypatch):
     monkeypatch.setenv(memory_service.BIN_ENV, str(tmp_path / "nope"))
     with pytest.raises(memory_service.MemoryUnavailable):
         memory_service.status("demo")
+
+
+class _FakeResp:
+    def __init__(self, body: bytes) -> None:
+        self._body = body
+
+    def read(self) -> bytes:
+        return self._body
+
+    def __enter__(self) -> "_FakeResp":
+        return self
+
+    def __exit__(self, *_: object) -> bool:
+        return False
+
+
+def test_layout_proxies_the_running_sidecar(monkeypatch):
+    monkeypatch.setattr(memory_service, "ensure_ui", lambda: {"available": True, "running": True, "url": "x"})
+    monkeypatch.setattr(
+        memory_service.urllib.request,
+        "urlopen",
+        lambda *_a, **_k: _FakeResp(b'{"nodes": [], "edges": []}'),
+    )
+    assert memory_service.layout("demo", 100) == {"nodes": [], "edges": []}
+
+
+def test_layout_raises_when_sidecar_down(monkeypatch):
+    monkeypatch.setattr(memory_service, "ensure_ui", lambda: {"available": True, "running": False, "url": None})
+    with pytest.raises(memory_service.MemoryUnavailable):
+        memory_service.layout("demo")
