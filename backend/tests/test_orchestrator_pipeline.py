@@ -21,11 +21,12 @@ def test_effective_provider_falls_back_when_preferred_exhausted():
 
 
 def test_effective_provider_keeps_preferred_when_clean():
-    # With a clean state, an installed preferred provider is kept as-is.
-    from agentflow.orchestrator import caps
-
-    if caps.installed_agents()["codex"]:
-        assert pipeline.effective_provider("codex", usage_state={"agents": {}, "events": {}}) == "codex"
+    # A non-exhausted preferred provider is kept as-is — even when its CLI is not
+    # installed here (run_step handles a missing CLI separately). Only exhaustion
+    # reroutes. This must hold on CI, where no provider CLIs are installed.
+    clean = {"agents": {}, "events": {}}
+    assert pipeline.effective_provider("codex", usage_state=clean) == "codex"
+    assert pipeline.effective_provider("antigravity", usage_state=clean) == "antigravity"
 
 
 def test_generic_goal_keeps_default_sequence():
