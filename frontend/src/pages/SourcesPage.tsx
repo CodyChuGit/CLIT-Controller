@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { api, ApiError } from "../api";
+import { Close } from "../components/icons";
 import type { OpensrcFile, OpensrcSearchHit, OpensrcTree } from "../types";
 
 const errMsg = (e: unknown) => (e instanceof ApiError ? e.message : String(e));
@@ -55,6 +56,23 @@ export default function SourcesPage() {
     setHits(null);
     try {
       setFile(await api.opensrcFile(pkg, path));
+    } catch (e) {
+      setError(errMsg(e));
+    }
+  };
+
+  const removePkg = async (name: string) => {
+    setError(null);
+    try {
+      await api.opensrcRemove(name);
+      setCached(await api.opensrcList());
+      if (pkg === name) {
+        // The open package was deleted — clear the browsing panes.
+        setPkg("");
+        setTree(null);
+        setFile(null);
+        setHits(null);
+      }
     } catch (e) {
       setError(errMsg(e));
     }
@@ -127,13 +145,23 @@ export default function SourcesPage() {
             <div className="section-label">Cached</div>
             <ul className="mt-1 space-y-0.5">
               {cached.map((c) => (
-                <li key={c.name ?? c.path}>
+                <li key={c.name ?? c.path} className="group flex items-center gap-0.5">
                   <button
-                    className="focusable w-full truncate rounded px-1 py-0.5 text-left text-[11px] text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                    className="focusable min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left text-[11px] text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
                     onClick={() => c.name && void openPkg(c.name)}
                   >
                     {c.name ?? c.path}
                   </button>
+                  {c.name && (
+                    <button
+                      className="icon-btn shrink-0 opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+                      title={`Remove ${c.name} from cache`}
+                      aria-label={`Remove ${c.name} from cache`}
+                      onClick={() => void removePkg(c.name!)}
+                    >
+                      <Close className="h-3 w-3" />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
