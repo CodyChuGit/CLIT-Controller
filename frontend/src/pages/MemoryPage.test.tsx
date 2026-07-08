@@ -5,7 +5,11 @@ vi.mock("../api", async (orig) => {
   const actual = (await orig()) as typeof import("../api");
   return {
     ...actual,
-    api: { memoryUi: vi.fn(), memoryIndex: vi.fn() },
+    api: {
+      memoryUi: vi.fn(),
+      memoryIndex: vi.fn(),
+      memoryStatus: vi.fn().mockResolvedValue({ available: true, project: null }),
+    },
   };
 });
 
@@ -29,6 +33,6 @@ describe("MemoryPage", () => {
     });
     render(<MemoryPage />);
     const iframe = await screen.findByTitle("Codebase Memory graph");
-    expect(iframe).toHaveAttribute("src", "http://localhost:9749");
+    expect(iframe).toHaveAttribute("src", "http://localhost:9749?tab=graph");
   });
 });
