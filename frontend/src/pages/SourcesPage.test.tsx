@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => {
@@ -34,5 +34,20 @@ describe("SourcesPage", () => {
     render(<SourcesPage />);
     expect(await screen.findByText("Fetch")).toBeInTheDocument();
     expect(await screen.findByText("zod")).toBeInTheDocument();
+  });
+
+  it("adds a freshly fetched package to the Cached list", async () => {
+    mockApi.opensrcStatus.mockResolvedValue({ available: true });
+    mockApi.opensrcList
+      .mockResolvedValueOnce([]) // on mount: nothing cached yet
+      .mockResolvedValue([{ name: "zod", path: "/x/zod" }]); // after fetch
+    mockApi.opensrcFetch.mockResolvedValue({ pkg: "zod", path: "/x/zod" });
+    mockApi.opensrcTree.mockResolvedValue({ entries: [] });
+    render(<SourcesPage />);
+    fireEvent.change(await screen.findByLabelText("Package to fetch"), {
+      target: { value: "zod" },
+    });
+    fireEvent.click(screen.getByText("Fetch"));
+    expect(await screen.findByText("zod")).toBeInTheDocument(); // now in Cached
   });
 });

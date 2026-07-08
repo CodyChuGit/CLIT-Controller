@@ -41,6 +41,7 @@ export default function SourcesPage() {
       await api.opensrcFetch(name);
       setTree(await api.opensrcTree(name));
       setPkg(name);
+      setCached(await api.opensrcList()); // a fresh fetch belongs in Cached immediately
     } catch (e) {
       setError(errMsg(e));
     } finally {
