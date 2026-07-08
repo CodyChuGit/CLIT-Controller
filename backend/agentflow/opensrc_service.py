@@ -59,9 +59,9 @@ def _run(args: list[str], timeout: int = _TIMEOUT) -> str:
     return proc.stdout
 
 
-def fetch(pkg: str) -> str:
+def fetch(pkg: str, timeout: int = _TIMEOUT) -> str:
     """Fetch + cache a package's source; return its local root path."""
-    out = _run(["path", pkg]).strip()
+    out = _run(["path", pkg], timeout=timeout).strip()
     path = out.splitlines()[-1].strip() if out else ""
     if not path or not os.path.isdir(path):
         raise OpensrcUnavailable(f"opensrc did not return a valid path for {pkg!r}")

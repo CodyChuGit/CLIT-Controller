@@ -8,10 +8,15 @@ and rendered into every agent prompt by prompt_section().
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import re
 import tomllib
+from datetime import datetime, timezone
 from pathlib import Path
+
+from . import opensrc_service, paths
 
 MAX_DEPS = 60
 # Fixed order within a directory (deterministic prompts).
@@ -68,10 +73,10 @@ def _parse_one(path: Path) -> list[tuple[str, str]]:
     return []
 
 
-def _parse_manifests(paths: list[Path]) -> list[tuple[str, str]]:
+def _parse_manifests(manifests: list[Path]) -> list[tuple[str, str]]:
     deps: list[tuple[str, str]] = []
     seen: set[str] = set()
-    for path in paths:
+    for path in manifests:
         for name, spec in _parse_one(path):
             if name in seen:
                 continue
@@ -80,3 +85,67 @@ def _parse_manifests(paths: list[Path]) -> list[tuple[str, str]]:
             if len(deps) >= MAX_DEPS:
                 return deps
     return deps
+
+
+# --- resolution + cache ------------------------------------------------------
+
+_CACHE_NAME = "opensrc-deps.json"
+_PER_DEP_TIMEOUT = 120  # a big first fetch is slow once; opensrc caches globally
+
+
+def _cache_path(ws: Path) -> Path:
+    return paths.workspace_app_dir(ws) / _CACHE_NAME
+
+
+def _manifest_hash(manifests: list[Path]) -> str:
+    h = hashlib.sha256()
+    for p in sorted(manifests):
+        st = p.stat()
+        h.update(f"{p}|{st.st_mtime_ns}|{st.st_size}\n".encode())
+    return h.hexdigest()
+
+
+def _read_cache(ws: Path) -> dict:
+    try:
+        return json.loads(_cache_path(ws).read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def refresh(ws: Path) -> dict[str, str]:
+    """Resolve the workspace's direct deps to local source paths and cache them.
+    No-op when opensrc is missing, no manifest exists, or the manifests are
+    unchanged since the last run."""
+    if not opensrc_service.available():
+        return {}
+    manifests = _discover_manifests(ws)
+    if not manifests:
+        return {}
+    digest = _manifest_hash(manifests)
+    cache = _read_cache(ws)
+    if cache.get("manifestHash") == digest:
+        return dict(cache.get("resolved") or {})
+    resolved: dict[str, str] = {}
+    failed: list[str] = []
+    for name, spec in _parse_manifests(manifests):
+        try:
+            resolved[name] = opensrc_service.fetch(spec, timeout=_PER_DEP_TIMEOUT)
+        except opensrc_service.OpensrcUnavailable:
+            failed.append(name)
+    out = {
+        "manifestHash": digest,
+        "resolved": resolved,
+        "failed": failed,
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+    }
+    cache_file = _cache_path(ws)
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
+    cache_file.write_text(json.dumps(out, indent=2))
+    return resolved
+
+
+def resolved_deps(ws: Path) -> dict[str, str]:
+    """Cached name -> path map (fast read; never resolves). Drops entries whose
+    source dir no longer exists (e.g. removed from the Sources tab)."""
+    cached = _read_cache(ws).get("resolved") or {}
+    return {n: p for n, p in cached.items() if os.path.isdir(p)}
