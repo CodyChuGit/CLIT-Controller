@@ -44,15 +44,19 @@ PERSONA_STEP: dict[str, str] = {
 
 
 def effective_provider(preferred: str, usage_state: Optional[dict] = None) -> str:
-    """The user's preferred provider, unless it is exhausted (per engine usage
-    state) — then the engine's spread-first fallback. Honors user routing while
-    adding exhaustion-aware fallback. Claude/unknown providers pass through
-    (Claude is always available)."""
+    """The user's preferred provider, unless it is *exhausted* (rate-limited, per
+    engine usage state) — then the engine's spread-first fallback. A provider whose
+    CLI is not installed here is NOT rerouted: run_step handles a missing CLI (saves
+    the prompt, surfaces the install path), so routing must keep the user's choice.
+    Only exhaustion reroutes. Claude/unknown providers pass through (always available)."""
     if preferred not in ("codex", "antigravity"):
         return preferred
     ns = _engine.load()
     state = usage_state if usage_state is not None else ns.usage_lib.load_state()
-    effective, _hops = ns.usage_lib.resolve(preferred, caps.installed_agents(), state)
+    # Force the preferred "installed" for the lookup so only exhaustion reroutes;
+    # real install status still gates which *fallback* provider is chosen.
+    installed = {**caps.installed_agents(), preferred: True}
+    effective, _hops = ns.usage_lib.resolve(preferred, installed, state)
     return effective
 
 

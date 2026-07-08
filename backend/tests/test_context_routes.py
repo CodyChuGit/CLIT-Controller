@@ -68,7 +68,10 @@ def test_no_workspace_is_409(monkeypatch):
 def test_router_is_registered_in_app():
     from agentflow.app import create_app
 
-    routes = {r.path for r in create_app().routes}
-    assert "/api/context/preview" in routes
-    assert "/api/context/benchmark" in routes
-    assert "/api/context/reports/{report_id}" in routes
+    # openapi()["paths"] is version-agnostic: newer FastAPI keeps included routers
+    # as nested objects in app.routes (no top-level .path), but the OpenAPI schema
+    # always lists the effective paths.
+    paths = set(create_app().openapi()["paths"])
+    assert "/api/context/preview" in paths
+    assert "/api/context/benchmark" in paths
+    assert "/api/context/reports/{report_id}" in paths
