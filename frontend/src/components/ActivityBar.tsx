@@ -12,7 +12,7 @@ export type PageId =
 interface NavItem {
   id: PageId;
   label: string;
-  icon: JSX.Element;
+  icon: React.JSX.Element;
 }
 
 const MAIN_NAV: NavItem[] = [

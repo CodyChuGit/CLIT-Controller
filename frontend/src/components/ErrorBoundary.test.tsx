@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ErrorBoundary } from "./ErrorBoundary";
 
-function Boom(): JSX.Element {
+function Boom(): React.JSX.Element {
   throw new Error("kaboom");
 }
 
