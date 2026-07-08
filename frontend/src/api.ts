@@ -1,4 +1,5 @@
 import type { InputSubmission } from "./lib/ioContracts";
+import type { GraphData as GalaxyLayout } from "./vendor/galaxy/lib/types";
 import type {
   Approval,
   ChatSendResult,
@@ -108,6 +109,8 @@ export const api = {
   memoryStatus: () => get<MemoryStatus>("/memory/status"),
   memoryUi: () => get<{ available: boolean; running: boolean; url: string | null }>("/memory/ui"),
   memoryIndex: () => post<Record<string, unknown>>("/memory/index"),
+  // Precomputed 3D layout for the current workspace — feeds the native galaxy.
+  memoryLayout: (maxNodes = 5000) => get<GalaxyLayout>(`/memory/layout?max_nodes=${maxNodes}`),
   memoryGraph: (params: { label?: string; name?: string; limit?: number }) => {
     const q = new URLSearchParams();
     if (params.label) q.set("label", params.label);

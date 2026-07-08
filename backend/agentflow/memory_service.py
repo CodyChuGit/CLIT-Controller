@@ -19,6 +19,9 @@ import shutil
 import socket
 import subprocess
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from typing import Any, Optional
 
 BIN_ENV = "CODEBASE_MEMORY_MCP_BIN"
@@ -104,6 +107,22 @@ def stop_ui() -> None:
         except subprocess.TimeoutExpired:
             _ui_proc.kill()
     _ui_proc = None
+
+
+def layout(project: str, max_nodes: int = 5000) -> Any:
+    """Fetch the viewer's precomputed 3D layout for ``project`` so the frontend
+    can render the galaxy natively (no iframe). Starts the viewer sidecar if
+    needed, then proxies its localhost-only ``/api/layout`` endpoint."""
+    ui = ensure_ui()
+    if not ui.get("running"):
+        raise MemoryUnavailable("graph viewer sidecar is not running")
+    qs = urllib.parse.urlencode({"project": project, "max_nodes": max_nodes})
+    url = f"http://127.0.0.1:{UI_PORT}/api/layout?{qs}"
+    try:
+        with urllib.request.urlopen(url, timeout=60) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.URLError as exc:
+        raise MemoryUnavailable(f"layout fetch failed: {exc}") from exc
 
 
 def _run(tool: str, args: Optional[dict] = None) -> Any:

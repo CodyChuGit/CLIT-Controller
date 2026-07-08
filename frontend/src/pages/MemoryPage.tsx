@@ -1,34 +1,33 @@
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 
 import { api, ApiError } from "../api";
 import { Spinner } from "../components/icons";
 
-interface UiState {
+// three.js / R3F only loads when the Memory tab is actually opened.
+const MemoryGalaxy = lazy(() => import("./MemoryGalaxy"));
+
+interface Status {
   available: boolean;
-  running: boolean;
-  url: string | null;
+  project: string | null;
 }
 
-// The Memory tab embeds codebase-memory-mcp's own graph viewer as-is in an
-// iframe (the "galaxy"). The backend starts that sidecar and returns its URL;
-// we deep-link to the graph view for the current workspace's project.
+const errMsg = (e: unknown) => (e instanceof ApiError ? e.message : String(e));
+
+// The Memory tab renders codebase-memory-mcp's own galaxy (its three.js
+// GraphScene component, vendored) natively inside CLITC — fed by the backend
+// layout proxy, scoped to the current workspace. No iframe, no viewer chrome.
 export default function MemoryPage() {
-  const [ui, setUi] = useState<UiState | null>(null);
-  const [project, setProject] = useState<string | null>(null);
+  const [status, setStatus] = useState<Status | null>(null);
+  const [indexing, setIndexing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      setUi(await api.memoryUi());
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : String(e));
-    }
-    try {
       const s = await api.memoryStatus();
-      setProject(s.project ?? null);
-    } catch {
-      /* project only scopes the deep-link; never block the viewer on it */
+      setStatus({ available: s.available, project: s.project ?? null });
+    } catch (e) {
+      setError(errMsg(e));
     }
   }, []);
 
@@ -36,16 +35,22 @@ export default function MemoryPage() {
     void load();
   }, [load]);
 
-  // The sidecar may take a moment to come up; poll until it's ready.
-  useEffect(() => {
-    if (!ui?.available || ui.running) return;
-    const t = setTimeout(() => void load(), 1500);
-    return () => clearTimeout(t);
-  }, [ui, load]);
+  const onIndex = async () => {
+    setIndexing(true);
+    setError(null);
+    try {
+      await api.memoryIndex();
+      await load();
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setIndexing(false);
+    }
+  };
 
-  if (ui && !ui.available) {
+  if (status && !status.available) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-1 p-6 text-center">
         <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
           Codebase Memory not installed
         </h2>
@@ -60,17 +65,39 @@ export default function MemoryPage() {
     );
   }
 
-  const src =
-    ui?.running && ui.url
-      ? `${ui.url}?tab=graph${project ? `&project=${encodeURIComponent(project)}` : ""}`
-      : "";
+  if (status && !status.project) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+        <p className="max-w-xs text-xs text-neutral-400">
+          This workspace isn&apos;t indexed yet. Build its knowledge graph to explore it.
+        </p>
+        <button className="btn-secondary btn-xs" onClick={onIndex} disabled={indexing}>
+          {indexing ? "Indexing…" : "Index workspace"}
+        </button>
+        {error && <p className="text-[11px] text-amber-600 dark:text-amber-400">{error}</p>}
+      </div>
+    );
+  }
 
-  return src ? (
-    <iframe title="Codebase Memory graph" src={src} className="h-full w-full border-0" />
-  ) : (
-    <div className="flex h-full flex-col items-center justify-center gap-2 text-neutral-400">
-      <Spinner className="h-5 w-5" />
-      <span className="text-xs">{error ?? "Starting the graph viewer…"}</span>
+  if (!status) {
+    return (
+      <div className="flex h-full items-center justify-center text-neutral-400">
+        <Spinner className="h-5 w-5" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full w-full">
+      <Suspense
+        fallback={
+          <div className="flex h-full w-full items-center justify-center bg-[#06090f] text-neutral-400">
+            <Spinner className="h-5 w-5" />
+          </div>
+        }
+      >
+        <MemoryGalaxy />
+      </Suspense>
     </div>
   );
 }
