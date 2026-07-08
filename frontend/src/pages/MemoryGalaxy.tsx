@@ -49,7 +49,10 @@ export default function MemoryGalaxy() {
   }
 
   return (
-    <div className="h-full w-full bg-[#06090f]">
+    <div className="relative h-full w-full bg-[#06090f]">
+      <div className="pointer-events-none absolute left-3 top-2 z-10 font-mono text-[11px] text-neutral-400">
+        {data.nodes.length.toLocaleString()} nodes · {data.edges.length.toLocaleString()} edges
+      </div>
       <GraphScene
         data={data}
         highlightedIds={null}
