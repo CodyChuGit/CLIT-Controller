@@ -68,6 +68,11 @@ def fetch(pkg: str) -> str:
     return path
 
 
+def remove(pkg: str) -> None:
+    """Remove a package's cached source (wraps ``opensrc remove``)."""
+    _run(["remove", pkg])
+
+
 def list_cached() -> list:
     try:
         out = _run(["list", "--json"]).strip()

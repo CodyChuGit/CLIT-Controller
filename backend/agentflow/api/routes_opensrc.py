@@ -33,6 +33,15 @@ def fetch(body: FetchBody) -> Any:
     return _guard(lambda: {"pkg": body.pkg, "path": opensrc_service.fetch(body.pkg)})
 
 
+@router.post("/remove")
+def remove(body: FetchBody) -> Any:
+    def _remove() -> dict:
+        opensrc_service.remove(body.pkg)
+        return {"ok": True, "pkg": body.pkg}
+
+    return _guard(_remove)
+
+
 @router.get("/list")
 def list_cached() -> Any:
     return _guard(opensrc_service.list_cached)

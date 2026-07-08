@@ -129,6 +129,7 @@ export const api = {
   opensrcStatus: () => get<{ available: boolean }>("/opensrc/status"),
   opensrcFetch: (pkg: string) => post<{ pkg: string; path: string }>("/opensrc/fetch", { pkg }),
   opensrcList: () => get<{ name?: string; path?: string }[]>("/opensrc/list"),
+  opensrcRemove: (pkg: string) => post<{ ok: boolean; pkg: string }>("/opensrc/remove", { pkg }),
   opensrcTree: (pkg: string) => get<OpensrcTree>(`/opensrc/tree?pkg=${encodeURIComponent(pkg)}`),
   opensrcFile: (pkg: string, path: string) =>
     get<OpensrcFile>(

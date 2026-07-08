@@ -18,6 +18,12 @@ _FAKE_TMPL = textwrap.dedent(
         print(SRC)
     elif cmd == "list":
         print(json.dumps([{{"name": "demo", "path": SRC}}]))
+    elif cmd == "remove":
+        target = sys.argv[2] if len(sys.argv) > 2 else ""
+        if target != "demo":
+            sys.stderr.write("not cached")
+            sys.exit(1)
+        open(SRC + "/.removed-" + target, "w").write("1")
     else:
         print("")
     """
@@ -64,6 +70,18 @@ def test_search_finds_matches(tmp_path, monkeypatch):
     _install(tmp_path, monkeypatch)
     hits = opensrc_service.search("demo", "helper")
     assert any(h["path"] == "sub/util.js" for h in hits)
+
+
+def test_remove_invokes_cli(tmp_path, monkeypatch):
+    src = _install(tmp_path, monkeypatch)
+    opensrc_service.remove("demo")
+    assert (src / ".removed-demo").exists()
+
+
+def test_remove_unknown_package_raises(tmp_path, monkeypatch):
+    _install(tmp_path, monkeypatch)
+    with pytest.raises(opensrc_service.OpensrcUnavailable):
+        opensrc_service.remove("missing")
 
 
 def test_missing_binary(tmp_path, monkeypatch):

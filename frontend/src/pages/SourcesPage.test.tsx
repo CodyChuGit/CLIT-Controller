@@ -9,6 +9,7 @@ vi.mock("../api", async (orig) => {
       opensrcStatus: vi.fn(),
       opensrcList: vi.fn().mockResolvedValue([]),
       opensrcFetch: vi.fn(),
+      opensrcRemove: vi.fn(),
       opensrcTree: vi.fn(),
       opensrcFile: vi.fn(),
       opensrcSearch: vi.fn(),
@@ -34,6 +35,19 @@ describe("SourcesPage", () => {
     render(<SourcesPage />);
     expect(await screen.findByText("Fetch")).toBeInTheDocument();
     expect(await screen.findByText("zod")).toBeInTheDocument();
+  });
+
+  it("removes a cached package via its delete button", async () => {
+    mockApi.opensrcStatus.mockResolvedValue({ available: true });
+    mockApi.opensrcList
+      .mockResolvedValueOnce([{ name: "zod", path: "/x/zod" }]) // on mount
+      .mockResolvedValue([]); // after remove
+    mockApi.opensrcRemove.mockResolvedValue({ ok: true, pkg: "zod" });
+    render(<SourcesPage />);
+    fireEvent.click(await screen.findByLabelText("Remove zod from cache"));
+    await screen.findByText(/fetch a package/i); // list refreshed…
+    expect(screen.queryByText("zod")).not.toBeInTheDocument(); // …and zod is gone
+    expect(mockApi.opensrcRemove).toHaveBeenCalledWith("zod");
   });
 
   it("adds a freshly fetched package to the Cached list", async () => {

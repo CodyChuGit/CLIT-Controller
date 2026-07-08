@@ -46,3 +46,8 @@ def test_fetch_tree_file(tmp_path, monkeypatch):
     entries = {e["path"] for e in routes_opensrc.tree("demo")["entries"]}
     assert "index.js" in entries
     assert routes_opensrc.file("demo", "index.js")["content"].startswith("export const parse")
+
+
+def test_remove_route(tmp_path, monkeypatch):
+    _install(tmp_path, monkeypatch)
+    assert routes_opensrc.remove(routes_opensrc.FetchBody(pkg="demo")) == {"ok": True, "pkg": "demo"}
