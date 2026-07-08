@@ -12,6 +12,7 @@ from typing import Optional
 
 from . import (
     config,
+    dependency_service,
     git_service,
     paths,
     prompt_templates,
@@ -138,6 +139,7 @@ async def _changed_code_paths(workspace: Path) -> set[str]:
 
 
 def create_task(workspace: Path, title: str, goal: str, orchestrated: bool = False) -> dict:
+    dependency_service.start_background_refresh(workspace)  # cheap no-op when fresh
     usage = usage_service.ensure_usage(workspace)
     routing = config.get_workspace_routing(workspace)
 

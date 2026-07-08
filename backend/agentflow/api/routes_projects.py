@@ -8,7 +8,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from .. import config, git_service, headroom_service, paths, ponytail, state_store
+from .. import config, dependency_service, git_service, headroom_service, paths, ponytail, state_store
 from .. import workspace as workspace_service
 from ..models import (
     FileWriteRequest,
@@ -54,6 +54,9 @@ def set_workspace(body: WorkspaceRequest):
         state_store.recover_workspace(Path(cfg["workspacePath"]))
     except Exception as exc:  # noqa: BLE001 — recovery must not block workspace selection
         add_log_entry("system", f"recovery on workspace select failed: {exc}", status="error")
+    # Resolve the workspace's dependency sources in the background so agent
+    # prompts can list real local paths (never blocks selection).
+    dependency_service.start_background_refresh(Path(cfg["workspacePath"]))
     return {"ok": True, "workspacePath": cfg["workspacePath"], "routing": cfg["routing"]}
 
 
